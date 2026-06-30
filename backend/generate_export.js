@@ -1,0 +1,400 @@
+/**
+ * generate_export.js
+ * 
+ * Mengekspor SELURUH data dari semua tabel SQLite (netify_data.db)
+ * ke dalam file netify_data_export.txt
+ * 
+ * Format output:
+ * - Header metadata (tanggal, versi, jumlah tabel)
+ * - Untuk setiap tabel: header section, row count, schema, dan semua data (JSON per baris)
+ * - Footer summary
+ */
+
+const fs   = require('fs');
+const path = require('path');
+const db   = require('./database');
+
+const OUTPUT_FILE = path.join(__dirname, '../netify_data_export.txt');
+const d = db.getDB();
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function fmtBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let b = Math.abs(bytes);
+  let i = 0;
+  while (b >= 1024 && i < units.length - 1) { b /= 1024; i++; }
+  return b.toFixed(2) + ' ' + units[i];
+}
+
+function fmtNum(n) {
+  if (n == null) return 'N/A';
+  return Number(n).toLocaleString('id-ID');
+}
+
+function separator(char = '═', len = 80) {
+  return char.repeat(len);
+}
+
+function sectionHeader(tableName, rowCount, description) {
+  return [
+    '',
+    separator('═'),
+    `[TABLE: ${tableName}]`,
+    `Row Count: ${fmtNum(rowCount)}`,
+    description ? `Description: ${description}` : '',
+    separator('─'),
+  ].filter(l => l !== '').join('\n');
+}
+
+// ─── Table descriptions ──────────────────────────────────────────────────────
+const TABLE_DESCRIPTIONS = {
+  bandwidth_apps       : 'Bandwidth per aplikasi (YouTube, Facebook, dll) dari Netify DPI',
+  bandwidth_timeline   : 'Timeline bandwidth per menit (download/upload historis)',
+  bittorrent_info_hashes: 'Deteksi aktivitas BitTorrent berdasarkan info hash',
+  countries            : 'Distribusi traffic berdasarkan negara tujuan',
+  devices              : 'Daftar perangkat (IP/MAC) beserta bandwidth & OS',
+  dhcp_fingerprints    : 'Fingerprint DHCP untuk identifikasi tipe device',
+  discovered_os        : 'OS yang terdeteksi dari traffic scanning',
+  dns_stats            : 'Query DNS teratas dan statistik resolusi domain',
+  events               : 'Event log dari Netify agent (koneksi, peringatan, dll)',
+  flows                : 'Data aliran jaringan per-sesi (src IP, dst IP, aplikasi, domain, bytes)',
+  flow_origins         : 'Asal flow: lokal (LAN) atau eksternal (WAN)',
+  flow_types           : 'Tipe flow: TCP, UDP, ICMP, dll',
+  http_user_agents     : 'HTTP User-Agent yang terdeteksi (browser, OS, framework)',
+  intel_crypto_mining  : 'Deteksi aktivitas crypto mining (pool host, protokol)',
+  intel_device_discovery: 'Penemuan perangkat baru di jaringan (tipe, OS, manufaktur)',
+  intel_encryption_audit: 'Audit enkripsi traffic per perangkat (encrypted%, risk level)',
+  intel_insecure_protocols: 'Protokol tidak aman yang terdeteksi (HTTP, Telnet, FTP, dll)',
+  intel_ip_reputation  : 'Reputasi IP eksternal (blacklist, threat score)',
+  intel_server_discovery: 'Server yang terdeteksi (HTTPS, SSH, HTTP, dll)',
+  intel_tor_detection  : 'Deteksi penggunaan jaringan Tor',
+  intel_unencrypted_passwords: 'Deteksi pengiriman password dalam bentuk plaintext',
+  intel_vpn_detection  : 'Deteksi penggunaan VPN (OpenVPN, WireGuard, dll)',
+  interfaces           : 'Interface jaringan per agent (WAN/LAN, bandwidth)',
+  ip_versions          : 'Distribusi traffic IPv4 vs IPv6',
+  mac_bandwidth        : 'Bandwidth per MAC address perangkat',
+  mdns_hostnames       : 'mDNS hostname yang terdeteksi di jaringan lokal',
+  netbios_hostnames    : 'NetBIOS hostname (nama komputer Windows)',
+  protocols            : 'Distribusi protokol jaringan (port usage)',
+  quic_hostnames       : 'Hostname via QUIC/HTTP3 (Google, Cloudflare, dll)',
+  regions              : 'Distribusi traffic berdasarkan region/kota tujuan',
+  remote_ips           : 'IP remote teratas yang diakses perangkat',
+  sni_hostnames        : 'Server Name Indication dari koneksi TLS',
+  ssh_versions         : 'Versi SSH yang terdeteksi di jaringan',
+  ssl_server_cn        : 'Common Name sertifikat SSL server',
+  threats              : 'Ancaman keamanan terdeteksi (threat alerts)',
+  tls_ciphers          : 'Cipher suite TLS yang digunakan',
+  tls_security         : 'Tingkat keamanan TLS (Modern, Compatible, Old)',
+  tls_versions         : 'Versi TLS yang digunakan (1.0, 1.2, 1.3)',
+  vlans                : 'VLAN yang terdeteksi di jaringan',
+};
+
+// ─── Main Export Logic ───────────────────────────────────────────────────────
+async function main() {
+  console.log('🚀 Memulai export data...');
+  
+  const exportDate = new Date().toISOString();
+  const lines = [];
+
+  // ── File Header ──────────────────────────────────────────────────────────
+  lines.push(separator('═'));
+  lines.push('  NETIFY DATA EXPORT');
+  lines.push('  Seluruh data hasil parsing dari Netify API');
+  lines.push(separator('─'));
+  lines.push(`  Export Date:   ${exportDate}`);
+  lines.push(`  Generated by:  generate_export.js`);
+  lines.push(`  Source:        netify_data.db (SQLite lokal)`);
+  lines.push(`  API Base:      https://informatics.netify.ai`);
+  lines.push(`  Format:        Per-tabel, data JSON satu record per baris (JSONL)`);
+  lines.push(separator('─'));
+
+  // ── Get all tables ────────────────────────────────────────────────────────
+  const tables = d.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+  ).all().map(r => r.name);
+
+  lines.push(`  Total Tables:  ${tables.length}`);
+  lines.push(separator('═'));
+  lines.push('');
+
+  // ── Table of Contents ─────────────────────────────────────────────────────
+  lines.push('TABLE OF CONTENTS');
+  lines.push(separator('─', 40));
+  let totalRows = 0;
+  const tableSummaries = [];
+  for (const tableName of tables) {
+    const cnt = d.prepare(`SELECT COUNT(*) as c FROM ${tableName}`).get().c;
+    totalRows += cnt;
+    const desc = TABLE_DESCRIPTIONS[tableName] || '-';
+    lines.push(`  ${tableName.padEnd(35)} ${String(cnt).padStart(8)} rows`);
+    tableSummaries.push({ name: tableName, count: cnt, description: desc });
+  }
+  lines.push(separator('─', 40));
+  lines.push(`  ${'TOTAL'.padEnd(35)} ${String(totalRows).padStart(8)} rows`);
+  lines.push('');
+
+  // ── Per-Table Export ──────────────────────────────────────────────────────
+  for (const { name: tableName, count, description } of tableSummaries) {
+    console.log(`  📋 Exporting: ${tableName} (${fmtNum(count)} rows)...`);
+
+    // Section header
+    lines.push(sectionHeader(tableName, count, description));
+
+    // Schema
+    const cols = d.prepare(`PRAGMA table_info(${tableName})`).all();
+    lines.push('Schema:');
+    cols.forEach(c => {
+      lines.push(`  - ${c.name} [${c.type || 'TEXT'}]${c.notnull ? ' NOT NULL' : ''}${c.pk ? ' PRIMARY KEY' : ''}`);
+    });
+    lines.push('');
+
+    // Statistics for numeric columns
+    const numericCols = cols.filter(c => 
+      ['INTEGER', 'REAL', 'NUMERIC'].includes((c.type || '').toUpperCase()) && 
+      !['id'].includes(c.name.toLowerCase())
+    );
+    
+    if (count > 0 && numericCols.length > 0) {
+      lines.push('Statistics:');
+      for (const col of numericCols.slice(0, 5)) { // max 5 numeric cols
+        try {
+          const stat = d.prepare(`
+            SELECT MIN(${col.name}) as min, MAX(${col.name}) as max, 
+                   AVG(${col.name}) as avg, SUM(${col.name}) as total
+            FROM ${tableName}
+          `).get();
+          if (stat && stat.max !== null) {
+            lines.push(`  ${col.name}: min=${fmtNum(stat.min)} max=${fmtNum(stat.max)} avg=${Number(stat.avg || 0).toFixed(2)} total=${fmtNum(stat.total)}`);
+          }
+        } catch(e) { /* skip */ }
+      }
+      lines.push('');
+    }
+
+    // Data rows (ALL rows)
+    if (count === 0) {
+      lines.push('(No data)');
+    } else {
+      lines.push(`Data (${fmtNum(count)} records):`);
+      const rows = d.prepare(`SELECT * FROM ${tableName}`).all();
+      for (const row of rows) {
+        lines.push(JSON.stringify(row));
+      }
+    }
+    lines.push('');
+  }
+
+  // ── Agent-specific sections (derived from flows) ───────────────────────────
+  lines.push('');
+  lines.push(separator('═'));
+  lines.push('[DERIVED: AGENT ANALYSIS]');
+  lines.push('Description: Analisis traffic per agent berdasarkan MAC address dari flows table');
+  lines.push(separator('─'));
+
+  const AGENT_MAC_MAP = {
+    '2F-TF-1D-GK': { label: 'JRP Cibubur',  macs: ['60:be:b4:1f:05:96'] },
+    '8A-V3-PB-85': { label: 'IFG LT.18',    macs: ['04:f4:1c:ce:c2:e6'] },
+    'F6-2V-DT-8A': { label: 'CPI Balaraja', macs: ['2c:7b:a0:d8:86:91', '16:11:ac:73:34:1d', 'bc:45:5b:ca:d5:be', 'de:ed:cc:57:58:34', 'f4:6d:3f:ef:01:a0', '60:be:b4:29:d3:36'] },
+  };
+
+  for (const [uuid, agent] of Object.entries(AGENT_MAC_MAP)) {
+    lines.push('');
+    lines.push(`Agent: ${agent.label} (${uuid})`);
+    lines.push(`MACs:  ${agent.macs.join(', ')}`);
+    lines.push(separator('─', 40));
+
+    const ph = agent.macs.map(() => '?').join(',');
+
+    // Summary
+    const sumRow = d.prepare(`
+      SELECT COUNT(DISTINCT src_ip) AS device_count, COUNT(*) AS flow_count,
+             SUM(bytes_download) AS total_dl, SUM(bytes_upload) AS total_ul
+      FROM flows WHERE src_mac IN (${ph})
+    `).get(...agent.macs);
+
+    lines.push(`  Devices:        ${fmtNum(sumRow.device_count)}`);
+    lines.push(`  Total Flows:    ${fmtNum(sumRow.flow_count)}`);
+    lines.push(`  Total Download: ${fmtBytes(sumRow.total_dl)}`);
+    lines.push(`  Total Upload:   ${fmtBytes(sumRow.total_ul)}`);
+
+    // Top apps
+    const apps = d.prepare(`
+      SELECT app_label, SUM(bytes_download) AS dl, SUM(bytes_upload) AS ul, COUNT(*) AS cnt
+      FROM flows WHERE src_mac IN (${ph}) AND app_label IS NOT NULL
+      GROUP BY app_label ORDER BY dl DESC LIMIT 10
+    `).all(...agent.macs);
+
+    lines.push(`  Top Applications:`);
+    apps.forEach((a, i) => {
+      lines.push(`    ${String(i+1).padStart(2)}. ${(a.app_label||'?').padEnd(30)} DL:${fmtBytes(a.dl).padStart(12)}  UL:${fmtBytes(a.ul).padStart(12)}  Flows:${a.cnt}`);
+    });
+
+    // Top devices
+    const devs = d.prepare(`
+      SELECT src_ip, SUM(bytes_download) AS dl, MAX(last_seen) AS last
+      FROM flows WHERE src_mac IN (${ph})
+      GROUP BY src_ip ORDER BY dl DESC LIMIT 10
+    `).all(...agent.macs);
+
+    lines.push(`  Top Devices:`);
+    devs.forEach((d2, i) => {
+      lines.push(`    ${String(i+1).padStart(2)}. ${(d2.src_ip||'?').padEnd(20)} DL:${fmtBytes(d2.dl).padStart(12)}  Last:${d2.last||'-'}`);
+    });
+  }
+
+  // ── Bandwidth Apps Summary ─────────────────────────────────────────────────
+  lines.push('');
+  lines.push(separator('═'));
+  lines.push('[DERIVED: BANDWIDTH APPS LATEST SNAPSHOT]');
+  lines.push('Description: Snapshot terakhir bandwidth per aplikasi (nilai aktual, bukan akumulasi)');
+  lines.push(separator('─'));
+
+  const latestBwSnap = d.prepare('SELECT MAX(fetched_at) as t FROM bandwidth_apps').get()?.t;
+  if (latestBwSnap) {
+    lines.push(`Latest Snapshot: ${latestBwSnap}`);
+    const bwApps = d.prepare('SELECT app_label, category, download, upload, total, flow_count FROM bandwidth_apps WHERE fetched_at = ? ORDER BY download DESC').all(latestBwSnap);
+    lines.push(`Total Apps: ${bwApps.length}`);
+    lines.push('');
+    bwApps.forEach((a, i) => {
+      lines.push(`  ${String(i+1).padStart(3)}. ${(a.app_label||'?').padEnd(30)} [${(a.category||'?').padEnd(20)}] DL:${fmtBytes(a.download).padStart(12)}  UL:${fmtBytes(a.upload).padStart(12)}  Flows:${fmtNum(a.flow_count)}`);
+    });
+  }
+
+  // ── Encryption Audit Summary ───────────────────────────────────────────────
+  lines.push('');
+  lines.push(separator('═'));
+  lines.push('[DERIVED: ENCRYPTION RISK SUMMARY]');
+  lines.push('Description: Distribusi risk level enkripsi per perangkat (snapshot terbaru)');
+  lines.push(separator('─'));
+
+  const latestEncSnap = d.prepare('SELECT MAX(fetched_at) as t FROM intel_encryption_audit').get()?.t;
+  if (latestEncSnap) {
+    const riskDist = d.prepare(`
+      SELECT risk_level, COUNT(*) as cnt, AVG(encrypted_pct) as avg_enc
+      FROM intel_encryption_audit WHERE fetched_at = ?
+      GROUP BY risk_level ORDER BY cnt DESC
+    `).all(latestEncSnap);
+
+    lines.push(`Latest Snapshot: ${latestEncSnap}`);
+    lines.push('Risk Distribution:');
+    riskDist.forEach(r => {
+      lines.push(`  ${(r.risk_level||'Unknown').padEnd(15)} ${String(r.cnt).padStart(5)} devices   avg encrypted: ${Number(r.avg_enc||0).toFixed(1)}%`);
+    });
+
+    // Highest risk devices
+    lines.push('');
+    lines.push('Critical Risk Devices (0% encrypted):');
+    const critDevs = d.prepare(`
+      SELECT ip_address, mac_address, device_label, encrypted_pct, total
+      FROM intel_encryption_audit WHERE fetched_at = ? AND risk_level = 'Critical'
+      ORDER BY total DESC LIMIT 20
+    `).all(latestEncSnap);
+    critDevs.forEach(r => {
+      lines.push(JSON.stringify(r));
+    });
+  }
+
+  // ── DNS Top Domains ────────────────────────────────────────────────────────
+  lines.push('');
+  lines.push(separator('═'));
+  lines.push('[DERIVED: TOP DNS DOMAINS]');
+  lines.push('Description: Domain paling sering diquery dari DNS stats');
+  lines.push(separator('─'));
+
+  const latestDnsSnap = d.prepare('SELECT MAX(fetched_at) as t FROM dns_queries').get()?.t;
+  if (latestDnsSnap) {
+    const dnsRows = d.prepare('SELECT * FROM dns_queries WHERE fetched_at = ? ORDER BY query_count DESC LIMIT 30').all(latestDnsSnap);
+
+    lines.push(`Latest Snapshot: ${latestDnsSnap}`);
+    dnsRows.forEach(r => lines.push(JSON.stringify(r)));
+  }
+
+  // ── IP Reputation Blacklisted ─────────────────────────────────────────────
+  lines.push('');
+  lines.push(separator('═'));
+  lines.push('[DERIVED: BLACKLISTED IP ADDRESSES]');
+  lines.push('Description: IP address yang terdeteksi blacklisted (dari intel_ip_reputation)');
+  lines.push(separator('─'));
+
+  const latestRepSnap = d.prepare('SELECT MAX(fetched_at) as t FROM intel_ip_reputation').get()?.t;
+  if (latestRepSnap) {
+    const blacklisted = d.prepare('SELECT * FROM intel_ip_reputation WHERE fetched_at = ? AND blacklisted = 1').all(latestRepSnap);
+    lines.push(`Latest Snapshot: ${latestRepSnap}`);
+    lines.push(`Blacklisted count: ${blacklisted.length}`);
+    blacklisted.forEach(r => lines.push(JSON.stringify(r)));
+  }
+
+  // ── Flows: Active Sessions Summary ────────────────────────────────────────
+  lines.push('');
+  lines.push(separator('═'));
+  lines.push('[DERIVED: ACTIVE FLOWS SUMMARY]');
+  lines.push('Description: Ringkasan aliran jaringan aktif (50 terbaru per download)');
+  lines.push(separator('─'));
+
+  const flowSummary = d.prepare(`
+    SELECT COUNT(*) as total_flows,
+           COUNT(DISTINCT src_ip) as unique_src_ips,
+           COUNT(DISTINCT dst_ip) as unique_dst_ips,
+           COUNT(DISTINCT src_mac) as unique_macs,
+           SUM(bytes_download) as total_dl,
+           SUM(bytes_upload) as total_ul,
+           MIN(first_seen) as earliest,
+           MAX(last_seen) as latest
+    FROM flows
+  `).get();
+
+  lines.push(`Total Flows in DB:    ${fmtNum(flowSummary.total_flows)}`);
+  lines.push(`Unique Source IPs:    ${fmtNum(flowSummary.unique_src_ips)}`);
+  lines.push(`Unique Dest IPs:      ${fmtNum(flowSummary.unique_dst_ips)}`);
+  lines.push(`Unique MAC Addresses: ${fmtNum(flowSummary.unique_macs)}`);
+  lines.push(`Total Download:       ${fmtBytes(flowSummary.total_dl)}`);
+  lines.push(`Total Upload:         ${fmtBytes(flowSummary.total_ul)}`);
+  lines.push(`Data from:            ${flowSummary.earliest}`);
+  lines.push(`Data to:              ${flowSummary.latest}`);
+  lines.push('');
+
+  // Top 50 flows by download
+  lines.push('Top 50 Flows by Download:');
+  const topFlows = d.prepare('SELECT * FROM flows ORDER BY bytes_download DESC LIMIT 50').all();
+  topFlows.forEach(r => lines.push(JSON.stringify(r)));
+
+  // ── Unencrypted Password Events ───────────────────────────────────────────
+  lines.push('');
+  lines.push(separator('═'));
+  lines.push('[DERIVED: UNENCRYPTED PASSWORD DETECTIONS]');
+  lines.push('Description: Kejadian pengiriman credential dalam plaintext (HIGH severity)');
+  lines.push(separator('─'));
+
+  const unencPwdHigh = d.prepare(`
+    SELECT ip_address, mac_address, dst_ip, dst_port, protocol, username, download, upload, severity, detected_at
+    FROM intel_unencrypted_passwords ORDER BY detected_at DESC
+  `).all();
+  lines.push(`Total detections: ${unencPwdHigh.length}`);
+  unencPwdHigh.forEach(r => lines.push(JSON.stringify(r)));
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  lines.push('');
+  lines.push(separator('═'));
+  lines.push('  END OF EXPORT');
+  lines.push(`  Generated at: ${new Date().toISOString()}`);
+  lines.push(`  Total lines:  ${lines.length + 3}`);
+  lines.push(separator('═'));
+
+  // Write to file
+  const output = lines.join('\n');
+  fs.writeFileSync(OUTPUT_FILE, output, 'utf-8');
+
+  const stats = fs.statSync(OUTPUT_FILE);
+  console.log(`\n✅ Export selesai!`);
+  console.log(`   File: ${OUTPUT_FILE}`);
+  console.log(`   Size: ${fmtBytes(stats.size)}`);
+  console.log(`   Lines: ${fmtNum(lines.length)}`);
+  console.log(`   Tables: ${tables.length}`);
+  console.log(`   Total Rows: ${fmtNum(totalRows)}`);
+}
+
+main().catch(e => {
+  console.error('❌ Export FAILED:', e);
+  process.exit(1);
+});

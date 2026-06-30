@@ -290,4 +290,56 @@ router.get('/lookup/applications', async (req, res) => {
   }
 });
 
-module.exports = router;
+// ─── INTERACTIVE DETAIL ROUTES ───────────────────────────────────────────────
+
+// GET /api/dashboard/agent-details?uuid=2F-TF-1D-GK
+router.get('/agent-details', async (req, res) => {
+  try {
+    const uuid = String(req.query.uuid ?? '');
+    if (!uuid) return res.status(400).json({ ok: false, message: 'uuid required' });
+    const { fetchAgentDetails } = require('../netify');
+    const data = await fetchAgentDetails(uuid);
+    res.json({ ok: true, data });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+// GET /api/dashboard/device-details?ip=10.6.10.23
+router.get('/device-details', async (req, res) => {
+  try {
+    const ip = String(req.query.ip ?? '');
+    if (!ip) return res.status(400).json({ ok: false, message: 'ip required' });
+    const { fetchDeviceDetails } = require('../netify');
+    const data = await fetchDeviceDetails(ip);
+    res.json({ ok: true, data });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+// GET /api/dashboard/app-details?label=YouTube
+router.get('/app-details', async (req, res) => {
+  try {
+    const label = String(req.query.label ?? '');
+    if (!label) return res.status(400).json({ ok: false, message: 'label required' });
+    const { fetchAppDetails } = require('../netify');
+    const data = await fetchAppDetails(label);
+    res.json({ ok: true, data });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+// GET /api/dashboard/security-devices
+router.get('/security-devices', async (req, res) => {
+  try {
+    const { fetchSecurityDevices } = require('../netify');
+    const data = await fetchSecurityDevices();
+    res.json({ ok: true, data });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+module.exports = router;

@@ -458,3 +458,155 @@ export function useLookupApplications(page: number = 1, limit: number = 25, sear
 
   return { data, error, isLoading };
 }
+
+// ─── INTERACTIVE DETAIL TYPES ──────────────────────────────────────────────────
+
+export interface AgentDeviceItem {
+  ip_address: string | null;
+  mac_address: string | null;
+  device_label: string | null;
+  device_type: string | null;
+  os_label: string | null;
+  manufacturer: string | null;
+  last_seen: string | null;
+  download: number;
+  upload: number;
+  encrypted_pct: number | null;
+  risk_level: string | null;
+  has_insecure: boolean;
+}
+
+export interface AgentFlowItem {
+  flow_id?: string | null;
+  src_ip: string | null;
+  dst_ip: string | null;
+  dst_port: number | null;
+  protocol: string | null;
+  app_label?: string | null;
+  domain?: string | null;
+  download: number;
+  upload: number;
+  last_seen: string | null;
+}
+
+export interface AgentAppItem {
+  app_id: number | null;
+  app_label: string;
+  category: string | null;
+  favicon: string | null;
+  download: number;
+  upload: number;
+}
+
+export interface AgentSummary {
+  total_devices: number;
+  active_flows: number;
+  bandwidth_down: number;
+  bandwidth_up: number;
+}
+
+export interface AgentDetails {
+  agent_uuid: string;
+  agent_label: string;
+  summary: AgentSummary | null;
+  devices: AgentDeviceItem[];
+  flows: AgentFlowItem[];
+  top_apps: AgentAppItem[];
+}
+
+export interface DeviceFlowItem {
+  dst_ip: string | null;
+  dst_port: number | null;
+  protocol: string | null;
+  app_label?: string | null;
+  domain?: string | null;
+  download: number;
+  upload: number;
+  last_seen: string | null;
+}
+
+export interface SecurityInfo {
+  encrypted_pct: number | null;
+  encrypted_bytes: number | null;
+  unencrypted_bytes: number | null;
+  risk_level: string | null;
+  insecure_protocols: { protocol: string; risk: string }[];
+  device_type: string | null;
+  os_label: string | null;
+  manufacturer: string | null;
+  device_label: string | null;
+  reputation: string | null;
+  rep_score: number | null;
+  blacklisted: boolean;
+}
+
+export interface DeviceDetails {
+  ip: string;
+  total_download: number;
+  total_upload: number;
+  flow_count: number;
+  top_apps: AgentAppItem[];
+  flows: DeviceFlowItem[];
+  security_info: SecurityInfo | null;
+}
+
+export interface AppAgentItem {
+  agent_uuid: string | null;
+  agent_label: string;
+  download: number;
+  upload: number;
+  flow_count?: number;
+}
+
+export interface AppIpItem {
+  ip_address: string | null;
+  download: number;
+  upload: number;
+  flow_count?: number;
+  reputation?: string | null;
+  blacklisted?: boolean;
+}
+
+export interface AppDetails {
+  app_label: string;
+  total_download: number;
+  total_upload: number;
+  data_source?: string;
+  has_domain_breakdown?: boolean;
+  agent_scorecard: AppAgentItem[];
+  top_ips: AppIpItem[];
+}
+
+export interface SecurityDevice {
+  ip_address: string;
+  mac_address: string | null;
+  device_label: string | null;
+  encrypted_pct: number;
+  unencrypted: number;
+  encrypted: number;
+  total: number;
+  risk_level: 'Rawan' | 'Sedang' | 'Aman';
+  has_insecure: boolean;
+  device_type: string | null;
+  os_label: string | null;
+  manufacturer: string | null;
+}
+
+// ─── DETAIL FETCH FUNCTIONS (one-shot, no polling) ───────────────────────────
+
+export async function fetchAgentDetails(uuid: string): Promise<AgentDetails> {
+  return fetcher<AgentDetails>(`/agent-details?uuid=${encodeURIComponent(uuid)}`);
+}
+
+export async function fetchDeviceDetails(ip: string): Promise<DeviceDetails> {
+  return fetcher<DeviceDetails>(`/device-details?ip=${encodeURIComponent(ip)}`);
+}
+
+export async function fetchAppDetails(label: string): Promise<AppDetails> {
+  return fetcher<AppDetails>(`/app-details?label=${encodeURIComponent(label)}`);
+}
+
+export async function fetchSecurityDevices(): Promise<SecurityDevice[]> {
+  return fetcher<SecurityDevice[]>('/security-devices');
+}
+

@@ -18,16 +18,20 @@ const getHeaders = () => {
     "Content-Type": "application/json",
   };
 
-  // JWT Token access requires x-net-site
-  if (JWT_TOKEN && SITE_UUID) {
-    headers["x-api-key"] = JWT_TOKEN;
-    headers["x-net-site"] = SITE_UUID;
-  } else if (API_KEY) {
+  // Prioritize long-term API Key as recommended by Netify support team
+  if (API_KEY) {
     headers["x-api-key"] = API_KEY;
+  } else if (JWT_TOKEN) {
+    headers["x-api-key"] = JWT_TOKEN;
+  }
+
+  if (SITE_UUID) {
+    headers["x-net-site"] = SITE_UUID;
   }
 
   return headers;
 };
+
 
 export interface Agent {
   id: number;
@@ -45,6 +49,67 @@ export interface Agent {
 
 export async function getAgents(): Promise<Agent[]> {
   try {
+    const API_KEY = process.env.NETIFY_API_KEY;
+    const SITE_UUID = process.env.NETIFY_SITE_UUID;
+
+    // Fallback to Informatics Scorecard Agent if site-scoped API key is used
+    if (API_KEY && API_KEY.startsWith("sk_db_")) {
+      const headers = getHeaders();
+      const [dlRes, ulRes] = await Promise.all([
+        fetch('https://informatics.netify.ai/api/v1/data/stats/scorecard/agent/download', { headers, cache: "no-store" }),
+        fetch('https://informatics.netify.ai/api/v1/data/stats/scorecard/agent/upload', { headers, cache: "no-store" })
+      ]);
+
+      if (!dlRes.ok) {
+        throw new Error(`Failed to fetch agents scorecard: ${dlRes.statusText} (${dlRes.status})`);
+      }
+
+      const dlResult = await dlRes.json();
+      const ulResult = ulRes.ok ? await ulRes.json() : { data: [] };
+
+      const ulMap: Record<string, number> = {};
+      if (ulResult.data) {
+        for (const item of ulResult.data) {
+          if (item.agent?.uuid) {
+            ulMap[item.agent.uuid] = item.upload ?? 0;
+          }
+        }
+      }
+
+      const AGENT_LABELS: Record<string, string> = {
+        "2F-TF-1D-GK": "JRP Cibubur",
+        "8A-V3-PB-85": "IFG LT.18",
+        "F6-2V-DT-8A": "CPI Balaraja"
+      };
+
+      const agents: Agent[] = (dlResult.data || []).map((item: any, idx: number) => {
+        const uuid = item.agent?.uuid || `agent-${idx}`;
+        const dl = item.download ?? 0;
+        const ul = ulMap[uuid] ?? 0;
+        const totalMB = ((dl + ul) / (1024 * 1024)).toFixed(2);
+        
+        return {
+          id: item.agent?.id || idx,
+          uuid: uuid,
+          serial: uuid,
+          site_uuid: SITE_UUID || "",
+          organization_uuid: "",
+          provisioned: true,
+          activated: true,
+          label: AGENT_LABELS[uuid] || item.agent?.label || uuid,
+          created_at: { human: "N/A", date: "", unix_time: 0 },
+          updated_at: { human: "N/A", date: "", unix_time: 0 },
+          last_seen_at: { 
+            human: `Active (Traffic: ${totalMB} MB)`, 
+            date: new Date().toISOString(), 
+            unix_time: Date.now() / 1000 
+          }
+        };
+      });
+
+      return agents;
+    }
+
     const response = await fetch(API_URL, {
       method: "GET",
       headers: getHeaders(),
@@ -72,6 +137,12 @@ export async function getAgents(): Promise<Agent[]> {
 
 export async function getAgent(agentId: string): Promise<Agent | null> {
   try {
+    const API_KEY = process.env.NETIFY_API_KEY;
+    if (API_KEY && API_KEY.startsWith("sk_db_")) {
+      const agents = await getAgents();
+      return agents.find(a => a.uuid === agentId || String(a.id) === agentId) || null;
+    }
+
     const response = await fetch(`${API_URL}/${agentId}`, {
       method: "GET",
       headers: getHeaders(),
@@ -92,6 +163,11 @@ export async function getAgent(agentId: string): Promise<Agent | null> {
 
 export async function createAgent(agentId: string, label: string) {
   try {
+    const API_KEY = process.env.NETIFY_API_KEY;
+    if (API_KEY && API_KEY.startsWith("sk_db_")) {
+      return { success: false, message: "Aksi ditolak: Site-scoped API Key tidak diperbolehkan membuat Agents." };
+    }
+
     const url = agentId 
       ? `${API_URL}/${encodeURIComponent(agentId)}?label=${encodeURIComponent(label)}`
       : `${API_URL}?label=${encodeURIComponent(label)}`;
@@ -115,6 +191,11 @@ export async function createAgent(agentId: string, label: string) {
 
 export async function updateAgent(agentId: string, label: string) {
   try {
+    const API_KEY = process.env.NETIFY_API_KEY;
+    if (API_KEY && API_KEY.startsWith("sk_db_")) {
+      return { success: false, message: "Aksi ditolak: Site-scoped API Key tidak diperbolehkan mengubah Agents." };
+    }
+
     const response = await fetch(`${API_URL}/${encodeURIComponent(agentId)}?label=${encodeURIComponent(label)}`, {
       method: "PATCH",
       headers: getHeaders(),
@@ -134,6 +215,11 @@ export async function updateAgent(agentId: string, label: string) {
 
 export async function deleteAgent(agentId: string) {
   try {
+    const API_KEY = process.env.NETIFY_API_KEY;
+    if (API_KEY && API_KEY.startsWith("sk_db_")) {
+      return { success: false, message: "Aksi ditolak: Site-scoped API Key tidak diperbolehkan menghapus Agents." };
+    }
+
     const response = await fetch(`${API_URL}/${encodeURIComponent(agentId)}`, {
       method: "DELETE",
       headers: getHeaders(),
@@ -150,3 +236,4 @@ export async function deleteAgent(agentId: string) {
     return { success: false, message: error.message };
   }
 }
+

@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
-import { Loader2, Plus, Edit, Trash2, Server, CheckCircle2, XCircle } from "lucide-react";
+import { AgentDetailModal } from "@/components/ui/AgentDetailModal";
+import { Loader2, Plus, Edit, Trash2, Server, CheckCircle2, XCircle, ChevronRight } from "lucide-react";
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -17,6 +18,16 @@ export default function AgentsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  // Detail modal
+  const [detailAgent, setDetailAgent] = useState<Agent | null>(null);
+
+  // Known agent UUIDs with labels
+  const AGENT_LABELS: Record<string, string> = {
+    '2F-TF-1D-GK': 'JRP Cibubur',
+    '8A-V3-PB-85': 'IFG LT.18',
+    'F6-2V-DT-8A': 'CPI Balaraja',
+  };
 
   // Form state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -100,8 +111,30 @@ export default function AgentsPage() {
   };
 
   const columns: Column<Agent>[] = [
-    { header: "UUID / Serial", accessor: (row) => <span className="font-mono text-xs text-blue-400">{row.uuid || row.serial}</span> },
-    { header: "Label", accessor: (row) => row.label || <span className="text-muted-foreground italic">No label</span> },
+    {
+      header: "UUID / Serial",
+      accessor: (row) => (
+        <button
+          onClick={() => setDetailAgent(row)}
+          className="flex items-center gap-2 group text-left"
+          title="Click to view agent details"
+        >
+          <span className="font-mono text-xs text-blue-400 group-hover:text-blue-300 transition-colors">{row.uuid || row.serial}</span>
+          <ChevronRight className="w-3 h-3 text-slate-600 group-hover:text-blue-400 transition-colors" />
+        </button>
+      )
+    },
+    {
+      header: "Label",
+      accessor: (row) => {
+        const friendlyLabel = AGENT_LABELS[row.uuid || row.serial];
+        return (
+          <button onClick={() => setDetailAgent(row)} className="text-left hover:text-white transition-colors">
+            {friendlyLabel || row.label || <span className="text-muted-foreground italic">No label</span>}
+          </button>
+        );
+      }
+    },
     { header: "Provisioned", accessor: (row) => row.provisioned ? <Badge variant="green"><CheckCircle2 className="w-3 h-3 mr-1" /> Yes</Badge> : <Badge variant="red"><XCircle className="w-3 h-3 mr-1" /> No</Badge> },
     { header: "Activated", accessor: (row) => row.activated ? <Badge variant="green"><CheckCircle2 className="w-3 h-3 mr-1" /> Yes</Badge> : <Badge variant="red"><XCircle className="w-3 h-3 mr-1" /> No</Badge> },
     { header: "Last Seen", accessor: (row) => <span className="text-muted-foreground">{row.last_seen_at?.human || '-'}</span> },
@@ -109,10 +142,17 @@ export default function AgentsPage() {
       header: "Actions", 
       accessor: (row) => (
         <div className="flex items-center gap-2">
-          <button onClick={() => openEdit(row)} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors">
+          <button
+            onClick={() => setDetailAgent(row)}
+            className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded transition-colors"
+            title="View details"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); openEdit(row); }} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors">
             <Edit className="w-4 h-4" />
           </button>
-          <button onClick={() => openDelete(row)} className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded transition-colors">
+          <button onClick={(e) => { e.stopPropagation(); openDelete(row); }} className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded transition-colors">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -143,8 +183,24 @@ export default function AgentsPage() {
         </CardHeader>
         <CardContent>
           {error ? (
-            <div className="p-4 bg-red-950/30 border border-red-900/50 rounded-lg text-red-400 text-sm">
-              {error}
+            <div className="p-6 bg-red-950/20 border border-red-500/30 rounded-xl space-y-4 text-slate-300">
+              <div className="flex items-center gap-2 text-red-400 font-semibold">
+                <XCircle className="w-5 h-5" />
+                <span>Akses Agents Ditolak (403 Forbidden)</span>
+              </div>
+              <p className="text-sm leading-relaxed">
+                API Key yang Anda gunakan saat ini (<code className="bg-red-950/40 text-red-300 px-1.5 py-0.5 rounded font-mono text-xs">sk_db_live_...</code>) adalah <strong>Site-scoped API Key</strong>. Netify membatasi kunci ini agar hanya dapat membaca data statistik jaringan (Informatics), sehingga tidak memiliki izin untuk mengelola inventaris Agents global.
+              </p>
+              <div className="bg-slate-900/60 rounded-lg p-4 border border-border/40 text-xs space-y-2 leading-relaxed">
+                <p className="font-semibold text-white">💡 Cara Mengatasinya:</p>
+                <ol className="list-decimal pl-4 space-y-1 text-slate-400">
+                  <li>Buka dan login ke portal <a href="https://portal.netify.ai" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Netify Portal</a>.</li>
+                  <li>Masuk ke menu <strong>Account</strong> di bagian atas.</li>
+                  <li>Pilih <strong>Profile &gt; API Access</strong> pada menu sebelah kiri.</li>
+                  <li>Buat sebuah <strong>Account-level API Key</strong> (kunci ini akan memiliki akses menyeluruh tanpa kedaluwarsa).</li>
+                  <li>Buka file <code className="text-slate-200">.env.local</code> di proyek Anda, lalu ganti nilai <code className="text-slate-200">NETIFY_API_KEY</code> dengan kunci baru tersebut.</li>
+                </ol>
+              </div>
             </div>
           ) : (
             <DataTable 
@@ -244,6 +300,15 @@ export default function AgentsPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Agent Detail Modal */}
+      {detailAgent && (
+        <AgentDetailModal
+          agentUuid={detailAgent.uuid || detailAgent.serial}
+          agentLabel={AGENT_LABELS[detailAgent.uuid || detailAgent.serial] || detailAgent.label || detailAgent.uuid || detailAgent.serial}
+          onClose={() => setDetailAgent(null)}
+        />
+      )}
 
     </div>
   );

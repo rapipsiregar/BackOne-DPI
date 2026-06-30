@@ -12,6 +12,7 @@ import {
 import { useState, useEffect } from "react";
 import { useDashboardSummary, useTimeline, useTopApps, useTopProtocols } from "@/lib/api";
 import { fmtBytes } from "@/lib/utils";
+import Link from "next/link";
 
 const COLORS = ['#58a6ff', '#3fb950', '#f0883e', '#bc8cff', '#f85149'];
 
@@ -44,91 +45,108 @@ export default function SummaryPage() {
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:bg-card/100 hover:border-primary/30 transition-all duration-300 cursor-default animate-slide-up" style={{ animationDelay: '0ms' }}>
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Download className="h-16 w-16 text-blue-500" />
-          </div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-            <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-blue-400 transition-colors">Download</CardTitle>
-            <Download className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-white tracking-tight">
-              {summary.data ? fmtBytes(summary.data.bandwidth_down) : "0 B"}
+        <Link href="/flows" className="block focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-xl">
+          <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:bg-card/100 hover:border-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer animate-slide-up" style={{ animationDelay: '0ms' }}>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Download className="h-16 w-16 text-blue-500" />
             </div>
-          </CardContent>
-        </Card>
-        <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:bg-card/100 hover:border-emerald-500/30 transition-all duration-300 cursor-default animate-slide-up" style={{ animationDelay: '50ms' }}>
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Upload className="h-16 w-16 text-emerald-500" />
-          </div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-            <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-emerald-400 transition-colors">Upload</CardTitle>
-            <Upload className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-white tracking-tight">
-              {summary.data ? fmtBytes(summary.data.bandwidth_up) : "0 B"}
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-blue-400 transition-colors">Download</CardTitle>
+              <Download className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="text-3xl font-bold text-white tracking-tight">
+                {summary.data ? fmtBytes(summary.data.bandwidth_down) : "0 B"}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/flows" className="block focus:outline-none focus:ring-2 focus:ring-emerald-500/50 rounded-xl">
+          <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:bg-card/100 hover:border-emerald-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer animate-slide-up" style={{ animationDelay: '50ms' }}>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Upload className="h-16 w-16 text-emerald-500" />
             </div>
-          </CardContent>
-        </Card>
-        <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:bg-card/100 hover:border-orange-500/30 transition-all duration-300 cursor-default animate-slide-up" style={{ animationDelay: '100ms' }}>
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Server className="h-16 w-16 text-orange-500" />
-          </div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-            <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-orange-400 transition-colors">Devices</CardTitle>
-            <Server className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-white tracking-tight">
-              {summary.data?.total_devices?.toLocaleString() || "0"}
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-emerald-400 transition-colors">Upload</CardTitle>
+              <Upload className="h-4 w-4 text-emerald-500" />
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="text-3xl font-bold text-white tracking-tight">
+                {summary.data ? fmtBytes(summary.data.bandwidth_up) : "0 B"}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/devices" className="block focus:outline-none focus:ring-2 focus:ring-orange-500/50 rounded-xl">
+          <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:bg-card/100 hover:border-orange-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer animate-slide-up" style={{ animationDelay: '100ms' }}>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Server className="h-16 w-16 text-orange-500" />
             </div>
-          </CardContent>
-        </Card>
-        <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:bg-card/100 hover:border-purple-500/30 transition-all duration-300 cursor-default animate-slide-up" style={{ animationDelay: '150ms' }}>
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Activity className="h-16 w-16 text-purple-500" />
-          </div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-            <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-purple-400 transition-colors">Flows</CardTitle>
-            <Activity className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-white tracking-tight">
-              {summary.data?.active_flows?.toLocaleString() || "0"}
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-orange-400 transition-colors">Devices</CardTitle>
+              <Server className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="text-3xl font-bold text-white tracking-tight">
+                {summary.data?.total_devices?.toLocaleString() || "0"}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/flows" className="block focus:outline-none focus:ring-2 focus:ring-purple-500/50 rounded-xl">
+          <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:bg-card/100 hover:border-purple-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer animate-slide-up" style={{ animationDelay: '150ms' }}>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Activity className="h-16 w-16 text-purple-500" />
             </div>
-          </CardContent>
-        </Card>
-        <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-red-500/20 hover:bg-card/100 hover:border-red-500/50 transition-all duration-300 cursor-default animate-slide-up" style={{ animationDelay: '200ms' }}>
-          <div className="absolute inset-0 bg-red-500/5 pointer-events-none" />
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-red-500">
-            <ShieldAlert className="h-16 w-16" />
-          </div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-            <CardTitle className="text-sm font-medium text-red-400 group-hover:text-red-300 transition-colors">Threats</CardTitle>
-            <ShieldAlert className="h-4 w-4 text-red-500 animate-pulse" />
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-red-500 tracking-tight">
-              {summary.data?.total_threats?.toLocaleString() || "0"}
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-purple-400 transition-colors">Flows</CardTitle>
+              <Activity className="h-4 w-4 text-purple-500" />
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="text-3xl font-bold text-white tracking-tight">
+                {summary.data?.active_flows?.toLocaleString() || "0"}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/threats" className="block focus:outline-none focus:ring-2 focus:ring-red-500/50 rounded-xl">
+          <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-red-500/20 hover:bg-card/100 hover:border-red-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer animate-slide-up" style={{ animationDelay: '200ms' }}>
+            <div className="absolute inset-0 bg-red-500/5 pointer-events-none" />
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-red-500">
+              <ShieldAlert className="h-16 w-16" />
             </div>
-          </CardContent>
-        </Card>
-        <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:bg-card/100 hover:border-yellow-500/30 transition-all duration-300 cursor-default animate-slide-up" style={{ animationDelay: '250ms' }}>
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-yellow-500">
-            <Zap className="h-16 w-16" />
-          </div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-            <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-yellow-400 transition-colors">Events</CardTitle>
-            <Zap className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-white tracking-tight">
-              {summary.data?.total_events?.toLocaleString() || "0"}
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium text-red-400 group-hover:text-red-300 transition-colors">Threats</CardTitle>
+              <ShieldAlert className="h-4 w-4 text-red-500 animate-pulse" />
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="text-3xl font-bold text-red-500 tracking-tight">
+                {summary.data?.total_threats?.toLocaleString() || "0"}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/events" className="block focus:outline-none focus:ring-2 focus:ring-yellow-500/50 rounded-xl">
+          <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:bg-card/100 hover:border-yellow-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer animate-slide-up" style={{ animationDelay: '250ms' }}>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-yellow-500">
+              <Zap className="h-16 w-16" />
             </div>
-          </CardContent>
-        </Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-yellow-400 transition-colors">Events</CardTitle>
+              <Zap className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="text-3xl font-bold text-white tracking-tight">
+                {summary.data?.total_events?.toLocaleString() || "0"}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7 animate-slide-up" style={{ animationDelay: '300ms' }}>
