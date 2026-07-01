@@ -52,7 +52,7 @@ export function DataTable<T>({
             <thead className="bg-secondary/30 text-muted-foreground border-b border-border/50">
               <tr>
                 {columns.map((col, i) => (
-                  <th key={i} className={`px-4 py-3.5 font-medium whitespace-nowrap tracking-wide ${col.className || ""}`}>
+                  <th key={i} className={`px-4 py-3.5 font-medium tracking-wide ${col.className || ""}`}>
                     {col.header}
                   </th>
                 ))}
@@ -91,7 +91,7 @@ export function DataTable<T>({
                     className={`hover:bg-primary/5 transition-colors duration-200 group ${getRowClassName ? getRowClassName(row) : ""}`}
                   >
                     {columns.map((col, j) => (
-                      <td key={j} className={`px-4 py-3 whitespace-nowrap text-foreground group-hover:text-white transition-colors ${col.className || ""}`}>
+                      <td key={j} className={`px-4 py-3 text-foreground group-hover:text-white transition-colors ${col.className || ""}`}>
                         {col.accessor(row, i)}
                       </td>
                     ))}

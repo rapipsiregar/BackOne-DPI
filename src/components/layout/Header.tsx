@@ -21,6 +21,28 @@ interface AppNotification {
   type: 'threat' | 'event';
 }
 
+function RealtimeClock() {
+  const [time, setTime] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setTime(new Date());
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!time) return (
+    <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground font-mono shadow-sm opacity-0">
+      00:00:00
+    </div>
+  );
+
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-mono shadow-sm text-cyan-400">
+      {time.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+    </div>
+  );
+}
+
 export function Header({
   lastUpdate = "—",
   isRefreshing = false,
@@ -171,13 +193,13 @@ export function Header({
           <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
           Site: {process.env.NEXT_PUBLIC_SITE_ID || "Unknown Site"}
         </div>
-
         {intervalText && (
           <div className="flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 px-3 py-1 text-xs text-blue-400 font-medium">
             <Calendar className="w-3.5 h-3.5" />
             <span>Rentang Data: {intervalText}</span>
           </div>
         )}
+        <RealtimeClock />
       </div>
 
       <div className="flex items-center gap-4">

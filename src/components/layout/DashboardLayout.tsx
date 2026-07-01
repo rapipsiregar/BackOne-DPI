@@ -53,7 +53,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-transparent transition-colors duration-500">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header 
@@ -62,7 +62,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           onRefresh={handleRefresh}
           intervalText={intervalText}
         />
-        <main className="flex-1 overflow-y-auto bg-[#0d1117] p-6">
+        <main className="flex-1 overflow-y-auto bg-transparent p-6 transition-colors duration-500">
           <div className="mx-auto max-w-7xl space-y-6">
             {children}
           </div>

@@ -11,15 +11,10 @@ import {
 } from "react-simple-maps";
 import { scaleLinear } from "d3-scale";
 import { fmtBytes } from "@/lib/utils";
+import { useTheme } from "next-themes";
 
 // The topojson file containing the world shapes
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
-
-// Our custom heatmap color scale
-// Maps values from 0 to maxValue to a gradient (Dark Blue to Electric Cyan/Purple)
-const colorScale = scaleLinear<string>()
-  .domain([0, 100]) // We will update the domain dynamically based on data
-  .range(["#1e293b", "#38bdf8"]); // Tailwind slate-800 to sky-400
 
 interface WorldMapProps {
   data: {
@@ -38,13 +33,26 @@ const WorldMapComponent = ({ data }: WorldMapProps) => {
     setMounted(true);
   }, []);
 
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
+
   useEffect(() => {
     if (data.length > 0) {
       const max = Math.max(...data.map(d => d.value));
       setMaxValue(max);
-      colorScale.domain([0, max]);
     }
   }, [data]);
+
+  const colorScale = scaleLinear<string>()
+    .domain(maxValue > 0 ? [0, maxValue * 0.33, maxValue * 0.66, maxValue] : [0, 1, 2, 3])
+    .range(isLight 
+      ? ["#bbf7d0", "#fef08a", "#fb923c", "#ef4444"] // Light: Green -> Yellow -> Orange -> Red
+      : ["#1e293b", "#0f172a", "#0284c7", "#38bdf8"] // Dark: Slate -> Sky
+    );
+
+  const defaultLandColor = isLight ? "#86efac" : "#1e293b";
+  const oceanColor = isLight ? "#bfdbfe" : "transparent";
+  const strokeColor = isLight ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.1)";
 
   if (!mounted) return null;
 
@@ -56,7 +64,14 @@ const WorldMapComponent = ({ data }: WorldMapProps) => {
         </div>
         <div className="flex items-center gap-2 mt-2">
           <div className="text-xs text-muted-foreground">Low</div>
-          <div className="w-24 h-2 rounded-full bg-gradient-to-r from-slate-800 to-sky-400 shadow-sm"></div>
+          <div 
+            className="w-24 h-2 rounded-full shadow-sm"
+            style={{ 
+              background: isLight 
+                ? 'linear-gradient(to right, #bbf7d0, #fef08a, #fb923c, #ef4444)' 
+                : 'linear-gradient(to right, #1e293b, #38bdf8)' 
+            }}
+          ></div>
           <div className="text-xs text-muted-foreground">High</div>
         </div>
       </div>
@@ -80,8 +95,8 @@ const WorldMapComponent = ({ data }: WorldMapProps) => {
         className="w-full h-full"
       >
         <ZoomableGroup zoom={1} maxZoom={4} translateExtent={[[-100, -100], [900, 500]]}>
-          <Sphere stroke="rgba(255,255,255,0.05)" strokeWidth={0.5} id="sphere" fill="transparent" />
-          <Graticule stroke="rgba(255,255,255,0.05)" strokeWidth={0.5} />
+          <Sphere stroke={strokeColor} strokeWidth={0.5} id="sphere" fill={oceanColor} />
+          <Graticule stroke={strokeColor} strokeWidth={0.5} />
           
           <Geographies geography={geoUrl}>
             {({ geographies }) =>
@@ -99,14 +114,14 @@ const WorldMapComponent = ({ data }: WorldMapProps) => {
                          (sLabel === 'south korea' && geoName === 'korea');
                 });
 
-                const color = d ? colorScale(d.value) : "#1e293b"; // Default color
+                const color = d ? colorScale(d.value) : defaultLandColor;
 
                 return (
                   <Geography
                     key={geo.rsmKey}
                     geography={geo}
                     fill={color}
-                    stroke="rgba(255,255,255,0.1)"
+                    stroke={strokeColor}
                     strokeWidth={0.5}
                     style={{
                       default: { outline: "none" },

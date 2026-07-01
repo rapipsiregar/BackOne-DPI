@@ -17,6 +17,7 @@ app.use(cookieParser());
 // ── API Routes ────────────────────────────────────────────────────────────────
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
+app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Auth Middleware for Dashboard
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-backone-key';

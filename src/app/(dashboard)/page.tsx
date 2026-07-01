@@ -125,17 +125,17 @@ export default function SummaryPage() {
         </Link>
 
         <Link href="/threats" className="block focus:outline-none focus:ring-2 focus:ring-red-500/50 rounded-xl">
-          <Card className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-red-500/20 hover:bg-card/100 hover:border-red-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer animate-slide-up" style={{ animationDelay: '200ms' }}>
-            <div className="absolute inset-0 bg-red-500/5 pointer-events-none" />
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-red-500">
+          <Card className="group relative overflow-hidden bg-red-50/90 dark:bg-card/80 backdrop-blur-xl border-red-200 dark:border-red-500/20 hover:bg-red-100 hover:dark:bg-card/100 hover:border-red-300 hover:dark:border-red-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer animate-slide-up" style={{ animationDelay: '200ms' }}>
+            <div className="absolute inset-0 bg-red-500/10 dark:bg-red-500/5 pointer-events-none" />
+            <div className="absolute top-0 right-0 p-4 opacity-20 dark:opacity-10 group-hover:opacity-30 dark:group-hover:opacity-20 transition-opacity text-red-600 dark:text-red-500">
               <ShieldAlert className="h-16 w-16" />
             </div>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-              <CardTitle className="text-sm font-medium text-red-400 group-hover:text-red-300 transition-colors">Threats</CardTitle>
-              <ShieldAlert className="h-4 w-4 text-red-500 animate-pulse" />
+              <CardTitle className="text-sm font-semibold text-red-700 dark:text-red-400 group-hover:text-red-800 dark:group-hover:text-red-300 transition-colors">Threats</CardTitle>
+              <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-500 animate-pulse" />
             </CardHeader>
             <CardContent className="relative z-10">
-              <div className="text-3xl font-bold text-red-500 tracking-tight">
+              <div className="text-3xl font-bold text-red-600 dark:text-red-500 tracking-tight">
                 {summary.data?.total_threats?.toLocaleString() || "0"}
               </div>
             </CardContent>

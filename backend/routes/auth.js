@@ -1,8 +1,24 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { getUserByUsername, updateUserPassword, getDB } = require('../database');
+const { getUserByUsername, updateUserPassword, updateUserUsername, updateUserAccountName, updateUserProfilePicture, getDB } = require('../database');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'uploads');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-backone-key';
 
@@ -23,7 +39,7 @@ router.post('/login', (req, res) => {
   }
 
   const token = jwt.sign(
-    { id: user.id, username: user.username, role: user.role, site_uuid: user.site_uuid, agent_uuid: user.agent_uuid },
+    { id: user.id, username: user.username, account_name: user.account_name, profile_picture: user.profile_picture, role: user.role, site_uuid: user.site_uuid, agent_uuid: user.agent_uuid },
     JWT_SECRET,
     { expiresIn: '1d' }
   );
@@ -38,7 +54,7 @@ router.post('/login', (req, res) => {
 
   res.json({
     message: 'Login successful',
-    user: { id: user.id, username: user.username, role: user.role, site_uuid: user.site_uuid, agent_uuid: user.agent_uuid }
+    user: { id: user.id, username: user.username, account_name: user.account_name, profile_picture: user.profile_picture, role: user.role, site_uuid: user.site_uuid, agent_uuid: user.agent_uuid }
   });
 });
 
@@ -83,10 +99,10 @@ router.post('/change-password', (req, res) => {
     }
 
     // 3. Validate new password strength
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
     if (!passwordRegex.test(newPassword)) {
       return res.status(400).json({
-        error: 'Password baru tidak memenuhi kriteria: minimal 8 karakter, serta mengandung huruf besar, huruf kecil, angka, dan karakter spesial.'
+        error: 'Password baru tidak memenuhi kriteria: minimal 6 karakter, serta mengandung huruf besar, huruf kecil, dan angka.'
       });
     }
 
@@ -97,6 +113,191 @@ router.post('/change-password', (req, res) => {
     return res.json({ ok: true, message: 'Password berhasil diubah!' });
   } catch (err) {
     return res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+router.post('/change-username', (req, res) => {
+  const token = req.cookies?.token;
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const { currentPassword, newUsername } = req.body;
+
+    if (!currentPassword || !newUsername) {
+      return res.status(400).json({ error: 'Current password and new username are required' });
+    }
+
+    if (newUsername.length < 4 || /[^a-zA-Z0-9_]/.test(newUsername)) {
+      return res.status(400).json({ error: 'Username baru tidak valid (minimal 4 karakter, hanya huruf, angka, dan underscore).' });
+    }
+
+    // 1. Get user details from database
+    const user = getUserByUsername(decoded.username);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // 2. Verify current password
+    const isCurrentValid = bcrypt.compareSync(currentPassword, user.password_hash);
+    if (!isCurrentValid) {
+      return res.status(400).json({ error: 'Password saat ini salah' });
+    }
+
+    // 3. Check if new username is already taken
+    const existingUser = getUserByUsername(newUsername);
+    if (existingUser) {
+      return res.status(400).json({ error: 'Username sudah digunakan oleh akun lain' });
+    }
+
+    // 4. Update username in DB
+    updateUserUsername(user.id, newUsername);
+
+    // 5. Generate new token with updated username
+    const newToken = jwt.sign(
+      { id: user.id, username: newUsername, account_name: user.account_name, profile_picture: user.profile_picture, role: user.role, site_uuid: user.site_uuid, agent_uuid: user.agent_uuid },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    // Set new HttpOnly cookie
+    res.cookie('token', newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
+    });
+
+    return res.json({ ok: true, message: 'Username berhasil diubah!', newUsername });
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+router.post('/change-account-name', (req, res) => {
+  const token = req.cookies?.token;
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const { currentPassword, newAccountName } = req.body;
+
+    if (!currentPassword || newAccountName === undefined || newAccountName === null) {
+      return res.status(400).json({ error: 'Current password and new account name are required' });
+    }
+
+    if (newAccountName.trim().length === 0) {
+      return res.status(400).json({ error: 'Nama akun tidak boleh kosong' });
+    }
+
+    // 1. Get user details from database
+    const user = getUserByUsername(decoded.username);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // 2. Verify current password
+    const isCurrentValid = bcrypt.compareSync(currentPassword, user.password_hash);
+    if (!isCurrentValid) {
+      return res.status(400).json({ error: 'Password saat ini salah' });
+    }
+
+    // 3. Update account name in DB
+    updateUserAccountName(user.id, newAccountName.trim());
+
+    // 4. Generate new token with updated account name
+    const newToken = jwt.sign(
+      { id: user.id, username: user.username, account_name: newAccountName.trim(), profile_picture: user.profile_picture, role: user.role, site_uuid: user.site_uuid, agent_uuid: user.agent_uuid },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    // Set new HttpOnly cookie
+    res.cookie('token', newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
+    });
+
+    return res.json({ ok: true, message: 'Nama akun berhasil diubah!', newAccountName: newAccountName.trim() });
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+router.post('/upload-profile-picture', upload.single('profile_picture'), (req, res) => {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image uploaded' });
+    }
+
+    const user = getUserByUsername(decoded.username);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    updateUserProfilePicture(user.id, req.file.filename);
+
+    const newToken = jwt.sign(
+      { id: user.id, username: user.username, account_name: user.account_name, profile_picture: req.file.filename, role: user.role, site_uuid: user.site_uuid, agent_uuid: user.agent_uuid },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.cookie('token', newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000
+    });
+
+    res.json({ ok: true, message: 'Foto profil berhasil diperbarui', profile_picture: req.file.filename });
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+router.post('/remove-profile-picture', (req, res) => {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = getUserByUsername(decoded.username);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (user.profile_picture) {
+      const filePath = path.join(__dirname, '..', 'uploads', user.profile_picture);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    updateUserProfilePicture(user.id, null);
+
+    const newToken = jwt.sign(
+      { id: user.id, username: user.username, account_name: user.account_name, profile_picture: null, role: user.role, site_uuid: user.site_uuid, agent_uuid: user.agent_uuid },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.cookie('token', newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000
+    });
+
+    res.json({ ok: true, message: 'Foto profil berhasil dihapus' });
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
   }
 });
 
