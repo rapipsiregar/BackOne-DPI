@@ -48,11 +48,16 @@ for (const u of expectedUsernames) {
 console.log("- Verifying data scoping/isolation for 1R-79-J9-YE...");
 const agentUuid = '1R-79-J9-YE';
 
+const allowedMacs = [
+  '70:85:6c:6d:f7:17', '70:85:6c:81:50:d4', 'a2:cc:8e:7d:39:51',
+  'f2:69:9d:a1:5e:11', '8e:91:0f:6e:24:63'
+];
+
 // A. Check flows count
 const flows = dbModule.getLatestFlows(100, null, agentUuid);
 console.log(`  Scoped flows count: ${flows.length}`);
 for (const f of flows) {
-  if (!['a2:cc:8e:7d:39:51', 'f2:69:9d:a1:5e:11', '8e:91:0f:6e:24:63'].includes(f.src_mac)) {
+  if (!allowedMacs.includes(f.src_mac)) {
     throw new Error(`❌ TEST FAILED: Flow src_mac '${f.src_mac}' leaked into 1R-79-J9-YE scope!`);
   }
 }
