@@ -913,6 +913,89 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
   const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM devices`).get();
   if (!latest?.t) return [];
 
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+
+    // Fetch all flows aggregated by IP address across all time/snapshots
+    const flowsData = d.prepare(`
+      SELECT src_ip, src_mac, SUM(bytes_download) as download, SUM(bytes_upload) as upload, MAX(last_seen) as last_seen, MAX(fetched_at) as fetched_at
+      FROM flows
+      WHERE src_mac IN (${placeholders})
+      GROUP BY src_ip
+    `).all(...macs);
+
+    // Fetch all devices matching this agent's criteria across all snapshots
+    const devicesData = d.prepare(`
+      SELECT ip_address, mac_address, device_label, device_type, os_label, manufacturer, download, upload, fetched_at
+      FROM devices
+      GROUP BY ip_address
+    `).all();
+
+    // Map discovered devices to allow lookups by IP
+    const devicesMap = new Map();
+    for (const dev of devicesData) {
+      if (dev.ip_address && deviceMatchesAgent(dev.ip_address, dev.mac_address, agentUuid)) {
+        devicesMap.set(dev.ip_address, dev);
+      }
+    }
+
+    const resolved = [];
+    const seenIps = new Set();
+
+    // Load intelligence tables to assist in type resolving
+    const intelList = d.prepare("SELECT * FROM intel_device_discovery").all();
+    const intelMap = new Map(intelList.map(i => [i.ip_address, i]));
+
+    function processAgentDevice(ip, mac, dbDev, download, upload, lastSeen) {
+      const intelInfo = intelMap.get(ip);
+      const dbLabel = dbDev ? dbDev.device_label : (intelInfo ? intelInfo.device_label : null);
+      const dbMan = dbDev ? dbDev.manufacturer : (intelInfo ? intelInfo.manufacturer : null);
+      const dbType = intelInfo ? intelInfo.device_type : null;
+
+      const meta = resolveDeviceMetadata(ip, mac, dbLabel, dbMan, dbType);
+      const isRouted = mac === '04:f4:1c:ce:c2:e6' && ip !== '10.6.50.25' && ip !== '10.6.12.242';
+
+      return {
+        id: dbDev ? dbDev.id : null,
+        site_uuid: dbDev ? dbDev.site_uuid : siteUuid,
+        fetched_at: lastSeen || latest.t,
+        mac_address: mac,
+        ip_address: ip,
+        device_label: meta.label,
+        device_type: meta.type,
+        os_label: meta.os,
+        manufacturer: meta.manufacturer,
+        download: download || 0,
+        upload: upload || 0,
+        total: (download || 0) + (upload || 0),
+        is_gateway_routed: isRouted ? 1 : 0
+      };
+    }
+
+    // 1. Process flowsData
+    for (const f of flowsData) {
+      if (!f.src_ip || seenIps.has(f.src_ip)) continue;
+      if (deviceMatchesAgent(f.src_ip, f.src_mac, agentUuid)) {
+        seenIps.add(f.src_ip);
+        const dbDev = devicesMap.get(f.src_ip);
+        resolved.push(processAgentDevice(f.src_ip, f.src_mac, dbDev, f.download, f.upload, f.last_seen || f.fetched_at));
+      }
+    }
+
+    // 2. Process devicesData that were not in flowsData but match agent
+    for (const dev of devicesData) {
+      if (!dev.ip_address || seenIps.has(dev.ip_address)) continue;
+      if (deviceMatchesAgent(dev.ip_address, dev.mac_address, agentUuid)) {
+        seenIps.add(dev.ip_address);
+        resolved.push(processAgentDevice(dev.ip_address, dev.mac_address, dev, dev.download, dev.upload, dev.fetched_at));
+      }
+    }
+
+    resolved.sort((a, b) => b.download - a.download);
+    return resolved.slice(0, limit);
+  }
+
   // Load intelligence tables to assist in type resolving
   const intelList = d.prepare("SELECT * FROM intel_device_discovery").all();
   const intelMap = new Map(intelList.map(i => [i.ip_address, i]));
@@ -1004,10 +1087,10 @@ function getLatestFlows(limit = 100, siteUuid = null, agentUuid = null) {
     const placeholders = macs.map(() => '?').join(',');
     return d.prepare(`
       SELECT * FROM flows 
-      WHERE src_mac IN (${placeholders}) AND fetched_at = ? 
-      ORDER BY bytes_download DESC 
+      WHERE src_mac IN (${placeholders}) 
+      ORDER BY last_seen DESC, fetched_at DESC 
       LIMIT ?
-    `).all(...macs, latest.t, limit);
+    `).all(...macs, limit);
   }
 
   return d.prepare(`
@@ -1127,14 +1210,23 @@ function getBandwidthTimeline(points = 60, siteUuid = null, agentUuid = null) {
     const macs = AGENT_MAC_MAP[agentUuid];
     const placeholders = macs.map(() => '?').join(',');
     return d.prepare(`
-      SELECT fetched_at, SUM(download) AS total_download, SUM(upload) AS total_upload,
-             0 AS total_flows, 0 AS active_devices
-      FROM mac_bandwidth
-      WHERE mac_address IN (${placeholders})
-      GROUP BY fetched_at
-      ORDER BY fetched_at DESC
+      SELECT mb.fetched_at, 
+             SUM(mb.download) AS total_download, 
+             SUM(mb.upload) AS total_upload,
+             COALESCE(fl.flow_count, 0) AS total_flows,
+             COALESCE(fl.device_count, 0) AS active_devices
+      FROM mac_bandwidth mb
+      LEFT JOIN (
+        SELECT fetched_at, COUNT(*) AS flow_count, COUNT(DISTINCT src_ip) AS device_count
+        FROM flows
+        WHERE src_mac IN (${placeholders})
+        GROUP BY fetched_at
+      ) fl ON fl.fetched_at = mb.fetched_at
+      WHERE mb.mac_address IN (${placeholders})
+      GROUP BY mb.fetched_at
+      ORDER BY mb.fetched_at DESC
       LIMIT ?
-    `).all(...macs, points).reverse();
+    `).all(...macs, ...macs, points).reverse();
   }
   return d.prepare(`
     SELECT * FROM bandwidth_timeline WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT @limit
@@ -1148,17 +1240,32 @@ function getStats(siteUuid = null, agentUuid = null) {
     const macs = AGENT_MAC_MAP[agentUuid];
     const placeholders = macs.map(() => '?').join(',');
     
-    // Count active devices for this agent
-    const totalDevices = getLatestDevices(1000, siteUuid, agentUuid).length;
+    // Count cumulative unique client devices for this agent
+    const flowsIPs = d.prepare(`
+      SELECT DISTINCT src_ip, src_mac FROM flows 
+      WHERE src_mac IN (${placeholders})
+    `).all(...macs);
 
-    // Count active flows for this agent
-    const latestFlowFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
-    const activeFlows = latestFlowFetch?.t
-      ? (d.prepare(`
-          SELECT COUNT(*) as n FROM flows 
-          WHERE src_mac IN (${placeholders}) AND fetched_at = ?
-        `).get(...macs, latestFlowFetch.t)?.n ?? 0)
-      : 0;
+    const devicesIPs = d.prepare(`
+      SELECT DISTINCT ip_address, mac_address FROM devices
+    `).all();
+
+    const uniqueDevs = new Set();
+    const addDev = (ip, mac) => {
+      if (!ip) return;
+      if (deviceMatchesAgent(ip, mac, agentUuid)) {
+        uniqueDevs.add(ip);
+      }
+    };
+    for (const f of flowsIPs) addDev(f.src_ip, f.src_mac);
+    for (const dev of devicesIPs) addDev(dev.ip_address, dev.mac_address);
+    const totalDevices = uniqueDevs.size;
+
+    // Count cumulative flows for this agent
+    const activeFlows = d.prepare(`
+      SELECT COUNT(*) as n FROM flows 
+      WHERE src_mac IN (${placeholders})
+    `).get(...macs)?.n ?? 0;
 
     // Count threats for this agent
     const totalThreats = d.prepare(`
