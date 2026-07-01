@@ -41,11 +41,17 @@ function explainAppOrPort(appLabel: string | null, domain: string | null, port: 
     "1813": "RADIUS Accounting Server"
   };
 
-  const explanation = matches[portStr] || (label.toLowerCase().includes("tls") || label.toLowerCase().includes("https") ? "Encrypted Connection (SSL/TLS)" : "");
-  
+  let mainLabel = label;
+  let subLabel = matches[portStr] || (label.toLowerCase().includes("tls") || label.toLowerCase().includes("https") ? "Encrypted Connection (SSL/TLS)" : "");
+
+  if (appLabel && appLabel.includes("(") && domain && domain.startsWith("Port ")) {
+    mainLabel = appLabel;
+    subLabel = domain;
+  }
+
   return {
-    main: label || `Port ${port}`,
-    sub: explanation
+    main: mainLabel || `Port ${port}`,
+    sub: subLabel
   };
 }
 

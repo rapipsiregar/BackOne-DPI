@@ -18,17 +18,17 @@ interface DataTableProps<T> {
   getRowClassName?: (row: T) => string;
 }
 
-export function DataTable<T>({ 
-  data, 
-  columns, 
-  searchPlaceholder = "Search...", 
+export function DataTable<T>({
+  data,
+  columns,
+  searchPlaceholder = "Search...",
   searchFilter,
   isLoading,
   getRowClassName
 }: DataTableProps<T>) {
   const [query, setQuery] = useState("");
 
-  const filteredData = searchFilter 
+  const filteredData = searchFilter
     ? data.filter(row => searchFilter(row, query))
     : data;
 
@@ -86,8 +86,8 @@ export function DataTable<T>({
                 </tr>
               ) : (
                 filteredData.map((row, i) => (
-                  <tr 
-                    key={i} 
+                  <tr
+                    key={i}
                     className={`hover:bg-primary/5 transition-colors duration-200 group ${getRowClassName ? getRowClassName(row) : ""}`}
                   >
                     {columns.map((col, j) => (

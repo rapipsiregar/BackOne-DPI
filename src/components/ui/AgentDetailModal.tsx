@@ -251,7 +251,18 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                               {f.dst_ip && <IpDetails ip={f.dst_ip} />}
                             </div>
                           </td>
-                          <td className="px-3 py-2 text-xs text-purple-300 max-w-[140px] truncate">{f.app_label || f.domain || "—"}</td>
+                           <td className="px-3 py-2 whitespace-nowrap max-w-[200px]">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-semibold text-purple-300 text-xs truncate" title={f.app_label || "—"}>
+                                {f.app_label || "—"}
+                              </span>
+                              {f.domain && (
+                                <span className="text-[10px] text-slate-500 italic truncate" title={f.domain}>
+                                  {f.domain}
+                                </span>
+                              )}
+                            </div>
+                           </td>
                           <td className="px-3 py-2 text-xs text-slate-400">{f.protocol || "—"}</td>
                           <td className="px-3 py-2 text-right text-xs text-cyan-400 whitespace-nowrap">{fmtBytes(f.download)}</td>
                           <td className="px-3 py-2 text-right text-xs text-green-400 whitespace-nowrap">{fmtBytes(f.upload)}</td>

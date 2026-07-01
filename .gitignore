@@ -41,7 +41,12 @@ yarn-error.log*
 next-env.d.ts
 
 # local databases & temporary files
-
 temp.json
 /scratch
-
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+backend/*.sqlite
+*.db
+*.db-shm
+*.db-wal

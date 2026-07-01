@@ -10,7 +10,21 @@ const app       = express();
 const PORT      = process.env.BACKEND_PORT || 3001;
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(cors({ origin: true, credentials: true }));
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Blocked by CORS policy (Unauthorized Origin)'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
 app.use(cookieParser());
 

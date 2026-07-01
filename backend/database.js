@@ -1,7 +1,7 @@
 // backend/database.js
 const Database = require('better-sqlite3');
-const path     = require('path');
-const bcrypt   = require('bcryptjs');
+const path = require('path');
+const bcrypt = require('bcryptjs');
 
 const DB_PATH = path.join(__dirname, 'netify_data.db');
 let db;
@@ -28,15 +28,15 @@ function getAgentTrafficRatio(agentUuid) {
   const d = getDB();
   const macs = AGENT_MAC_MAP[agentUuid];
   if (!macs || macs.length === 0) return 0;
-  
+
   const latest = d.prepare("SELECT MAX(fetched_at) as t FROM mac_bandwidth").get();
   if (!latest?.t) return 0;
-  
+
   const siteTotal = d.prepare("SELECT SUM(total) as val FROM mac_bandwidth WHERE fetched_at = ?").get(latest.t)?.val || 1;
-  
+
   const placeholders = macs.map(() => '?').join(',');
   const agentTotal = d.prepare(`SELECT SUM(total) as val FROM mac_bandwidth WHERE fetched_at = ? AND mac_address IN (${placeholders})`).get(latest.t, ...macs)?.val || 0;
-  
+
   return siteTotal > 0 ? (agentTotal / siteTotal) : 0;
 }
 
@@ -77,7 +77,7 @@ function initSchema() {
     d.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)").run('admin', hash, 'SUPER_ADMIN');
     console.log('[DB] Created default admin user (admin / admin123)');
   }
-  
+
   const agentExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'agent1'").get();
   if (agentExists.count === 0) {
     const hash = bcrypt.hashSync('agent123', 10);
@@ -568,7 +568,7 @@ function initSchema() {
 // ─── INSERT FUNCTIONS ─────────────────────────────────────────────────────────
 
 function insertBandwidthApps(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO bandwidth_apps
     (site_uuid, fetched_at, app_id, app_label, app_tag, category, favicon, download, upload, total, flow_count)
@@ -577,23 +577,23 @@ function insertBandwidthApps(rows, fetchedAt, siteUuid) {
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-    siteUuid, fetchedAt,
-        r.app_id    ?? null,
+        siteUuid, fetchedAt,
+        r.app_id ?? null,
         r.app_label ?? 'Unknown',
-        r.app_tag   ?? null,
-        r.category  ?? null,
-        r.favicon   ?? null,
-        r.download  ?? 0,
-        r.upload    ?? 0,
-        r.total     ?? (r.download ?? 0) + (r.upload ?? 0),
-        r.flows     ?? 0
+        r.app_tag ?? null,
+        r.category ?? null,
+        r.favicon ?? null,
+        r.download ?? 0,
+        r.upload ?? 0,
+        r.total ?? (r.download ?? 0) + (r.upload ?? 0),
+        r.flows ?? 0
       );
     }
   })(rows);
 }
 
 function insertDevices(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO devices
     (site_uuid, fetched_at, mac_address, ip_address, device_label, device_type, os_label, manufacturer, download, upload, last_seen)
@@ -602,23 +602,23 @@ function insertDevices(rows, fetchedAt, siteUuid) {
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-    siteUuid, fetchedAt,
-        r.mac_address  ?? null,
-        r.ip_address   ?? null,
+        siteUuid, fetchedAt,
+        r.mac_address ?? null,
+        r.ip_address ?? null,
         r.device_label ?? r.ip_address ?? 'Unknown',
-        r.device_type  ?? null,
-        r.os_label     ?? null,
+        r.device_type ?? null,
+        r.os_label ?? null,
         r.manufacturer ?? null,
-        r.download     ?? 0,
-        r.upload       ?? 0,
-        r.last_seen    ?? fetchedAt
+        r.download ?? 0,
+        r.upload ?? 0,
+        r.last_seen ?? fetchedAt
       );
     }
   })(rows);
 }
 
 function insertFlows(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO flows
     (site_uuid, fetched_at, flow_id, src_ip, src_mac, dst_ip, dst_port, protocol, app_label, domain, bytes_download, bytes_upload, first_seen, last_seen)
@@ -627,26 +627,26 @@ function insertFlows(rows, fetchedAt, siteUuid) {
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-    siteUuid, fetchedAt,
-        r.flow_id   ?? null,
-        r.src_ip    ?? null,
-        r.src_mac   ?? null,
-        r.dst_ip    ?? null,
-        r.dst_port  ?? null,
-        r.protocol  ?? null,
+        siteUuid, fetchedAt,
+        r.flow_id ?? null,
+        r.src_ip ?? null,
+        r.src_mac ?? null,
+        r.dst_ip ?? null,
+        r.dst_port ?? null,
+        r.protocol ?? null,
         r.app_label ?? null,
-        r.domain    ?? null,
-        r.download  ?? 0,
-        r.upload    ?? 0,
+        r.domain ?? null,
+        r.download ?? 0,
+        r.upload ?? 0,
         r.first_seen ?? fetchedAt,
-        r.last_seen  ?? fetchedAt
+        r.last_seen ?? fetchedAt
       );
     }
   })(rows);
 }
 
 function insertThreats(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO threats
     (site_uuid, fetched_at, threat_id, threat_type, severity, mac_address, ip_address, dst_ip, app_label, domain, description, detected_at)
@@ -655,15 +655,15 @@ function insertThreats(rows, fetchedAt, siteUuid) {
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-    siteUuid, fetchedAt,
-        r.threat_id   ?? null,
+        siteUuid, fetchedAt,
+        r.threat_id ?? null,
         r.threat_type ?? null,
-        r.severity    ?? null,
+        r.severity ?? null,
         r.mac_address ?? null,
-        r.ip_address  ?? null,
-        r.dst_ip      ?? null,
-        r.app_label   ?? null,
-        r.domain      ?? null,
+        r.ip_address ?? null,
+        r.dst_ip ?? null,
+        r.app_label ?? null,
+        r.domain ?? null,
         r.description ?? null,
         r.detected_at ?? fetchedAt
       );
@@ -672,7 +672,7 @@ function insertThreats(rows, fetchedAt, siteUuid) {
 }
 
 function insertProtocols(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO bandwidth_protocols
     (site_uuid, fetched_at, protocol_id, protocol_label, download, upload, flow_count)
@@ -682,19 +682,19 @@ function insertProtocols(rows, fetchedAt, siteUuid) {
     for (const r of items) {
       // Data sudah di-flatten oleh netify.js — akses langsung tanpa nested
       stmt.run(
-    siteUuid, fetchedAt,
-        r.protocol_id    ?? null,
+        siteUuid, fetchedAt,
+        r.protocol_id ?? null,
         r.protocol_label ?? 'Unknown',
-        r.download       ?? 0,
-        r.upload         ?? 0,
-        r.flows          ?? 0
+        r.download ?? 0,
+        r.upload ?? 0,
+        r.flows ?? 0
       );
     }
   })(rows);
 }
 
 function insertCountries(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO bandwidth_countries
     (site_uuid, fetched_at, country_code, country_name, download, upload, flow_count)
@@ -704,19 +704,19 @@ function insertCountries(rows, fetchedAt, siteUuid) {
     for (const r of items) {
       // Data sudah di-flatten oleh netify.js — akses langsung tanpa nested
       stmt.run(
-    siteUuid, fetchedAt,
+        siteUuid, fetchedAt,
         r.country_code ?? null,
         r.country_name ?? 'Unknown',
-        r.download     ?? 0,
-        r.upload       ?? 0,
-        r.flows        ?? 0
+        r.download ?? 0,
+        r.upload ?? 0,
+        r.flows ?? 0
       );
     }
   })(rows);
 }
 
 function insertDNS(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO dns_queries
     (site_uuid, fetched_at, domain, query_count, app_label, category)
@@ -725,18 +725,18 @@ function insertDNS(rows, fetchedAt, siteUuid) {
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-    siteUuid, fetchedAt,
-        r.domain      ?? null,
+        siteUuid, fetchedAt,
+        r.domain ?? null,
         r.query_count ?? 0,
-        r.app_label   ?? null,
-        r.category    ?? null
+        r.app_label ?? null,
+        r.category ?? null
       );
     }
   })(rows);
 }
 
 function insertEvents(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO events
     (site_uuid, fetched_at, event_id, event_type, severity, mac_address, ip_address, description, event_at)
@@ -745,14 +745,14 @@ function insertEvents(rows, fetchedAt, siteUuid) {
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-    siteUuid, fetchedAt,
-        r.event_id    ?? null,
-        r.event_type  ?? null,
-        r.severity    ?? null,
+        siteUuid, fetchedAt,
+        r.event_id ?? null,
+        r.event_type ?? null,
+        r.severity ?? null,
         r.mac_address ?? null,
-        r.ip_address  ?? null,
+        r.ip_address ?? null,
         r.description ?? null,
-        r.event_at    ?? fetchedAt
+        r.event_at ?? fetchedAt
       );
     }
   })(rows);
@@ -771,29 +771,73 @@ function insertBandwidthTimeline(summary, fetchedAt, siteUuid) {
 // ─── QUERY FUNCTIONS ──────────────────────────────────────────────────────────
 
 function getLatestBandwidthApps(limit = 20, siteUuid = null, agentUuid = null) {
-  const d      = getDB();
+  const d = getDB();
   const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
   if (!latest?.t) return [];
 
   if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
     const macs = AGENT_MAC_MAP[agentUuid];
     const placeholders = macs.map(() => '?').join(',');
-    return d.prepare(`
-      SELECT app_label, SUM(bytes_download) AS download, SUM(bytes_upload) AS upload,
-             (SUM(bytes_download) + SUM(bytes_upload)) AS total, COUNT(*) AS flow_count
+
+    // 1. Get raw aggregated apps bandwidth from flows table for this agent (cumulative)
+    const rawApps = d.prepare(`
+      SELECT app_label, SUM(bytes_download) AS download, SUM(bytes_upload) AS upload
       FROM flows
-      WHERE src_mac IN (${placeholders}) AND fetched_at = ? AND app_label IS NOT NULL
+      WHERE src_mac IN (${placeholders}) AND app_label IS NOT NULL
       GROUP BY app_label
-      ORDER BY download DESC
-      LIMIT ?
-    `).all(...macs, latest.t, limit);
+    `).all(...macs);
+
+    if (rawApps.length === 0) return [];
+
+    // Calculate sum of download/upload across all these apps
+    let totalFlowDl = 0;
+    let totalFlowUl = 0;
+    for (const r of rawApps) {
+      totalFlowDl += r.download;
+      totalFlowUl += r.upload;
+    }
+
+    // 2. Get true cumulative bandwidth from mac_bandwidth table
+    const latestMacSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM mac_bandwidth`).get()?.t;
+    const trueBw = latestMacSnap
+      ? d.prepare(`
+          SELECT SUM(download) AS dl, SUM(upload) AS ul
+          FROM mac_bandwidth
+          WHERE mac_address IN (${placeholders}) AND fetched_at = ?
+        `).get(...macs, latestMacSnap)
+      : null;
+
+    const trueDl = trueBw?.dl ?? 0;
+    const trueUl = trueBw?.ul ?? 0;
+
+    // Calculate scaling factors
+    const dlFactor = totalFlowDl > 0 ? trueDl / totalFlowDl : 1;
+    const ulFactor = totalFlowUl > 0 ? trueUl / totalFlowUl : 1;
+
+    // Map and scale
+    const scaledApps = rawApps.map(r => {
+      const dl = Math.round(r.download * dlFactor);
+      const ul = Math.round(r.upload * ulFactor);
+      return {
+        app_label: r.app_label,
+        download: dl,
+        upload: ul,
+        total: dl + ul,
+        flow_count: 0
+      };
+    });
+
+    // Sort by total bandwidth DESC
+    scaledApps.sort((a, b) => b.total - a.total);
+    return correlateAppLabels(scaledApps.slice(0, limit));
   }
 
   const appsLatest = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_apps`).get();
   if (!appsLatest?.t) return [];
-  return d.prepare(`
+  const rows = d.prepare(`
     SELECT * FROM bandwidth_apps WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
   `).all({ fetched_at: appsLatest.t, limit, siteUuid });
+  return correlateAppLabels(rows);
 }
 
 function resolveDeviceMetadata(ip, mac, dbLabel, dbManufacturer, dbType) {
@@ -898,18 +942,18 @@ function deviceMatchesAgent(ip, mac, agentUuid) {
     }
     if (agentUuid === '2F-TF-1D-GK') {
       return ip.startsWith('10.0.') || ip.startsWith('10.1.') || ip.startsWith('10.26.') ||
-             ip.startsWith('10.43.') || ip.startsWith('10.35.') || ip.startsWith('10.21.') ||
-             ip.startsWith('10.7.') || ip.startsWith('10.182.') || ip.startsWith('10.109.') ||
-             ip.startsWith('10.181.') || ip.startsWith('10.75.') || ip.startsWith('10.202.') ||
-             ip.startsWith('10.93.');
+        ip.startsWith('10.43.') || ip.startsWith('10.35.') || ip.startsWith('10.21.') ||
+        ip.startsWith('10.7.') || ip.startsWith('10.182.') || ip.startsWith('10.109.') ||
+        ip.startsWith('10.181.') || ip.startsWith('10.75.') || ip.startsWith('10.202.') ||
+        ip.startsWith('10.93.');
     }
   }
 
   return false;
 }
 
-function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
-  const d      = getDB();
+function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null, search = null) {
+  const d = getDB();
   const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM devices`).get();
   if (!latest?.t) return [];
 
@@ -940,6 +984,29 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
       }
     }
 
+    // Get true cumulative bandwidth from mac_bandwidth table to calculate scale factors
+    let totalFlowDl = 0;
+    let totalFlowUl = 0;
+    for (const f of flowsData) {
+      totalFlowDl += f.download;
+      totalFlowUl += f.upload;
+    }
+
+    const latestMacSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM mac_bandwidth`).get()?.t;
+    const trueBw = latestMacSnap
+      ? d.prepare(`
+          SELECT SUM(download) AS dl, SUM(upload) AS ul
+          FROM mac_bandwidth
+          WHERE mac_address IN (${placeholders}) AND fetched_at = ?
+        `).get(...macs, latestMacSnap)
+      : null;
+
+    const trueDl = trueBw?.dl ?? 0;
+    const trueUl = trueBw?.ul ?? 0;
+
+    const dlFactor = totalFlowDl > 0 ? trueDl / totalFlowDl : 1;
+    const ulFactor = totalFlowUl > 0 ? trueUl / totalFlowUl : 1;
+
     const resolved = [];
     const seenIps = new Set();
 
@@ -956,6 +1023,10 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
       const meta = resolveDeviceMetadata(ip, mac, dbLabel, dbMan, dbType);
       const isRouted = mac === '04:f4:1c:ce:c2:e6' && ip !== '10.6.50.25' && ip !== '10.6.12.242';
 
+      // Scale download and upload
+      const scaledDl = Math.round((download || 0) * dlFactor);
+      const scaledUl = Math.round((upload || 0) * ulFactor);
+
       return {
         id: dbDev ? dbDev.id : null,
         site_uuid: dbDev ? dbDev.site_uuid : siteUuid,
@@ -966,9 +1037,9 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
         device_type: meta.type,
         os_label: meta.os,
         manufacturer: meta.manufacturer,
-        download: download || 0,
-        upload: upload || 0,
-        total: (download || 0) + (upload || 0),
+        download: scaledDl || 0,
+        upload: scaledUl || 0,
+        total: (scaledDl || 0) + (scaledUl || 0),
         is_gateway_routed: isRouted ? 1 : 0
       };
     }
@@ -992,6 +1063,95 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
       }
     }
 
+    resolved.sort((a, b) => b.download - a.download);
+    return resolved.slice(0, limit);
+  }
+
+  // Admin View Search Logic
+  if (search) {
+    const q = `%${search}%`;
+
+    // 1. Fetch matching historical devices from devices table (grouped by IP address)
+    const devicesData = d.prepare(`
+      SELECT ip_address, mac_address, device_label, device_type, os_label, manufacturer, 
+             MAX(download) as download, MAX(upload) as upload, MAX(fetched_at) as fetched_at, site_uuid, id
+      FROM devices
+      WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (
+        ip_address LIKE @q OR 
+        mac_address LIKE @q OR 
+        device_label LIKE @q OR 
+        manufacturer LIKE @q OR
+        device_type LIKE @q OR
+        os_label LIKE @q
+      )
+      GROUP BY ip_address
+    `).all({ siteUuid, q });
+
+    // 2. Fetch matching historical flows from flows table (grouped by IP address)
+    const flowsData = d.prepare(`
+      SELECT src_ip as ip_address, src_mac as mac_address, 
+             SUM(bytes_download) as download, SUM(bytes_upload) as upload, 
+             MAX(last_seen) as last_seen, MAX(fetched_at) as fetched_at, site_uuid
+      FROM flows
+      WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (
+        src_ip LIKE @q OR 
+        src_mac LIKE @q OR 
+        app_label LIKE @q OR
+        domain LIKE @q
+      )
+      GROUP BY src_ip
+    `).all({ siteUuid, q });
+
+    const resolvedMap = new Map();
+    const intelList = d.prepare("SELECT * FROM intel_device_discovery").all();
+    const intelMap = new Map(intelList.map(i => [i.ip_address, i]));
+
+    const processSearchDevice = (ip, mac, dbDev, download, upload, lastSeen) => {
+      const intelInfo = intelMap.get(ip);
+      const dbLabel = dbDev ? dbDev.device_label : (intelInfo ? intelInfo.device_label : null);
+      const dbMan = dbDev ? dbDev.manufacturer : (intelInfo ? intelInfo.manufacturer : null);
+      const dbType = intelInfo ? intelInfo.device_type : null;
+
+      const meta = resolveDeviceMetadata(ip, mac, dbLabel, dbMan, dbType);
+      const isRouted = mac === '04:f4:1c:ce:c2:e6' && ip !== '10.6.50.25' && ip !== '10.6.12.242';
+
+      return {
+        id: dbDev ? dbDev.id : null,
+        site_uuid: dbDev ? dbDev.site_uuid : siteUuid,
+        fetched_at: lastSeen || latest.t,
+        mac_address: mac,
+        ip_address: ip,
+        device_label: meta.label,
+        device_type: meta.type,
+        os_label: meta.os,
+        manufacturer: meta.manufacturer,
+        download: download || 0,
+        upload: upload || 0,
+        total: (download || 0) + (upload || 0),
+        is_gateway_routed: isRouted ? 1 : 0
+      };
+    };
+
+    // Add from devicesData
+    for (const dev of devicesData) {
+      if (!dev.ip_address) continue;
+      resolvedMap.set(dev.ip_address, processSearchDevice(dev.ip_address, dev.mac_address, dev, dev.download, dev.upload, dev.fetched_at));
+    }
+
+    // Add/Merge from flowsData
+    for (const f of flowsData) {
+      if (!f.ip_address) continue;
+      const existing = resolvedMap.get(f.ip_address);
+      if (existing) {
+        existing.download = Math.max(existing.download, f.download || 0);
+        existing.upload = Math.max(existing.upload, f.upload || 0);
+        existing.total = existing.download + existing.upload;
+      } else {
+        resolvedMap.set(f.ip_address, processSearchDevice(f.ip_address, f.mac_address, null, f.download, f.upload, f.fetched_at));
+      }
+    }
+
+    const resolved = Array.from(resolvedMap.values());
     resolved.sort((a, b) => b.download - a.download);
     return resolved.slice(0, limit);
   }
@@ -1077,25 +1237,307 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
   return filtered.slice(0, limit);
 }
 
+function correlateFlows(flows) {
+  if (!Array.isArray(flows) || flows.length === 0) return flows;
+
+  const d = getDB();
+
+  // 1. Build cache maps for local IPs and public IPs in history
+  const devices = d.prepare(`
+    SELECT ip_address, device_label, manufacturer, device_type
+    FROM devices
+    WHERE ip_address IS NOT NULL
+  `).all();
+
+  const devMap = new Map();
+  for (const dev of devices) {
+    const label = dev.device_label || (dev.manufacturer && dev.manufacturer !== 'Unknown' ? `${dev.manufacturer} Device` : null);
+    if (label) {
+      devMap.set(dev.ip_address, label);
+    }
+  }
+
+  const flowIPs = d.prepare(`
+    SELECT dst_ip, domain, app_label, COUNT(*) as count
+    FROM flows
+    WHERE dst_ip IS NOT NULL 
+      AND (domain IS NOT NULL OR (app_label IS NOT NULL AND app_label NOT LIKE 'Port %'))
+    GROUP BY dst_ip, domain, app_label
+    ORDER BY count DESC
+  `).all();
+
+  const publicIpMap = new Map();
+  for (const row of flowIPs) {
+    if (!publicIpMap.has(row.dst_ip)) {
+      publicIpMap.set(row.dst_ip, {
+        domain: row.domain,
+        app_label: row.app_label
+      });
+    }
+  }
+
+  // Matches map for standard ports
+  const matches = {
+    "1433": "MSSQL Database Server",
+    "1434": "MSSQL Monitor Server",
+    "3306": "MySQL/MariaDB",
+    "5432": "PostgreSQL",
+    "1521": "Oracle DB Server",
+    "27017": "MongoDB",
+    "6379": "Redis Cache",
+    "80": "HTTP Web Server",
+    "443": "HTTPS/TLS Secure Connection",
+    "22": "SSH Remote Management",
+    "21": "FTP File Storage",
+    "23": "Telnet Command Insecure",
+    "25": "SMTP Mail Delivery",
+    "587": "Secure SMTP Mail",
+    "110": "POP3 Mail Retrieval",
+    "993": "Secure IMAP Mail",
+    "53": "DNS Domain Directory Query",
+    "123": "NTP Network Time",
+    "161": "SNMP Monitoring Service",
+    "3389": "RDP Remote Windows Desktop",
+    "445": "SMB Windows File Share",
+    "137": "NetBIOS Name Service",
+    "138": "NetBIOS Datagram Service",
+    "139": "NetBIOS Session Service",
+    "1812": "RADIUS Auth Server",
+    "1813": "RADIUS Accounting",
+    "5060": "SIP VoIP Service"
+  };
+
+  return flows.map(f => {
+    let appLabel = f.app_label;
+    let domain = f.domain;
+
+    const isPortLabel = !appLabel || appLabel.startsWith("Port ") || appLabel.toLowerCase().includes("port");
+
+    if (isPortLabel) {
+      const dstIp = f.dst_ip;
+      const dstPort = String(f.dst_port);
+      const proto = f.protocol || "TCP";
+
+      // Case A: Intranet IP
+      const isIntranet = dstIp && (
+        dstIp.startsWith("10.") ||
+        dstIp.startsWith("192.168.") ||
+        dstIp.startsWith("172.16.") ||
+        dstIp.startsWith("172.17.") ||
+        dstIp.startsWith("172.18.") ||
+        dstIp.startsWith("172.19.") ||
+        dstIp.startsWith("172.20.") ||
+        dstIp.startsWith("172.21.") ||
+        dstIp.startsWith("172.22.") ||
+        dstIp.startsWith("172.23.") ||
+        dstIp.startsWith("172.24.") ||
+        dstIp.startsWith("172.25.") ||
+        dstIp.startsWith("172.26.") ||
+        dstIp.startsWith("172.27.") ||
+        dstIp.startsWith("172.28.") ||
+        dstIp.startsWith("172.29.") ||
+        dstIp.startsWith("172.30.") ||
+        dstIp.startsWith("172.31.")
+      );
+
+      if (isIntranet) {
+        let friendlyName = devMap.get(dstIp);
+        if (!friendlyName) {
+          if (dstIp.startsWith("10.6.")) {
+            friendlyName = "IFG Client";
+          } else if (dstIp.startsWith("10.250.") || dstIp.startsWith("192.168.") || dstIp.startsWith("10.121.")) {
+            friendlyName = "CPI Client";
+          } else if (
+            dstIp.startsWith("10.0.") || dstIp.startsWith("10.1.") || dstIp.startsWith("10.26.") ||
+            dstIp.startsWith("10.43.") || dstIp.startsWith("10.35.") || dstIp.startsWith("10.21.") ||
+            dstIp.startsWith("10.7.") || dstIp.startsWith("10.182.") || dstIp.startsWith("10.109.") ||
+            dstIp.startsWith("10.181.") || dstIp.startsWith("10.75.") || dstIp.startsWith("10.202.") ||
+            dstIp.startsWith("10.93.")
+          ) {
+            friendlyName = "JRP Client";
+          } else {
+            friendlyName = "Intranet Client";
+          }
+        }
+        appLabel = `${friendlyName} (${dstIp})`;
+        domain = `Port ${dstPort} (${proto})`;
+      } else {
+        // Case B: Public IP
+        const cached = publicIpMap.get(dstIp);
+        if (cached) {
+          appLabel = cached.domain || cached.app_label || appLabel;
+          domain = `Port ${dstPort} (${proto})`;
+        } else {
+          const stdName = matches[dstPort];
+          if (stdName) {
+            appLabel = stdName;
+            domain = `Port ${dstPort} (${proto})`;
+          } else {
+            appLabel = `Public IP: ${dstIp}`;
+            domain = `Port ${dstPort} (${proto})`;
+          }
+        }
+      }
+    }
+
+    return {
+      ...f,
+      app_label: appLabel,
+      domain: domain
+    };
+  });
+}
+
+function correlateAppLabels(apps) {
+  if (!Array.isArray(apps) || apps.length === 0) return apps;
+
+  const d = getDB();
+
+  const devices = d.prepare(`
+    SELECT ip_address, device_label, manufacturer, device_type
+    FROM devices
+    WHERE ip_address IS NOT NULL
+  `).all();
+
+  const devMap = new Map();
+  for (const dev of devices) {
+    const label = dev.device_label || (dev.manufacturer && dev.manufacturer !== 'Unknown' ? `${dev.manufacturer} Device` : null);
+    if (label) {
+      devMap.set(dev.ip_address, label);
+    }
+  }
+
+  const flowIPs = d.prepare(`
+    SELECT dst_ip, domain, app_label, COUNT(*) as count
+    FROM flows
+    WHERE dst_ip IS NOT NULL 
+      AND (domain IS NOT NULL OR (app_label IS NOT NULL AND app_label NOT LIKE 'Port %'))
+    GROUP BY dst_ip, domain, app_label
+    ORDER BY count DESC
+  `).all();
+
+  const publicIpMap = new Map();
+  for (const row of flowIPs) {
+    if (!publicIpMap.has(row.dst_ip)) {
+      publicIpMap.set(row.dst_ip, {
+        domain: row.domain,
+        app_label: row.app_label
+      });
+    }
+  }
+
+  function getFriendlyIpName(ip) {
+    if (devMap.has(ip)) return devMap.get(ip);
+    if (publicIpMap.has(ip)) {
+      const pub = publicIpMap.get(ip);
+      return pub.domain || pub.app_label;
+    }
+    if (ip.startsWith('10.6.')) return 'IFG Client';
+    if (ip.startsWith('10.250.') || ip.startsWith('192.168.') || ip.startsWith('10.121.')) return 'CPI Client';
+    if (
+      ip.startsWith('10.0.') || ip.startsWith('10.1.') || ip.startsWith('10.26.') ||
+      ip.startsWith('10.43.') || ip.startsWith('10.35.') || ip.startsWith('10.21.') ||
+      ip.startsWith('10.7.') || ip.startsWith('10.182.') || ip.startsWith('10.109.') ||
+      ip.startsWith('10.181.') || ip.startsWith('10.75.') || ip.startsWith('10.202.') ||
+      ip.startsWith('10.93.')
+    ) return 'JRP Client';
+    return 'Intranet Client';
+  }
+
+  const matches = {
+    "1433": "MSSQL Database Server",
+    "1434": "MSSQL Monitor Server",
+    "3306": "MySQL/MariaDB",
+    "5432": "PostgreSQL",
+    "1521": "Oracle DB Server",
+    "27017": "MongoDB",
+    "6379": "Redis Cache",
+    "80": "HTTP Web Server",
+    "443": "HTTPS/TLS Secure Connection",
+    "22": "SSH Remote Management",
+    "21": "FTP File Storage",
+    "23": "Telnet Command Insecure",
+    "25": "SMTP Mail Delivery",
+    "587": "Secure SMTP Mail",
+    "110": "POP3 Mail Retrieval",
+    "993": "Secure IMAP Mail",
+    "53": "DNS Domain Directory Query",
+    "123": "NTP Network Time",
+    "161": "SNMP Monitoring Service",
+    "3389": "RDP Remote Windows Desktop",
+    "445": "SMB Windows File Share",
+    "137": "NetBIOS Name Service",
+    "138": "NetBIOS Datagram Service",
+    "139": "NetBIOS Session Service",
+    "1812": "RADIUS Auth Server",
+    "1813": "RADIUS Accounting",
+    "5060": "SIP VoIP Service"
+  };
+
+  return apps.map(app => {
+    let label = app.app_label;
+    if (!label) return app;
+
+    const isPortLabel = label.startsWith("Port ") || label.toLowerCase().includes("port");
+
+    if (isPortLabel) {
+      const portStr = label.replace("Port ", "").trim();
+      
+      const flow = d.prepare(`
+        SELECT dst_ip, protocol, dst_port
+        FROM flows
+        WHERE app_label = ? OR domain = ? OR dst_port = ?
+        GROUP BY dst_ip, protocol, dst_port
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+      `).get(label, label, portStr);
+
+      if (flow && flow.dst_ip) {
+        const friendlyName = getFriendlyIpName(flow.dst_ip);
+        label = `${friendlyName} (Port ${portStr})`;
+      } else {
+        const stdName = matches[portStr];
+        if (stdName) {
+          label = `${stdName} (Port ${portStr})`;
+        }
+      }
+    }
+
+    return {
+      ...app,
+      app_label: label
+    };
+  });
+}
+
 function getLatestFlows(limit = 100, siteUuid = null, agentUuid = null) {
-  const d      = getDB();
+  const d = getDB();
   const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
   if (!latest?.t) return [];
 
+  let rows = [];
   if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
     const macs = AGENT_MAC_MAP[agentUuid];
     const placeholders = macs.map(() => '?').join(',');
-    return d.prepare(`
+    rows = d.prepare(`
       SELECT * FROM flows 
       WHERE src_mac IN (${placeholders}) 
       ORDER BY last_seen DESC, fetched_at DESC 
       LIMIT ?
     `).all(...macs, limit);
+  } else {
+    rows = d.prepare(`
+      SELECT * FROM flows WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY bytes_download DESC LIMIT @limit
+    `).all({ fetched_at: latest.t, limit, siteUuid });
   }
 
-  return d.prepare(`
-    SELECT * FROM flows WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY bytes_download DESC LIMIT @limit
-  `).all({ fetched_at: latest.t, limit, siteUuid });
+  const mapped = rows.map(r => ({
+    ...r,
+    download: r.bytes_download ?? 0,
+    upload: r.bytes_upload ?? 0
+  }));
+
+  return correlateFlows(mapped);
 }
 
 function getLatestThreats(limit = 50, siteUuid = null, agentUuid = null) {
@@ -1114,7 +1556,7 @@ function getLatestThreats(limit = 50, siteUuid = null, agentUuid = null) {
 }
 
 function getLatestProtocols(limit = 20, siteUuid = null, agentUuid = null) {
-  const d      = getDB();
+  const d = getDB();
   const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
   if (!latest?.t) return [];
 
@@ -1139,7 +1581,7 @@ function getLatestProtocols(limit = 20, siteUuid = null, agentUuid = null) {
 }
 
 function getLatestCountries(limit = 15, siteUuid = null, agentUuid = null) {
-  const d      = getDB();
+  const d = getDB();
   const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM intel_ip_reputation`).get();
   if (!latest?.t) return [];
 
@@ -1165,7 +1607,7 @@ function getLatestCountries(limit = 15, siteUuid = null, agentUuid = null) {
 }
 
 function getLatestDNS(limit = 20, siteUuid = null, agentUuid = null) {
-  const d      = getDB();
+  const d = getDB();
   const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
   if (!latest?.t) return [];
 
@@ -1239,7 +1681,7 @@ function getStats(siteUuid = null, agentUuid = null) {
   if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
     const macs = AGENT_MAC_MAP[agentUuid];
     const placeholders = macs.map(() => '?').join(',');
-    
+
     // Count cumulative unique client devices for this agent
     const flowsIPs = d.prepare(`
       SELECT DISTINCT src_ip, src_mac FROM flows 
@@ -1307,9 +1749,9 @@ function getStats(siteUuid = null, agentUuid = null) {
     : 0;
 
   const totalThreats = d.prepare(`SELECT COUNT(*) as n FROM threats WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid)`).get({ siteUuid })?.n ?? 0;
-  const totalEvents  = d.prepare(`SELECT COUNT(*) as n FROM events WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid)`).get({ siteUuid })?.n  ?? 0;
-  const lastFetch    = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_timeline`).get()?.t ?? null;
-  const latestBw     = d.prepare(`SELECT * FROM bandwidth_timeline WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT 1`).get({ siteUuid });
+  const totalEvents = d.prepare(`SELECT COUNT(*) as n FROM events WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid)`).get({ siteUuid })?.n ?? 0;
+  const lastFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_timeline`).get()?.t ?? null;
+  const latestBw = d.prepare(`SELECT * FROM bandwidth_timeline WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT 1`).get({ siteUuid });
 
   return { totalDevices, activeFlows, totalThreats, totalEvents, lastFetch, latestBw };
 }
@@ -1320,8 +1762,10 @@ function insertAppCategories(rows, fetchedAt, siteUuid) {
   const stmt = d.prepare(`INSERT INTO app_categories
     (site_uuid, fetched_at, category_label, download, upload, total)
     VALUES (?, ?,?,?,?,?)`);
-  d.transaction(items => { for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.category_label, r.download, r.upload, r.total); })(rows);
+  d.transaction(items => {
+    for (const r of items) stmt.run(
+      siteUuid, fetchedAt, r.category_label, r.download, r.upload, r.total);
+  })(rows);
 }
 
 function insertContinents(rows, fetchedAt, siteUuid) {
@@ -1329,8 +1773,10 @@ function insertContinents(rows, fetchedAt, siteUuid) {
   const stmt = d.prepare(`INSERT INTO continents
     (site_uuid, fetched_at, continent_name, download, upload, total)
     VALUES (?, ?,?,?,?,?)`);
-  d.transaction(items => { for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.continent_name, r.download, r.upload, r.total); })(rows);
+  d.transaction(items => {
+    for (const r of items) stmt.run(
+      siteUuid, fetchedAt, r.continent_name, r.download, r.upload, r.total);
+  })(rows);
 }
 
 function insertRegions(rows, fetchedAt, siteUuid) {
@@ -1338,8 +1784,10 @@ function insertRegions(rows, fetchedAt, siteUuid) {
   const stmt = d.prepare(`INSERT INTO regions
     (site_uuid, fetched_at, region_name, region_code, country_name, country_code, download)
     VALUES (?, ?,?,?,?,?,?)`);
-  d.transaction(items => { for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.region_name, r.region_code, r.country_name, r.country_code, r.download); })(rows);
+  d.transaction(items => {
+    for (const r of items) stmt.run(
+      siteUuid, fetchedAt, r.region_name, r.region_code, r.country_name, r.country_code, r.download);
+  })(rows);
 }
 
 function insertCities(rows, fetchedAt, siteUuid) {
@@ -1347,8 +1795,10 @@ function insertCities(rows, fetchedAt, siteUuid) {
   const stmt = d.prepare(`INSERT INTO cities
     (site_uuid, fetched_at, city_name, region_name, country_name, country_code, download)
     VALUES (?, ?,?,?,?,?,?)`);
-  d.transaction(items => { for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.city_name, r.region_name, r.country_name, r.country_code, r.download); })(rows);
+  d.transaction(items => {
+    for (const r of items) stmt.run(
+      siteUuid, fetchedAt, r.city_name, r.region_name, r.country_name, r.country_code, r.download);
+  })(rows);
 }
 
 function insertVLANs(rows, fetchedAt, siteUuid) {
@@ -1356,8 +1806,10 @@ function insertVLANs(rows, fetchedAt, siteUuid) {
   const stmt = d.prepare(`INSERT INTO vlans
     (site_uuid, fetched_at, vlan_id, vlan_label, download, upload, total)
     VALUES (?, ?,?,?,?,?,?)`);
-  d.transaction(items => { for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.vlan_id, r.vlan_label, r.download, r.upload, r.total); })(rows);
+  d.transaction(items => {
+    for (const r of items) stmt.run(
+      siteUuid, fetchedAt, r.vlan_id, r.vlan_label, r.download, r.upload, r.total);
+  })(rows);
 }
 
 function insertInterfaces(rows, fetchedAt, siteUuid) {
@@ -1365,8 +1817,10 @@ function insertInterfaces(rows, fetchedAt, siteUuid) {
   const stmt = d.prepare(`INSERT INTO interfaces
     (site_uuid, fetched_at, iface_id, iface_name, iface_role, agent_id, download, upload, total)
     VALUES (?, ?,?,?,?,?,?,?,?)`);
-  d.transaction(items => { for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.iface_id, r.iface_name, r.iface_role, String(r.agent_id ?? ''), r.download, r.upload, r.total); })(rows);
+  d.transaction(items => {
+    for (const r of items) stmt.run(
+      siteUuid, fetchedAt, r.iface_id, r.iface_name, r.iface_role, String(r.agent_id ?? ''), r.download, r.upload, r.total);
+  })(rows);
 }
 
 function insertFlowTypes(rows, fetchedAt, siteUuid) {
@@ -1374,8 +1828,10 @@ function insertFlowTypes(rows, fetchedAt, siteUuid) {
   const stmt = d.prepare(`INSERT INTO flow_types
     (site_uuid, fetched_at, flow_type_label, download, upload, total)
     VALUES (?, ?,?,?,?,?)`);
-  d.transaction(items => { for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.flow_type_label, r.download, r.upload, r.total); })(rows);
+  d.transaction(items => {
+    for (const r of items) stmt.run(
+      siteUuid, fetchedAt, r.flow_type_label, r.download, r.upload, r.total);
+  })(rows);
 }
 
 function insertFlowOrigins(rows, fetchedAt, siteUuid) {
@@ -1383,8 +1839,10 @@ function insertFlowOrigins(rows, fetchedAt, siteUuid) {
   const stmt = d.prepare(`INSERT INTO flow_origins
     (site_uuid, fetched_at, flow_origin_label, download, upload, total)
     VALUES (?, ?,?,?,?,?)`);
-  d.transaction(items => { for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.flow_origin_label, r.download, r.upload, r.total); })(rows);
+  d.transaction(items => {
+    for (const r of items) stmt.run(
+      siteUuid, fetchedAt, r.flow_origin_label, r.download, r.upload, r.total);
+  })(rows);
 }
 
 function insertIPVersions(rows, fetchedAt, siteUuid) {
@@ -1392,8 +1850,10 @@ function insertIPVersions(rows, fetchedAt, siteUuid) {
   const stmt = d.prepare(`INSERT INTO ip_versions
     (site_uuid, fetched_at, ip_version_label, download, upload, total)
     VALUES (?, ?,?,?,?,?)`);
-  d.transaction(items => { for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.ip_version_label, r.download, r.upload, r.total); })(rows);
+  d.transaction(items => {
+    for (const r of items) stmt.run(
+      siteUuid, fetchedAt, r.ip_version_label, r.download, r.upload, r.total);
+  })(rows);
 }
 
 function insertRemoteIPs(rows, fetchedAt, siteUuid) {
@@ -1401,8 +1861,10 @@ function insertRemoteIPs(rows, fetchedAt, siteUuid) {
   const stmt = d.prepare(`INSERT INTO remote_ips
     (site_uuid, fetched_at, remote_ip, ip_version, download, upload, total)
     VALUES (?, ?,?,?,?,?,?)`);
-  d.transaction(items => { for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.remote_ip, r.ip_version, r.download, r.upload, r.total); })(rows);
+  d.transaction(items => {
+    for (const r of items) stmt.run(
+      siteUuid, fetchedAt, r.remote_ip, r.ip_version, r.download, r.upload, r.total);
+  })(rows);
 }
 
 function insertMACBandwidth(rows, fetchedAt, siteUuid) {
@@ -1410,8 +1872,10 @@ function insertMACBandwidth(rows, fetchedAt, siteUuid) {
   const stmt = d.prepare(`INSERT INTO mac_bandwidth
     (site_uuid, fetched_at, mac_address, manufacturer, download, upload, total)
     VALUES (?, ?,?,?,?,?,?)`);
-  d.transaction(items => { for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.mac_address, r.manufacturer, r.download, r.upload, r.total); })(rows);
+  d.transaction(items => {
+    for (const r of items) stmt.run(
+      siteUuid, fetchedAt, r.mac_address, r.manufacturer, r.download, r.upload, r.total);
+  })(rows);
 }
 
 // ─── QUERY FITUR BARU ─────────────────────────────────────────────────────────
@@ -1495,57 +1959,57 @@ function getLatest(table, orderBy = 'download', limit = 50, siteUuid = null, age
 
 // DPI Fields
 function insertTLSVersions(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`INSERT INTO tls_versions
     (site_uuid, fetched_at, tls_version, download, upload, total)
     VALUES (?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.tls_version, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.tls_version, r.download, r.upload, r.total);
   })(rows);
 }
 
 function insertTLSCiphers(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`INSERT INTO tls_ciphers
     (site_uuid, fetched_at, tls_cipher, download, upload, total)
     VALUES (?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.tls_cipher, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.tls_cipher, r.download, r.upload, r.total);
   })(rows);
 }
 
 function insertTLSSecurity(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`INSERT INTO tls_security
     (site_uuid, fetched_at, tls_security, color, download, upload, total)
     VALUES (?, ?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.tls_security, r.color, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.tls_security, r.color, r.download, r.upload, r.total);
   })(rows);
 }
 
 function insertNetBIOSHostnames(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`INSERT INTO netbios_hostnames
     (site_uuid, fetched_at, hostname, download, upload, total)
     VALUES (?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.hostname, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.hostname, r.download, r.upload, r.total);
   })(rows);
 }
 
 function insertDiscoveryOS(rows, fetchedAt, siteUuid) {
-  const d    = getDB();
+  const d = getDB();
   const stmt = d.prepare(`INSERT INTO discovery_os
     (site_uuid, fetched_at, os_label, download, upload, total)
     VALUES (?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.os_label, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.os_label, r.download, r.upload, r.total);
   })(rows);
 }
 
@@ -1558,7 +2022,7 @@ function insertDHCPFingerprints(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.fingerprint, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.fingerprint, r.download, r.upload, r.total);
   })(rows);
 }
 
@@ -1569,7 +2033,7 @@ function insertHTTPUserAgents(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.user_agent, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.user_agent, r.download, r.upload, r.total);
   })(rows);
 }
 
@@ -1580,7 +2044,7 @@ function insertSNIHostnames(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.sni_hostname, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.sni_hostname, r.download, r.upload, r.total);
   })(rows);
 }
 
@@ -1591,7 +2055,7 @@ function insertSSLServerCN(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.ssl_server_cn, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.ssl_server_cn, r.download, r.upload, r.total);
   })(rows);
 }
 
@@ -1602,7 +2066,7 @@ function insertQUICHostnames(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.quic_hostname, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.quic_hostname, r.download, r.upload, r.total);
   })(rows);
 }
 
@@ -1613,7 +2077,7 @@ function insertBitTorrentHashes(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.info_hash, r.label, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.info_hash, r.label, r.download, r.upload, r.total);
   })(rows);
 }
 
@@ -1624,7 +2088,7 @@ function insertSSHVersions(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.ssh_version, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.ssh_version, r.download, r.upload, r.total);
   })(rows);
 }
 
@@ -1635,7 +2099,7 @@ function insertMDNSHostnames(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.mdns_hostname, r.download, r.upload, r.total);
+      siteUuid, fetchedAt, r.mdns_hostname, r.download, r.upload, r.total);
   })(rows);
 }
 
@@ -1648,7 +2112,7 @@ function insertCryptoMining(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.pool_host, r.pool_ip, r.protocol, r.app_label, r.confidence,
       r.download ?? 0, r.upload ?? 0
     );
@@ -1662,7 +2126,7 @@ function insertDeviceDiscovery(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.device_label, r.device_type, r.os_label, r.manufacturer,
       r.is_new ? 1 : 0
     );
@@ -1676,7 +2140,7 @@ function insertEncryptionAudit(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.device_label, r.encrypted_pct, r.unencrypted ?? 0, r.encrypted ?? 0,
       r.total ?? 0, r.risk_level
     );
@@ -1690,7 +2154,7 @@ function insertInsecureProtocols(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.protocol, r.ip_address, r.mac_address,
+      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.protocol, r.ip_address, r.mac_address,
       r.dst_ip, r.dst_port, r.app_label, r.download ?? 0, r.upload ?? 0,
       r.risk ?? 'Medium', r.source ?? 'api'
     );
@@ -1704,7 +2168,7 @@ function insertIPReputation(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.local_ip, r.mac_address,
+      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.local_ip, r.mac_address,
       r.reputation, r.score, r.country, r.app_label,
       r.download ?? 0, r.upload ?? 0, r.blacklisted ? 1 : 0
     );
@@ -1718,7 +2182,7 @@ function insertServerDiscovery(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.server_type, r.hostname, r.port, r.protocol, r.os_label,
       r.download ?? 0, r.upload ?? 0
     );
@@ -1732,7 +2196,7 @@ function insertTorDetection(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.exit_node, r.circuit_id, r.download ?? 0, r.upload ?? 0, r.country
     );
   })(rows);
@@ -1745,7 +2209,7 @@ function insertUnencryptedPasswords(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.dst_ip, r.dst_port, r.protocol, r.username,
       r.download ?? 0, r.upload ?? 0, r.severity ?? 'Critical'
     );
@@ -1759,7 +2223,7 @@ function insertVPNDetection(rows, fetchedAt, siteUuid) {
     VALUES (?, ?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-    siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.vpn_type, r.remote_ip, r.protocol,
       r.download ?? 0, r.upload ?? 0, r.country, r.confidence
     );
@@ -1773,10 +2237,10 @@ function getIntelData(table, limit = 100, siteUuid = null, agentUuid = null) {
   if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
     const macs = AGENT_MAC_MAP[agentUuid];
     const placeholders = macs.map(() => '?').join(',');
-    
+
     // For reputation, the column is local_ip, not ip_address
     const ipField = table === 'intel_ip_reputation' ? 'local_ip' : 'ip_address';
-    
+
     return d.prepare(`
       SELECT * FROM ${table} 
       WHERE mac_address IN (${placeholders}) OR ${ipField} IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
@@ -1795,7 +2259,7 @@ function getIntelStats(siteUuid = null, agentUuid = null) {
     'intel_tor_detection', 'intel_unencrypted_passwords', 'intel_vpn_detection',
   ];
   const counts = {};
-  
+
   const macs = agentUuid ? AGENT_MAC_MAP[agentUuid] : null;
   const placeholders = macs ? macs.map(() => '?').join(',') : '';
 

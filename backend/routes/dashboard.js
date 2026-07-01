@@ -1,25 +1,25 @@
 // backend/routes/dashboard.js
 const express = require('express');
-const router  = express.Router();
-const db      = require('../database');
+const router = express.Router();
+const db = require('../database');
 const { runPoll } = require('../scheduler');
 
 // GET /api/dashboard/summary — kartu ringkasan (top of page)
 router.get('/summary', (req, res) => {
-  const stats    = db.getStats(req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
+  const stats = db.getStats(req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
   const timeline = db.getBandwidthTimeline(1, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
-  const latest   = timeline[0] ?? {};
+  const latest = timeline[0] ?? {};
 
   res.json({
     ok: true,
     data: {
-      total_devices  : stats.totalDevices,
-      total_threats  : stats.totalThreats,
-      total_events   : stats.totalEvents,
-      last_fetch     : stats.lastFetch,
-      bandwidth_down : latest.total_download ?? 0,
-      bandwidth_up   : latest.total_upload   ?? 0,
-      active_flows   : stats.activeFlows,
+      total_devices: stats.totalDevices,
+      total_threats: stats.totalThreats,
+      total_events: stats.totalEvents,
+      last_fetch: stats.lastFetch,
+      bandwidth_down: latest.total_download ?? 0,
+      bandwidth_up: latest.total_upload ?? 0,
+      active_flows: stats.activeFlows,
     }
   });
 });
@@ -27,28 +27,28 @@ router.get('/summary', (req, res) => {
 // GET /api/dashboard/apps — top aplikasi
 router.get('/apps', (req, res) => {
   const limit = parseInt(req.query.limit ?? 10);
-  const data  = db.getLatestBandwidthApps(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
+  const data = db.getLatestBandwidthApps(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
   res.json({ ok: true, data });
 });
 
 // GET /api/dashboard/devices — daftar device
 router.get('/devices', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  const data  = db.getLatestDevices(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
+  const data = db.getLatestDevices(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
   res.json({ ok: true, data });
 });
 
 // GET /api/dashboard/flows — flow aktif
 router.get('/flows', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  const data  = db.getLatestFlows(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
+  const data = db.getLatestFlows(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
   res.json({ ok: true, data });
 });
 
 // GET /api/dashboard/threats — ancaman keamanan
 router.get('/threats', (req, res) => {
   const limit = parseInt(req.query.limit ?? 20);
-  const data  = db.getLatestThreats(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
+  const data = db.getLatestThreats(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
   res.json({ ok: true, data });
 });
 
@@ -67,14 +67,14 @@ router.get('/countries', (req, res) => {
 // GET /api/dashboard/dns — top DNS queries
 router.get('/dns', (req, res) => {
   const limit = parseInt(req.query.limit ?? 20);
-  const data  = db.getLatestDNS(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
+  const data = db.getLatestDNS(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
   res.json({ ok: true, data });
 });
 
 // GET /api/dashboard/events — events terbaru
 router.get('/events', (req, res) => {
   const limit = parseInt(req.query.limit ?? 20);
-  const rawData  = db.getLatestEvents(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
+  const rawData = db.getLatestEvents(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
   const mappedData = rawData.map(r => ({
     id: r.id,
     event_id: r.event_id,
@@ -90,7 +90,7 @@ router.get('/events', (req, res) => {
 // GET /api/dashboard/timeline — bandwidth timeline (grafik)
 router.get('/timeline', (req, res) => {
   const points = parseInt(req.query.points ?? 60);
-  const data   = db.getBandwidthTimeline(points, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
+  const data = db.getBandwidthTimeline(points, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
   res.json({ ok: true, data });
 });
 
@@ -282,10 +282,10 @@ let lastCacheTime = 0;
 
 router.get('/lookup/applications', async (req, res) => {
   try {
-    const page   = parseInt(req.query.page ?? 1);
-    const limit  = parseInt(req.query.limit ?? 50);
+    const page = parseInt(req.query.page ?? 1);
+    const limit = parseInt(req.query.limit ?? 50);
     const search = String(req.query.search ?? '').toLowerCase();
-    
+
     // Refresh cache every 24 hours
     if (!cachedApplications || Date.now() - lastCacheTime > 86400000) {
       const { fetchLookupApplications } = require('../netify');
@@ -303,8 +303,8 @@ router.get('/lookup/applications', async (req, res) => {
     // Local Search Filtering
     let filteredApps = cachedApplications;
     if (search) {
-      filteredApps = cachedApplications.filter(app => 
-        (app.label && app.label.toLowerCase().includes(search)) || 
+      filteredApps = cachedApplications.filter(app =>
+        (app.label && app.label.toLowerCase().includes(search)) ||
         (app.tag && app.tag.toLowerCase().includes(search)) ||
         (app.name && app.name.toLowerCase().includes(search))
       );
@@ -316,8 +316,8 @@ router.get('/lookup/applications', async (req, res) => {
     const start_idx = (page - 1) * limit;
     const paginatedApps = filteredApps.slice(start_idx, start_idx + limit);
 
-    res.json({ 
-      ok: true, 
+    res.json({
+      ok: true,
       data: {
         applications: paginatedApps,
         pagination: {
@@ -326,7 +326,7 @@ router.get('/lookup/applications', async (req, res) => {
           current_page: page,
           limit
         }
-      } 
+      }
     });
   } catch (err) {
     res.status(500).json({ ok: false, message: err.message });
@@ -378,7 +378,9 @@ router.get('/app-details', async (req, res) => {
 router.get('/security-devices', async (req, res) => {
   try {
     const { fetchSecurityDevices } = require('../netify');
-    const data = await fetchSecurityDevices();
+    const siteUuid = req.user?.site_uuid || null;
+    const agentUuid = req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null;
+    const data = await fetchSecurityDevices(siteUuid, agentUuid);
     res.json({ ok: true, data });
   } catch (err) {
     res.status(500).json({ ok: false, message: err.message });
@@ -395,4 +397,4 @@ router.get('/data-interval', (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = router;

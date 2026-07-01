@@ -1381,8 +1381,8 @@ async function fetchDeviceDetails(ip) {
     is_new       : discRow?.is_new ?? null,
   };
 
-  // ── 3. Named apps (exclude "Port XXX" port-only entries) ─────────────────
-  const namedAppRows = d.prepare(`
+  // ── 3. Named apps & correlated ports ─────────────────────────────────────
+  const rawAppRows = d.prepare(`
     SELECT app_label,
            SUM(bytes_download) AS download,
            SUM(bytes_upload)   AS upload,
@@ -1390,11 +1390,92 @@ async function fetchDeviceDetails(ip) {
     FROM   flows
     WHERE  src_ip = ?
       AND  app_label IS NOT NULL
-      AND  app_label NOT LIKE 'Port %'
     GROUP  BY app_label
     ORDER  BY download DESC
-    LIMIT  20
+    LIMIT  30
   `).all(ip);
+
+  // Cache helper mappings
+  const devices = d.prepare(`
+    SELECT ip_address, device_label, manufacturer, device_type
+    FROM devices
+    WHERE ip_address IS NOT NULL
+  `).all();
+
+  const devMap = new Map();
+  for (const dev of devices) {
+    const label = dev.device_label || (dev.manufacturer && dev.manufacturer !== 'Unknown' ? `${dev.manufacturer} Device` : null);
+    if (label) {
+      devMap.set(dev.ip_address, label);
+    }
+  }
+
+  const flowIPs = d.prepare(`
+    SELECT dst_ip, domain, app_label, COUNT(*) as count
+    FROM flows
+    WHERE dst_ip IS NOT NULL 
+      AND (domain IS NOT NULL OR (app_label IS NOT NULL AND app_label NOT LIKE 'Port %'))
+    GROUP BY dst_ip, domain, app_label
+    ORDER BY count DESC
+  `).all();
+
+  const publicIpMap = new Map();
+  for (const row of flowIPs) {
+    if (!publicIpMap.has(row.dst_ip)) {
+      publicIpMap.set(row.dst_ip, {
+        domain: row.domain,
+        app_label: row.app_label
+      });
+    }
+  }
+
+  function getFriendlyIpName(ipAddress) {
+    if (devMap.has(ipAddress)) return devMap.get(ipAddress);
+    if (publicIpMap.has(ipAddress)) {
+      const pub = publicIpMap.get(ipAddress);
+      return pub.domain || pub.app_label;
+    }
+    if (ipAddress.startsWith('10.6.')) return 'IFG Client';
+    if (ipAddress.startsWith('10.250.') || ipAddress.startsWith('192.168.') || ipAddress.startsWith('10.121.')) return 'CPI Client';
+    if (
+      ipAddress.startsWith('10.0.') || ipAddress.startsWith('10.1.') || ipAddress.startsWith('10.26.') ||
+      ipAddress.startsWith('10.43.') || ipAddress.startsWith('10.35.') || ipAddress.startsWith('10.21.') ||
+      ipAddress.startsWith('10.7.') || ipAddress.startsWith('10.182.') || ipAddress.startsWith('10.109.') ||
+      ipAddress.startsWith('10.181.') || ipAddress.startsWith('10.75.') || ipAddress.startsWith('10.202.') ||
+      ipAddress.startsWith('10.93.')
+    ) return 'JRP Client';
+    return 'Intranet Client';
+  }
+
+  const matches = {
+    "1433": "MSSQL Database Server",
+    "1434": "MSSQL Monitor Server",
+    "3306": "MySQL/MariaDB",
+    "5432": "PostgreSQL",
+    "1521": "Oracle DB Server",
+    "27017": "MongoDB",
+    "6379": "Redis Cache",
+    "80": "HTTP Web Server",
+    "443": "HTTPS/TLS Secure Connection",
+    "22": "SSH Remote Management",
+    "21": "FTP File Storage",
+    "23": "Telnet Command Insecure",
+    "25": "SMTP Mail Delivery",
+    "587": "Secure SMTP Mail",
+    "110": "POP3 Mail Retrieval",
+    "993": "Secure IMAP Mail",
+    "53": "DNS Domain Directory Query",
+    "123": "NTP Network Time",
+    "161": "SNMP Monitoring Service",
+    "3389": "RDP Remote Windows Desktop",
+    "445": "SMB Windows File Share",
+    "137": "NetBIOS Name Service",
+    "138": "NetBIOS Datagram Service",
+    "139": "NetBIOS Session Service",
+    "1812": "RADIUS Auth Server",
+    "1813": "RADIUS Accounting",
+    "5060": "SIP VoIP Service"
+  };
 
   // ── 4. Top domains accessed by this device ─────────────────────────────
   const domainRows = d.prepare(`
@@ -1417,11 +1498,7 @@ async function fetchDeviceDetails(ip) {
     LIMIT  30
   `).all(ip);
 
-  // ── 5. Smart combined: flows with BOTH domain and app_label, or just one ─
-  // Build combined display list:
-  // Priority 1 = rows with actual domain (show domain as label)
-  // Priority 2 = rows with named app (not port-only)
-  // Merge & de-duplicate by display name
+  // ── 5. Smart combined display list ──────────────────────────────────────
   const combinedMap = new Map();
 
   // Add domains first (higher priority)
@@ -1436,14 +1513,48 @@ async function fetchDeviceDetails(ip) {
     });
   }
 
-  // Add named apps that don't duplicate a domain entry
-  for (const r of namedAppRows) {
-    const key = 'app:' + r.app_label;
+  // Add named & correlated apps
+  for (const r of rawAppRows) {
+    let label = r.app_label;
+    let sub_label = null;
+    let type = 'protocol';
+
+    const isPortLabel = label.startsWith("Port ") || label.toLowerCase().includes("port");
+
+    if (isPortLabel) {
+      const portStr = label.replace("Port ", "").trim();
+      type = 'port';
+
+      const flow = d.prepare(`
+        SELECT dst_ip, protocol, dst_port
+        FROM flows
+        WHERE src_ip = ? AND (app_label = ? OR dst_port = ?)
+        GROUP BY dst_ip, protocol, dst_port
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+      `).get(ip, label, portStr);
+
+      if (flow && flow.dst_ip) {
+        const friendlyName = getFriendlyIpName(flow.dst_ip);
+        label = friendlyName;
+        sub_label = `Port ${portStr} (${flow.protocol || 'TCP'})`;
+      } else {
+        const stdName = matches[portStr];
+        if (stdName) {
+          label = stdName;
+          sub_label = `Port ${portStr}`;
+        } else {
+          sub_label = `Port ${portStr}`;
+        }
+      }
+    }
+
+    const key = isPortLabel ? 'port:' + r.app_label : 'app:' + r.app_label;
     if (!combinedMap.has(key)) {
       combinedMap.set(key, {
-        label      : r.app_label,  // protocol name (DNS, HTTPS/TLS, etc)
-        sub_label  : null,
-        type       : 'protocol',
+        label      : label,
+        sub_label  : sub_label,
+        type       : type,
         download   : r.download ?? 0,
         upload     : r.upload   ?? 0,
         flow_count : r.flow_count,
@@ -1451,15 +1562,7 @@ async function fetchDeviceDetails(ip) {
     }
   }
 
-  // If neither domain nor named app found, fall back to ALL app_labels incl Port XXX
-  const top_apps = combinedMap.size > 0
-    ? [...combinedMap.values()].sort((a, b) => b.download - a.download).slice(0, 25)
-    : d.prepare(`
-        SELECT app_label AS label, NULL AS sub_label, 'port' AS type,
-               SUM(bytes_download) AS download, SUM(bytes_upload) AS upload, COUNT(*) AS flow_count
-        FROM   flows WHERE src_ip = ? AND app_label IS NOT NULL
-        GROUP  BY app_label ORDER BY download DESC LIMIT 25
-      `).all(ip).map(r => ({ label: r.label, sub_label: null, type: 'port', download: r.download ?? 0, upload: r.upload ?? 0, flow_count: r.flow_count }));
+  const top_apps = [...combinedMap.values()].sort((a, b) => b.download - a.download).slice(0, 25);
 
   // top_domains: keep simple list for Info tab
   const top_domains = domainRows.map(r => ({
@@ -1865,16 +1968,52 @@ async function fetchAppDetails(appLabel) {
 
 
 // Fetch security device risk overview — encryption audit + insecure protocols per device
-async function fetchSecurityDevices() {
+async function fetchSecurityDevices(siteUuid = null, agentUuid = null) {
   const db = require('./database');
   const d  = db.getDB();
 
-  const latestFetch = d.prepare(`SELECT MAX(fetched_at) AS t FROM intel_encryption_audit`).get()?.t;
-  const encryptRows = latestFetch
-    ? d.prepare(`SELECT * FROM intel_encryption_audit WHERE fetched_at = ?`).all(latestFetch)
-    : [];
+  // Get active IPs and MACs for filtering if agentUuid is provided
+  let agentIPs = null;
+  let agentIPSet = null;
+  let agentMacs = null;
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    agentMacs = AGENT_MAC_MAP[agentUuid];
+    const resolvedDevices = db.getLatestDevices(1000, null, agentUuid);
+    agentIPs = resolvedDevices.map(d => d.ip_address).filter(Boolean);
+    agentIPSet = new Set(agentIPs);
+  }
 
-  const insecureRows = d.prepare(`SELECT DISTINCT ip_address FROM intel_insecure_protocols`).all();
+  const latestFetch = d.prepare(`SELECT MAX(fetched_at) AS t FROM intel_encryption_audit`).get()?.t;
+  let encryptRows = [];
+  if (latestFetch) {
+    if (agentMacs) {
+      // Query with agent's MACs or JRP subnet IPs
+      const placeholders = agentMacs.map(() => '?').join(',');
+      encryptRows = d.prepare(`
+        SELECT * FROM intel_encryption_audit 
+        WHERE fetched_at = ? AND (mac_address IN (${placeholders}) OR ip_address IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders})))
+      `).all(latestFetch, ...agentMacs, ...agentMacs);
+    } else {
+      encryptRows = d.prepare(`
+        SELECT * FROM intel_encryption_audit 
+        WHERE fetched_at = ? AND (@siteUuid IS NULL OR site_uuid = @siteUuid)
+      `).all(latestFetch, { siteUuid });
+    }
+  }
+
+  let insecureRows = [];
+  if (agentMacs) {
+    const placeholders = agentMacs.map(() => '?').join(',');
+    insecureRows = d.prepare(`
+      SELECT DISTINCT ip_address FROM intel_insecure_protocols 
+      WHERE mac_address IN (${placeholders}) OR ip_address IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
+    `).all(...agentMacs, ...agentMacs);
+  } else {
+    insecureRows = d.prepare(`
+      SELECT DISTINCT ip_address FROM intel_insecure_protocols
+      WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid)
+    `).all({ siteUuid });
+  }
   const insecureIPs  = new Set(insecureRows.map(r => r.ip_address).filter(Boolean));
 
   // Compute risk per device
@@ -1882,6 +2021,12 @@ async function fetchSecurityDevices() {
   for (const r of encryptRows) {
     const ip = r.ip_address;
     if (!ip) continue;
+    
+    // Additional security check: if agent is logged in, ensure we do not leak other agent's IPs
+    if (agentIPSet && !agentIPSet.has(ip)) {
+      continue;
+    }
+
     const encPct = r.encrypted_pct ?? 100;
     let riskLevel;
     if (encPct < 50 || insecureIPs.has(ip)) {
@@ -1906,17 +2051,16 @@ async function fetchSecurityDevices() {
     }
   }
 
-  // Try to get device info (type, OS) from discovery data — table may not exist
+  // Get device details (type, OS) from discovery data
   const discMap = {};
   try {
-    const discRows = d.prepare(`SELECT DISTINCT ip_address, device_type, os_label, manufacturer FROM devices`).all();
+    const discRows = db.getLatestDevices(1000, siteUuid, agentUuid);
     for (const r of discRows) {
       if (r.ip_address) discMap[r.ip_address] = r;
     }
   } catch (_) {
-    // devices table doesn't exist yet — skip enrichment
+    // skip enrichment if error
   }
-
 
   const devices = Object.values(deviceMap).map(dev => ({
     ...dev,

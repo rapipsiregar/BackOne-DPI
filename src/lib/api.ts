@@ -661,117 +661,117 @@ export interface SecurityInfo {
 }
 
 export interface DeviceInfo {
-  device_label : string | null;
-  device_type  : string | null;
-  os_label     : string | null;
-  manufacturer : string | null;
-  mac_address  : string | null;
-  is_new       : number | null;
+  device_label: string | null;
+  device_type: string | null;
+  os_label: string | null;
+  manufacturer: string | null;
+  mac_address: string | null;
+  is_new: number | null;
 }
 
 export interface DeviceAppItem {
-  label      : string;             // domain name OR protocol name
-  sub_label  : string | null;      // protocol when label is domain; null otherwise
-  type       : 'domain' | 'protocol' | 'port';
-  download   : number;
-  upload     : number;
-  flow_count : number;
+  label: string;             // domain name OR protocol name
+  sub_label: string | null;      // protocol when label is domain; null otherwise
+  type: 'domain' | 'protocol' | 'port';
+  download: number;
+  upload: number;
+  flow_count: number;
 }
 
 export interface DeviceDomainItem {
-  domain     : string;
-  download   : number;
-  upload     : number;
-  flow_count : number;
+  domain: string;
+  download: number;
+  upload: number;
+  flow_count: number;
 }
 
 export interface DeviceEncryption {
-  encrypted_pct   : number | null;
-  encrypted_bytes : number | null;
+  encrypted_pct: number | null;
+  encrypted_bytes: number | null;
   unencrypted_bytes: number | null;
-  total_bytes     : number | null;
-  risk_level      : string | null;
+  total_bytes: number | null;
+  risk_level: string | null;
 }
 
 export interface DeviceServerItem {
-  server_type : string | null;
-  hostname    : string | null;
-  port        : number | null;
-  protocol    : string | null;
-  os_label    : string | null;
-  download    : number;
-  upload      : number;
-  detected_at : string | null;
+  server_type: string | null;
+  hostname: string | null;
+  port: number | null;
+  protocol: string | null;
+  os_label: string | null;
+  download: number;
+  upload: number;
+  detected_at: string | null;
 }
 
 export interface DevicePwdItem {
-  dst_ip      : string | null;
-  dst_port    : number | null;
-  protocol    : string | null;
-  username    : string | null;
-  severity    : string | null;
-  download    : number;
-  upload      : number;
-  detected_at : string | null;
+  dst_ip: string | null;
+  dst_port: number | null;
+  protocol: string | null;
+  username: string | null;
+  severity: string | null;
+  download: number;
+  upload: number;
+  detected_at: string | null;
 }
 
 export interface DeviceReputationItem {
-  remote_ip   : string | null;
-  local_ip    : string | null;
-  reputation  : string | null;
-  score       : number | null;
-  country     : string | null;
-  app_label   : string | null;
-  blacklisted : boolean;
-  download    : number;
-  upload      : number;
+  remote_ip: string | null;
+  local_ip: string | null;
+  reputation: string | null;
+  score: number | null;
+  country: string | null;
+  app_label: string | null;
+  blacklisted: boolean;
+  download: number;
+  upload: number;
 }
 
 export interface DeviceVpnItem {
-  vpn_type    : string | null;
-  remote_ip   : string | null;
-  protocol    : string | null;
-  country     : string | null;
-  confidence  : number | null;
-  download    : number;
-  upload      : number;
-  detected_at : string | null;
+  vpn_type: string | null;
+  remote_ip: string | null;
+  protocol: string | null;
+  country: string | null;
+  confidence: number | null;
+  download: number;
+  upload: number;
+  detected_at: string | null;
 }
 
 export interface DeviceEventItem {
-  event_type  : string | null;
-  severity    : string | null;
-  ip_address  : string | null;
-  mac_address : string | null;
-  description : string | null;
-  event_at    : string | null;
+  event_type: string | null;
+  severity: string | null;
+  ip_address: string | null;
+  mac_address: string | null;
+  description: string | null;
+  event_at: string | null;
 }
 
 export interface DeviceMacBandwidth {
-  mac_address  : string;
-  manufacturer : string | null;
-  download     : number;
-  upload       : number;
-  total        : number;
+  mac_address: string;
+  manufacturer: string | null;
+  download: number;
+  upload: number;
+  total: number;
 }
 
 export interface DeviceDetails {
-  ip               : string;
-  mac_address      : string | null;
-  total_download   : number;
-  total_upload     : number;
-  flow_count       : number;
-  device_info      : DeviceInfo;
-  top_apps         : DeviceAppItem[];
-  top_domains      : DeviceDomainItem[];
-  flows            : DeviceFlowItem[];
-  encryption       : DeviceEncryption | null;
-  server_discovery : DeviceServerItem[];
+  ip: string;
+  mac_address: string | null;
+  total_download: number;
+  total_upload: number;
+  flow_count: number;
+  device_info: DeviceInfo;
+  top_apps: DeviceAppItem[];
+  top_domains: DeviceDomainItem[];
+  flows: DeviceFlowItem[];
+  encryption: DeviceEncryption | null;
+  server_discovery: DeviceServerItem[];
   unencrypted_passwords: DevicePwdItem[];
-  ip_reputation    : DeviceReputationItem[];
-  vpn_detections   : DeviceVpnItem[];
-  events           : DeviceEventItem[];
-  mac_bandwidth    : DeviceMacBandwidth | null;
+  ip_reputation: DeviceReputationItem[];
+  vpn_detections: DeviceVpnItem[];
+  events: DeviceEventItem[];
+  mac_bandwidth: DeviceMacBandwidth | null;
 }
 
 
