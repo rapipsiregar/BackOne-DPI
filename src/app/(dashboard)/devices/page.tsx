@@ -40,9 +40,16 @@ export default function DevicesPage() {
       header: "MAC Address",
       accessor: (row) =>
         row.mac_address ? (
-          <code className="text-xs bg-secondary/50 px-1 py-0.5 rounded text-muted-foreground">
-            {row.mac_address}
-          </code>
+          <div className="flex flex-col gap-1">
+            <code className="text-xs bg-secondary/50 px-1 py-0.5 rounded text-muted-foreground w-fit">
+              {row.mac_address}
+            </code>
+            {row.is_gateway_routed === 1 && (
+              <span className="text-[10px] text-amber-500/80 font-sans italic">
+                Via Routed Gateway
+              </span>
+            )}
+          </div>
         ) : (
           "-"
         ),

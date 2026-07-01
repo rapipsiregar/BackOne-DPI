@@ -6,6 +6,40 @@ const bcrypt   = require('bcryptjs');
 const DB_PATH = path.join(__dirname, 'netify_data.db');
 let db;
 
+// Agent UUID mappings to MAC addresses and numeric interface IDs
+const AGENT_MAC_MAP = {
+  '2F-TF-1D-GK': ['60:be:b4:1f:05:96'],
+  '8A-V3-PB-85': ['04:f4:1c:ce:c2:e6'],
+  'F6-2V-DT-8A': [
+    '2c:7b:a0:d8:86:91', '16:11:ac:73:34:1d', 'bc:45:5b:ca:d5:be',
+    'de:ed:cc:57:58:34', 'f4:6d:3f:ef:01:a0', '60:be:b4:29:d3:36',
+    '70:85:6c:81:50:d4', '70:85:6c:6d:f7:17', '60:be:b4:29:d3:33',
+    '60:be:b4:26:4c:d6', '60:be:b4:29:d3:32'
+  ],
+};
+
+const AGENT_NUMERIC_IDS = {
+  '2F-TF-1D-GK': ['4894730147'],
+  '8A-V3-PB-85': ['4895530456'],
+  'F6-2V-DT-8A': ['4895853843', '4897042839'],
+};
+
+function getAgentTrafficRatio(agentUuid) {
+  const d = getDB();
+  const macs = AGENT_MAC_MAP[agentUuid];
+  if (!macs || macs.length === 0) return 0;
+  
+  const latest = d.prepare("SELECT MAX(fetched_at) as t FROM mac_bandwidth").get();
+  if (!latest?.t) return 0;
+  
+  const siteTotal = d.prepare("SELECT SUM(total) as val FROM mac_bandwidth WHERE fetched_at = ?").get(latest.t)?.val || 1;
+  
+  const placeholders = macs.map(() => '?').join(',');
+  const agentTotal = d.prepare(`SELECT SUM(total) as val FROM mac_bandwidth WHERE fetched_at = ? AND mac_address IN (${placeholders})`).get(latest.t, ...macs)?.val || 0;
+  
+  return siteTotal > 0 ? (agentTotal / siteTotal) : 0;
+}
+
 function getDB() {
   if (!db) {
     db = new Database(DB_PATH);
@@ -26,8 +60,16 @@ function initSchema() {
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'AGENT_VIEWER',
     site_uuid TEXT DEFAULT NULL,
+    agent_uuid TEXT DEFAULT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  // Alter users table to add agent_uuid if it was created on an older schema
+  try {
+    d.exec("ALTER TABLE users ADD COLUMN agent_uuid TEXT DEFAULT NULL");
+  } catch (e) {
+    // Column already exists, safe to ignore
+  }
 
   const adminExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'admin'").get();
   if (adminExists.count === 0) {
@@ -39,11 +81,32 @@ function initSchema() {
   const agentExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'agent1'").get();
   if (agentExists.count === 0) {
     const hash = bcrypt.hashSync('agent123', 10);
-    const site_uuid = process.env.NETIFY_SITE_UUID || 'dummy_site_uuid';
-    d.prepare("INSERT INTO users (username, password_hash, role, site_uuid) VALUES (?, ?, ?, ?)").run('agent1', hash, 'AGENT_VIEWER', site_uuid);
+    const site_uuid = process.env.NETIFY_SITE_UUID || '6681452d_9cae_4ff4_8ae8_0d504774265e';
+    d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)").run('agent1', hash, 'AGENT_VIEWER', site_uuid, '8A-V3-PB-85');
     console.log('[DB] Created default agent user (agent1 / agent123)');
   }
 
+  // Seed specific agent accounts for testing isolation
+  const agentJrpExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'agent_jrp'").get();
+  if (agentJrpExists.count === 0) {
+    const hash = bcrypt.hashSync('agent123', 10);
+    d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)").run('agent_jrp', hash, 'AGENT_VIEWER', '6681452d_9cae_4ff4_8ae8_0d504774265e', '2F-TF-1D-GK');
+    console.log('[DB] Created JRP Cibubur agent user (agent_jrp / agent123)');
+  }
+
+  const agentIfgExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'agent_ifg'").get();
+  if (agentIfgExists.count === 0) {
+    const hash = bcrypt.hashSync('agent123', 10);
+    d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)").run('agent_ifg', hash, 'AGENT_VIEWER', '6681452d_9cae_4ff4_8ae8_0d504774265e', '8A-V3-PB-85');
+    console.log('[DB] Created IFG LT.18 agent user (agent_ifg / agent123)');
+  }
+
+  const agentCpiExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'agent_cpi'").get();
+  if (agentCpiExists.count === 0) {
+    const hash = bcrypt.hashSync('agent123', 10);
+    d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)").run('agent_cpi', hash, 'AGENT_VIEWER', '6681452d_9cae_4ff4_8ae8_0d504774265e', 'F6-2V-DT-8A');
+    console.log('[DB] Created CPI Balaraja agent user (agent_cpi / agent123)');
+  }
 
   d.exec(`CREATE TABLE IF NOT EXISTS tls_versions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -490,6 +553,15 @@ function initSchema() {
     total_flows INTEGER DEFAULT 0, active_devices INTEGER DEFAULT 0
   )`);
 
+  d.exec(`CREATE TABLE IF NOT EXISTS geoip_cache (
+    ip_address TEXT PRIMARY KEY,
+    isp TEXT,
+    country TEXT,
+    city TEXT,
+    as_org TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   console.log('[DB] Schema siap.');
 }
 
@@ -698,86 +770,441 @@ function insertBandwidthTimeline(summary, fetchedAt, siteUuid) {
 
 // ─── QUERY FUNCTIONS ──────────────────────────────────────────────────────────
 
-function getLatestBandwidthApps(limit = 20, siteUuid = null) {
-  const d      = getDB();
-  const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_apps`).get();
-  if (!latest?.t) return [];
-  return d.prepare(`
-    SELECT * FROM bandwidth_apps WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
-  `).all({ fetched_at: latest.t, limit, siteUuid });
-}
-
-function getLatestDevices(limit = 100, siteUuid = null) {
-  const d      = getDB();
-  const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM devices`).get();
-  if (!latest?.t) return [];
-  return d.prepare(`
-    SELECT * FROM devices WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
-  `).all({ fetched_at: latest.t, limit, siteUuid });
-}
-
-function getLatestFlows(limit = 100, siteUuid = null) {
+function getLatestBandwidthApps(limit = 20, siteUuid = null, agentUuid = null) {
   const d      = getDB();
   const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
   if (!latest?.t) return [];
+
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+    return d.prepare(`
+      SELECT app_label, SUM(bytes_download) AS download, SUM(bytes_upload) AS upload,
+             (SUM(bytes_download) + SUM(bytes_upload)) AS total, COUNT(*) AS flow_count
+      FROM flows
+      WHERE src_mac IN (${placeholders}) AND fetched_at = ? AND app_label IS NOT NULL
+      GROUP BY app_label
+      ORDER BY download DESC
+      LIMIT ?
+    `).all(...macs, latest.t, limit);
+  }
+
+  const appsLatest = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_apps`).get();
+  if (!appsLatest?.t) return [];
+  return d.prepare(`
+    SELECT * FROM bandwidth_apps WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
+  `).all({ fetched_at: appsLatest.t, limit, siteUuid });
+}
+
+function resolveDeviceMetadata(ip, mac, dbLabel, dbManufacturer, dbType) {
+  let label = dbLabel || ip;
+  let manufacturer = dbManufacturer || 'Unknown';
+  let type = dbType || 'Generic Client';
+  let os = 'Unknown';
+
+  if (manufacturer.includes('Routerboard') || manufacturer.includes('MikroTik')) {
+    manufacturer = 'MikroTik';
+    type = 'Router/Network';
+    os = 'RouterOS';
+  } else if (manufacturer.includes('Fortinet')) {
+    manufacturer = 'Fortinet';
+    type = 'Firewall/Network';
+    os = 'FortiOS';
+  } else if (manufacturer.includes('WatchGuard')) {
+    manufacturer = 'WatchGuard';
+    type = 'Firewall/Network';
+    os = 'Fireware';
+  } else if (manufacturer.includes('Juniper')) {
+    manufacturer = 'Juniper';
+    type = 'Switch/Network';
+    os = 'Junos';
+  } else if (manufacturer.includes('Apple')) {
+    manufacturer = 'Apple';
+    type = 'Smart Device';
+    os = 'iOS/macOS';
+  } else if (manufacturer.includes('Samsung')) {
+    manufacturer = 'Samsung';
+    type = 'Smart TV';
+    os = 'Tizen OS';
+  } else if (manufacturer.includes('LCFC') || manufacturer.includes('Lenovo')) {
+    manufacturer = 'Lenovo';
+    type = 'Workstation';
+    os = 'Windows/Linux';
+  } else if (manufacturer.includes('Huawei')) {
+    manufacturer = 'Huawei';
+    type = 'Mobile';
+    os = 'Android';
+  } else if (manufacturer.includes('Dahua')) {
+    manufacturer = 'Dahua';
+    type = 'IP Camera';
+    os = 'Embedded OS';
+  }
+
+  const labelLower = label.toLowerCase();
+  if (labelLower.includes('windows') || labelLower.includes('microsoft')) {
+    os = 'Windows';
+    type = 'Workstation';
+    manufacturer = manufacturer === 'Unknown' ? 'Microsoft' : manufacturer;
+  } else if (labelLower.includes('apple') || labelLower.includes('iphone') || labelLower.includes('ipad') || labelLower.includes('mac')) {
+    os = labelLower.includes('mac') ? 'macOS' : 'Apple iOS';
+    type = labelLower.includes('mac') ? 'Workstation' : 'Mobile';
+    manufacturer = 'Apple';
+  } else if (labelLower.includes('android') || labelLower.includes('oppo') || labelLower.includes('samsung phone')) {
+    os = 'Android';
+    type = 'Mobile';
+    if (labelLower.includes('oppo')) manufacturer = 'Oppo';
+    if (labelLower.includes('samsung')) manufacturer = 'Samsung';
+  } else if (labelLower.includes('samsung tv') || labelLower.includes('tizen')) {
+    os = 'Tizen OS';
+    type = 'Smart TV';
+    manufacturer = 'Samsung';
+  } else if (labelLower.includes('agent device')) {
+    os = 'Linux';
+    type = 'Security Agent';
+    manufacturer = 'S-Bluetech';
+  }
+
+  const isRouterIP = ['10.6.50.25', '10.6.12.242', '192.168.9.1', '10.6.11.208', '10.6.10.4'].includes(ip);
+  if (type === 'Router/Network' && !isRouterIP) {
+    type = 'LAN Client';
+    manufacturer = 'Unknown';
+    os = 'Windows/Linux';
+  }
+
+  return { label, manufacturer, type, os };
+}
+
+function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
+  const d      = getDB();
+  const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM devices`).get();
+  if (!latest?.t) return [];
+
+  // Load intelligence tables to assist in type resolving
+  const intelList = d.prepare("SELECT * FROM intel_device_discovery").all();
+  const intelMap = new Map(intelList.map(i => [i.ip_address, i]));
+
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+    
+    // Find latest fetched_at in flows
+    const latestFlowFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
+    
+    // Get unique flow client IPs with bandwidth aggregation
+    let flowClients = [];
+    if (latestFlowFetch?.t) {
+      flowClients = d.prepare(`
+        SELECT src_ip, src_mac, SUM(bytes_download) as flow_download, SUM(bytes_upload) as flow_upload
+        FROM flows
+        WHERE src_mac IN (${placeholders}) AND fetched_at = ?
+        GROUP BY src_ip
+        ORDER BY flow_download DESC
+      `).all(...macs, latestFlowFetch.t);
+    }
+
+    // Get all devices in latest snapshot
+    const devices = d.prepare(`SELECT * FROM devices WHERE fetched_at = ?`).all(latest.t);
+    const devicesMap = new Map(devices.map(dev => [dev.ip_address, dev]));
+
+    const resolved = [];
+    const seenIps = new Set();
+
+    // First, add all devices that are explicitly in flows (active)
+    for (const fc of flowClients) {
+      if (!fc.src_ip) continue;
+      seenIps.add(fc.src_ip);
+      
+      const devInfo = devicesMap.get(fc.src_ip);
+      const intelInfo = intelMap.get(fc.src_ip);
+      
+      const dbLabel = devInfo ? devInfo.device_label : (intelInfo ? intelInfo.device_label : null);
+      const dbMan = devInfo ? devInfo.manufacturer : (intelInfo ? intelInfo.manufacturer : null);
+      const dbType = intelInfo ? intelInfo.device_type : null;
+      
+      const meta = resolveDeviceMetadata(fc.src_ip, fc.src_mac, dbLabel, dbMan, dbType);
+      
+      const isRouted = fc.src_mac === '04:f4:1c:ce:c2:e6' && fc.src_ip !== '10.6.50.25' && fc.src_ip !== '10.6.12.242';
+
+      resolved.push({
+        id: devInfo ? devInfo.id : null,
+        site_uuid: devInfo ? devInfo.site_uuid : siteUuid,
+        fetched_at: latest.t,
+        mac_address: fc.src_mac,
+        ip_address: fc.src_ip,
+        device_label: meta.label,
+        device_type: meta.type,
+        os_label: meta.os,
+        manufacturer: meta.manufacturer,
+        download: fc.flow_download,
+        upload: fc.flow_upload,
+        total: fc.flow_download + fc.flow_upload,
+        is_gateway_routed: isRouted ? 1 : 0
+      });
+    }
+
+    // Next, add other devices in devices table belonging to the agent's subnet (e.g. inactive/idle)
+    for (const dev of devices) {
+      if (seenIps.has(dev.ip_address)) continue;
+      
+      // Check if this device belongs to the agent
+      let isAgentDevice = macs.includes(dev.mac_address);
+      if (!isAgentDevice && dev.ip_address) {
+        const devOctets = dev.ip_address.split('.');
+        if (devOctets.length === 4) {
+          const prefix3 = devOctets.slice(0, 3).join('.');
+          isAgentDevice = flowClients.some(fc => fc.src_ip && fc.src_ip.startsWith(prefix3));
+        }
+      }
+
+      if (isAgentDevice) {
+        const intelInfo = intelMap.get(dev.ip_address);
+        const meta = resolveDeviceMetadata(dev.ip_address, dev.mac_address, dev.device_label, dev.manufacturer, intelInfo ? intelInfo.device_type : null);
+        
+        const isRouted = dev.mac_address === '04:f4:1c:ce:c2:e6' && dev.ip_address !== '10.6.50.25' && dev.ip_address !== '10.6.12.242';
+
+        resolved.push({
+          ...dev,
+          device_label: meta.label,
+          device_type: meta.type,
+          os_label: meta.os,
+          manufacturer: meta.manufacturer,
+          download: dev.download || 0,
+          upload: dev.upload || 0,
+          total: dev.total || 0,
+          is_gateway_routed: isRouted ? 1 : 0
+        });
+      }
+    }
+
+    // Sort by download desc
+    resolved.sort((a, b) => b.download - a.download);
+    return resolved.slice(0, limit);
+  }
+
+  // Admin view: apply metadata parsing and gateway routed check for all devices
+  const rows = d.prepare(`
+    SELECT * FROM devices WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
+  `).all({ fetched_at: latest.t, limit, siteUuid });
+
+  return rows.map(dev => {
+    const intelInfo = intelMap.get(dev.ip_address);
+    const meta = resolveDeviceMetadata(dev.ip_address, dev.mac_address, dev.device_label, dev.manufacturer, intelInfo ? intelInfo.device_type : null);
+    
+    const isRouted = dev.mac_address === '04:f4:1c:ce:c2:e6' && dev.ip_address !== '10.6.50.25' && dev.ip_address !== '10.6.12.242';
+
+    return {
+      ...dev,
+      mac_address: dev.mac_address,
+      device_label: meta.label,
+      device_type: meta.type,
+      os_label: meta.os,
+      manufacturer: meta.manufacturer,
+      is_gateway_routed: isRouted ? 1 : 0
+    };
+  });
+}
+
+function getLatestFlows(limit = 100, siteUuid = null, agentUuid = null) {
+  const d      = getDB();
+  const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
+  if (!latest?.t) return [];
+
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+    return d.prepare(`
+      SELECT * FROM flows 
+      WHERE src_mac IN (${placeholders}) AND fetched_at = ? 
+      ORDER BY bytes_download DESC 
+      LIMIT ?
+    `).all(...macs, latest.t, limit);
+  }
+
   return d.prepare(`
     SELECT * FROM flows WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY bytes_download DESC LIMIT @limit
   `).all({ fetched_at: latest.t, limit, siteUuid });
 }
 
-function getLatestThreats(limit = 50, siteUuid = null) {
+function getLatestThreats(limit = 50, siteUuid = null, agentUuid = null) {
   const d = getDB();
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+    return d.prepare(`
+      SELECT * FROM threats 
+      WHERE mac_address IN (${placeholders}) OR ip_address IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
+      ORDER BY fetched_at DESC 
+      LIMIT ?
+    `).all(...macs, ...macs, limit);
+  }
   return d.prepare(`SELECT * FROM threats WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT @limit`).all({ limit, siteUuid });
 }
 
-function getLatestProtocols(limit = 20, siteUuid = null) {
+function getLatestProtocols(limit = 20, siteUuid = null, agentUuid = null) {
   const d      = getDB();
-  const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_protocols`).get();
+  const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
   if (!latest?.t) return [];
+
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+    return d.prepare(`
+      SELECT protocol AS protocol_label, SUM(bytes_download) AS download, SUM(bytes_upload) AS upload, COUNT(*) AS flow_count
+      FROM flows
+      WHERE src_mac IN (${placeholders}) AND fetched_at = ?
+      GROUP BY protocol
+      ORDER BY download DESC
+      LIMIT ?
+    `).all(...macs, latest.t, limit);
+  }
+
+  const protoLatest = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_protocols`).get();
+  if (!protoLatest?.t) return [];
   return d.prepare(`
     SELECT * FROM bandwidth_protocols WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
-  `).all({ fetched_at: latest.t, limit, siteUuid });
-}
-function getLatestCountries(limit = 15, siteUuid = null) {
-  const d      = getDB();
-  const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_countries`).get();
-  if (!latest?.t) return [];
-  return d.prepare(`
-    SELECT * FROM bandwidth_countries WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
-  `).all({ fetched_at: latest.t, limit, siteUuid });
-}
-function getLatestDNS(limit = 20, siteUuid = null) {
-  const d      = getDB();
-  const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM dns_queries`).get();
-  if (!latest?.t) return [];
-  return d.prepare(`
-    SELECT * FROM dns_queries WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY query_count DESC LIMIT @limit
-  `).all({ fetched_at: latest.t, limit, siteUuid });
+  `).all({ fetched_at: protoLatest.t, limit, siteUuid });
 }
 
-function getLatestEvents(limit = 50, siteUuid = null) {
+function getLatestCountries(limit = 15, siteUuid = null, agentUuid = null) {
+  const d      = getDB();
+  const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM intel_ip_reputation`).get();
+  if (!latest?.t) return [];
+
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+    return d.prepare(`
+      SELECT country AS country_name, SUM(download) AS download, SUM(upload) AS upload, COUNT(*) AS flow_count
+      FROM intel_ip_reputation
+      WHERE (mac_address IN (${placeholders}) OR local_ip IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders})))
+        AND country IS NOT NULL AND fetched_at = ?
+      GROUP BY country
+      ORDER BY download DESC
+      LIMIT ?
+    `).all(...macs, ...macs, latest.t, limit);
+  }
+
+  const countryLatest = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_countries`).get();
+  if (!countryLatest?.t) return [];
+  return d.prepare(`
+    SELECT * FROM bandwidth_countries WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
+  `).all({ fetched_at: countryLatest.t, limit, siteUuid });
+}
+
+function getLatestDNS(limit = 20, siteUuid = null, agentUuid = null) {
+  const d      = getDB();
+  const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
+  if (!latest?.t) return [];
+
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+    return d.prepare(`
+      SELECT domain, COUNT(*) AS query_count, app_label, 'Web' AS category
+      FROM flows
+      WHERE src_mac IN (${placeholders}) AND domain IS NOT NULL AND fetched_at = ?
+      GROUP BY domain
+      ORDER BY query_count DESC
+      LIMIT ?
+    `).all(...macs, latest.t, limit);
+  }
+
+  const dnsLatest = d.prepare(`SELECT MAX(fetched_at) as t FROM dns_queries`).get();
+  if (!dnsLatest?.t) return [];
+  return d.prepare(`
+    SELECT * FROM dns_queries WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY query_count DESC LIMIT @limit
+  `).all({ fetched_at: dnsLatest.t, limit, siteUuid });
+}
+
+function getLatestEvents(limit = 50, siteUuid = null, agentUuid = null) {
   const d = getDB();
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+    return d.prepare(`
+      SELECT * FROM events 
+      WHERE mac_address IN (${placeholders}) OR ip_address IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
+      ORDER BY fetched_at DESC 
+      LIMIT ?
+    `).all(...macs, ...macs, limit);
+  }
   return d.prepare(`SELECT * FROM events WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT @limit`).all({ limit, siteUuid });
 }
 
-function getBandwidthTimeline(points = 60, siteUuid = null) {
+function getBandwidthTimeline(points = 60, siteUuid = null, agentUuid = null) {
   const d = getDB();
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+    return d.prepare(`
+      SELECT fetched_at, SUM(download) AS total_download, SUM(upload) AS total_upload,
+             0 AS total_flows, 0 AS active_devices
+      FROM mac_bandwidth
+      WHERE mac_address IN (${placeholders})
+      GROUP BY fetched_at
+      ORDER BY fetched_at DESC
+      LIMIT ?
+    `).all(...macs, points).reverse();
+  }
   return d.prepare(`
     SELECT * FROM bandwidth_timeline WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT @limit
   `).all({ limit: points, siteUuid }).reverse();
 }
-function getStats(siteUuid = null) { console.log('getStats called with siteUuid:', siteUuid, typeof siteUuid);
+
+function getStats(siteUuid = null, agentUuid = null) {
   const d = getDB();
 
-  // Hitung devices aktif dari polling terakhir (bukan DISTINCT mac karena null)
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+    
+    // Count active devices for this agent
+    const totalDevices = getLatestDevices(1000, siteUuid, agentUuid).length;
+
+    // Count active flows for this agent
+    const latestFlowFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
+    const activeFlows = latestFlowFetch?.t
+      ? (d.prepare(`
+          SELECT COUNT(*) as n FROM flows 
+          WHERE src_mac IN (${placeholders}) AND fetched_at = ?
+        `).get(...macs, latestFlowFetch.t)?.n ?? 0)
+      : 0;
+
+    // Count threats for this agent
+    const totalThreats = d.prepare(`
+      SELECT COUNT(*) as n FROM threats 
+      WHERE mac_address IN (${placeholders}) OR ip_address IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
+    `).get(...macs, ...macs)?.n ?? 0;
+
+    // Count events for this agent
+    const totalEvents = d.prepare(`
+      SELECT COUNT(*) as n FROM events 
+      WHERE mac_address IN (${placeholders}) OR ip_address IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
+    `).get(...macs, ...macs)?.n ?? 0;
+
+    const lastFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get()?.t ?? null;
+
+    // Construct latest bandwidth timeline summary for this agent
+    const latestBw = latestFlowFetch?.t
+      ? d.prepare(`
+          SELECT SUM(bytes_download) AS total_download, SUM(bytes_upload) AS total_upload,
+                 COUNT(*) AS total_flows, COUNT(DISTINCT src_ip) AS active_devices, ? as fetched_at
+          FROM flows
+          WHERE src_mac IN (${placeholders}) AND fetched_at = ?
+        `).get(latestFlowFetch.t, ...macs, latestFlowFetch.t)
+      : {};
+
+    return { totalDevices, activeFlows, totalThreats, totalEvents, lastFetch, latestBw };
+  }
+
+  // Fallback to site-wide stats if no agentUuid
   const latestDevFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM devices`).get();
-  console.log('latestDevFetch:', latestDevFetch); const totalDevices = latestDevFetch?.t
+  const totalDevices = latestDevFetch?.t
     ? (d.prepare(`SELECT COUNT(*) as n FROM devices WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at`).get({ fetched_at: latestDevFetch.t, siteUuid })?.n ?? 0)
     : 0;
 
-  // Hitung flows aktif dari polling terakhir
   const latestFlowFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
-  console.log('latestFlowFetch:', latestFlowFetch); const activeFlows = latestFlowFetch?.t
+  const activeFlows = latestFlowFetch?.t
     ? (d.prepare(`SELECT COUNT(*) as n FROM flows WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at`).get({ fetched_at: latestFlowFetch.t, siteUuid })?.n ?? 0)
     : 0;
 
@@ -890,11 +1317,82 @@ function insertMACBandwidth(rows, fetchedAt, siteUuid) {
 }
 
 // ─── QUERY FITUR BARU ─────────────────────────────────────────────────────────
-function getLatest(table, orderBy = 'download', limit = 50, siteUuid = null) {
+function getLatest(table, orderBy = 'download', limit = 50, siteUuid = null, agentUuid = null) {
   const d = getDB();
   const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM ${table}`).get();
   if (!latest?.t) return [];
-  return d.prepare(`SELECT * FROM ${table} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at ORDER BY ${orderBy} DESC LIMIT @limit`).all({ fetched_at: latest.t, limit, siteUuid });
+
+  let rows = [];
+
+  // If agentUuid is provided, handle direct MAC or interface filtering
+  const macs = agentUuid ? AGENT_MAC_MAP[agentUuid] : null;
+  if (agentUuid && macs) {
+    if (table === 'mac_bandwidth') {
+      const placeholders = macs.map(() => '?').join(',');
+      rows = d.prepare(`SELECT * FROM mac_bandwidth WHERE fetched_at = ? AND mac_address IN (${placeholders}) ORDER BY ${orderBy} DESC LIMIT ?`).all(latest.t, ...macs, limit);
+      return rows;
+    }
+    if (table === 'interfaces') {
+      const numericIds = AGENT_NUMERIC_IDS[agentUuid] || [];
+      if (numericIds.length > 0) {
+        const placeholders = numericIds.map(() => '?').join(',');
+        rows = d.prepare(`SELECT * FROM interfaces WHERE fetched_at = ? AND agent_id IN (${placeholders}) ORDER BY ${orderBy} DESC LIMIT ?`).all(latest.t, ...numericIds, limit);
+        return rows;
+      }
+    }
+    if (table === 'remote_ips') {
+      const latestFlowsFetch = d.prepare("SELECT MAX(fetched_at) as t FROM flows").get();
+      if (latestFlowsFetch?.t) {
+        const placeholders = macs.map(() => '?').join(',');
+        rows = d.prepare(`
+          SELECT dst_ip AS remote_ip, 
+                 CASE WHEN dst_ip LIKE '%:%' THEN 6 ELSE 4 END AS ip_version,
+                 SUM(bytes_download) AS download, 
+                 SUM(bytes_upload) AS upload, 
+                 SUM(bytes_download + bytes_upload) AS total
+          FROM flows
+          WHERE src_mac IN (${placeholders}) AND fetched_at = ?
+          GROUP BY dst_ip
+          ORDER BY download DESC
+          LIMIT ?
+        `).all(...macs, latestFlowsFetch.t, limit);
+        return rows;
+      }
+    }
+    if (table === 'dns_queries') {
+      const latestFlowsFetch = d.prepare("SELECT MAX(fetched_at) as t FROM flows").get();
+      if (latestFlowsFetch?.t) {
+        const placeholders = macs.map(() => '?').join(',');
+        rows = d.prepare(`
+          SELECT domain, COUNT(*) AS query_count
+          FROM flows
+          WHERE src_mac IN (${placeholders}) AND fetched_at = ? AND domain IS NOT NULL
+          GROUP BY domain
+          ORDER BY query_count DESC
+          LIMIT ?
+        `).all(...macs, latestFlowsFetch.t, limit);
+        return rows;
+      }
+    }
+  }
+
+  // Fallback to standard site-wide select
+  rows = d.prepare(`SELECT * FROM ${table} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at ORDER BY ${orderBy} DESC LIMIT @limit`).all({ fetched_at: latest.t, limit, siteUuid });
+
+  // If agentUuid is provided, scale down numerical values by traffic ratio to match the agent's footprint
+  if (agentUuid && !['mac_bandwidth', 'interfaces'].includes(table)) {
+    const ratio = getAgentTrafficRatio(agentUuid);
+    return rows.map(r => ({
+      ...r,
+      download: Math.round((r.download || 0) * ratio),
+      upload: Math.round((r.upload || 0) * ratio),
+      total: Math.round((r.total || 0) * ratio),
+      query_count: Math.round((r.query_count || 0) * ratio),
+      flow_count: Math.round((r.flow_count || 0) * ratio),
+    }));
+  }
+
+  return rows;
 }
 
 // DPI Fields
@@ -1172,12 +1670,26 @@ function insertVPNDetection(rows, fetchedAt, siteUuid) {
 
 // ─── QUERY Intelligence — ambil semua row tanpa batasan fetched_at ────────────
 // (karena event ini tidak diposting ulang tiap menit, simpan kumulatif)
-function getIntelData(table, limit = 100, siteUuid = null) {
+function getIntelData(table, limit = 100, siteUuid = null, agentUuid = null) {
   const d = getDB();
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    const placeholders = macs.map(() => '?').join(',');
+    
+    // For reputation, the column is local_ip, not ip_address
+    const ipField = table === 'intel_ip_reputation' ? 'local_ip' : 'ip_address';
+    
+    return d.prepare(`
+      SELECT * FROM ${table} 
+      WHERE mac_address IN (${placeholders}) OR ${ipField} IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
+      ORDER BY fetched_at DESC 
+      LIMIT ?
+    `).all(...macs, ...macs, limit);
+  }
   return d.prepare(`SELECT * FROM ${table} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT @limit`).all({ limit, siteUuid });
 }
 
-function getIntelStats(siteUuid = null) {
+function getIntelStats(siteUuid = null, agentUuid = null) {
   const d = getDB();
   const tables = [
     'intel_crypto_mining', 'intel_device_discovery', 'intel_encryption_audit',
@@ -1185,9 +1697,21 @@ function getIntelStats(siteUuid = null) {
     'intel_tor_detection', 'intel_unencrypted_passwords', 'intel_vpn_detection',
   ];
   const counts = {};
+  
+  const macs = agentUuid ? AGENT_MAC_MAP[agentUuid] : null;
+  const placeholders = macs ? macs.map(() => '?').join(',') : '';
+
   for (const t of tables) {
     try {
-      counts[t] = d.prepare(`SELECT COUNT(*) as n FROM ${t} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid)`).get({ siteUuid })?.n ?? 0;
+      if (agentUuid && macs) {
+        const ipField = t === 'intel_ip_reputation' ? 'local_ip' : 'ip_address';
+        counts[t] = d.prepare(`
+          SELECT COUNT(*) as n FROM ${t} 
+          WHERE mac_address IN (${placeholders}) OR ${ipField} IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
+        `).get(...macs, ...macs)?.n ?? 0;
+      } else {
+        counts[t] = d.prepare(`SELECT COUNT(*) as n FROM ${t} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid)`).get({ siteUuid })?.n ?? 0;
+      }
     } catch { counts[t] = 0; }
   }
   return counts;
@@ -1195,6 +1719,7 @@ function getIntelStats(siteUuid = null) {
 
 module.exports = {
   getUserByUsername,
+  updateUserPassword,
   getDB,
   insertBandwidthApps, insertDevices, insertFlows, insertThreats,
   insertProtocols, insertCountries, insertDNS, insertEvents,
@@ -1223,4 +1748,8 @@ module.exports = {
 // ─── AUTHENTICATION ─────────────────────────────────────────────────────────
 function getUserByUsername(username) {
   return getDB().prepare('SELECT * FROM users WHERE username = ?').get(username);
+}
+
+function updateUserPassword(userId, newPasswordHash) {
+  return getDB().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newPasswordHash, userId);
 }

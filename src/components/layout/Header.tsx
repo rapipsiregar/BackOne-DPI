@@ -1,6 +1,13 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Bell, RefreshCw } from "lucide-react";
+
+const AGENT_LABELS: Record<string, string> = {
+  '2F-TF-1D-GK': 'JRP Cibubur',
+  '8A-V3-PB-85': 'IFG LT.18',
+  'F6-2V-DT-8A': 'CPI Balaraja',
+};
 
 export function Header({
   lastUpdate = "—",
@@ -11,6 +18,19 @@ export function Header({
   isRefreshing?: boolean;
   onRefresh?: () => void;
 }) {
+  const [user, setUser] = useState<{ role?: string; agent_uuid?: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.user) {
+          setUser(data.user);
+        }
+      })
+      .catch(err => console.error(err));
+  }, []);
+
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-background px-6">
       <div className="flex items-center gap-2">
@@ -20,6 +40,16 @@ export function Header({
         </div>
       </div>
       <div className="flex items-center gap-4">
+        {user?.role === 'AGENT_VIEWER' && (
+          <div className="flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-950/40 px-3 py-1 text-xs text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
+            <span className="font-semibold">Agent:</span> {AGENT_LABELS[user.agent_uuid || ''] || user.agent_uuid} ({user.agent_uuid})
+          </div>
+        )}
+        {user?.role === 'SUPER_ADMIN' && (
+          <div className="flex items-center gap-2 rounded-full border border-red-500/30 bg-red-950/40 px-3 py-1 text-xs text-red-300 shadow-[0_0_10px_rgba(239,68,68,0.1)]">
+            <span className="font-semibold">Admin:</span> All Agents
+          </div>
+        )}
         <div className="text-xs text-muted-foreground">
           Update: {lastUpdate}
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { getAgents, createAgent, updateAgent, deleteAgent, Agent } from "@/lib/actions/agents";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DataTable, Column } from "@/components/ui/DataTable";
@@ -10,6 +11,8 @@ import { AgentDetailModal } from "@/components/ui/AgentDetailModal";
 import { Loader2, Plus, Edit, Trash2, Server, CheckCircle2, XCircle, ChevronRight } from "lucide-react";
 
 export default function AgentsPage() {
+  const router = useRouter();
+  const [role, setRole] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -46,8 +49,25 @@ export default function AgentsPage() {
   };
 
   useEffect(() => {
-    loadAgents();
-  }, []);
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.user) {
+          setRole(data.user.role || null);
+          if (data.user.role === 'AGENT_VIEWER') {
+            router.push('/');
+          } else {
+            loadAgents();
+          }
+        } else {
+          setIsLoading(false);
+        }
+      })
+      .catch(err => {
+        console.error("Auth check failed:", err);
+        setIsLoading(false);
+      });
+  }, [router]);
 
   const openCreate = () => {
     setFormData({ agentId: "", label: "" });

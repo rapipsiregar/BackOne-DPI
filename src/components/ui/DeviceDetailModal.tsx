@@ -5,6 +5,7 @@ import {
   fetchDeviceDetails, DeviceDetails,
 } from "@/lib/api";
 import { fmtBytes } from "@/lib/utils";
+import { IpDetails } from "./IpDetails";
 import {
   Loader2, X, Monitor, Globe, Activity, Lock, Server,
   AlertTriangle, Eye, Shield, Bell, Wifi, Unlock, Router,
@@ -21,6 +22,47 @@ interface Props {
 type Tab = "info" | "flows" | "apps" | "encryption" | "servers" | "passwords" | "reputation" | "vpn_events";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+function explainAppOrPort(appLabel: string | null, domain: string | null, port: number) {
+  const label = appLabel || domain || "";
+  const portStr = String(port);
+  
+  const matches: Record<string, string> = {
+    "1433": "MSSQL Database Server",
+    "1434": "MSSQL Monitor Server",
+    "3306": "MySQL/MariaDB Database Server",
+    "5432": "PostgreSQL Database Server",
+    "1521": "Oracle Database Server",
+    "27017": "MongoDB Database Server",
+    "6379": "Redis Key-Value Cache",
+    "80": "Unencrypted Web Traffic (HTTP)",
+    "443": "Encrypted Web Traffic (HTTPS/TLS)",
+    "22": "SSH Remote Management / SFTP",
+    "21": "FTP File Upload/Download (Unencrypted)",
+    "23": "Telnet Command Shell (Insecure)",
+    "25": "SMTP Mail Delivery",
+    "587": "Secure SMTP Mail Delivery",
+    "110": "POP3 Mail Storage Retrieval",
+    "993": "Secure IMAP Mail Service",
+    "53": "DNS Server Query (Domain Lookup)",
+    "123": "NTP Network Clock Synchronizer",
+    "161": "SNMP Network Device Monitoring",
+    "3389": "RDP Remote Desktop Management",
+    "445": "SMB Windows File Sharing",
+    "137": "NetBIOS Name Service",
+    "138": "NetBIOS Datagram Service",
+    "139": "NetBIOS Session Service",
+    "1812": "RADIUS Authentication Server",
+    "1813": "RADIUS Accounting Server"
+  };
+
+  const explanation = matches[portStr] || (label.toLowerCase().includes("tls") || label.toLowerCase().includes("https") ? "Encrypted Connection (SSL/TLS)" : "");
+  
+  return {
+    main: label || `Port ${port}`,
+    sub: explanation
+  };
+}
+
 function sevStyle(sev: string | null) {
   switch ((sev || "").toLowerCase()) {
     case "critical": return "bg-red-500/15 text-red-400 ring-1 ring-red-500/30";
@@ -264,36 +306,30 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                 {activeTab === "flows" && (
                   data.flows.length === 0 ? <Empty msg="Tidak ada flows untuk device ini." /> : (
                     <TableWrap head={["Destination IP", "Port", "Domain / App", "Proto", "↓", "↑", "Last Seen"]}>
-                      {data.flows.map((f, i) => (
-                        <tr key={i} className="hover:bg-white/[0.03] transition-colors">
-                          <td className="px-3 py-2 font-mono text-xs text-blue-400 whitespace-nowrap">{f.dst_ip || "—"}</td>
-                          <td className="px-3 py-2 text-xs text-slate-400">{f.dst_port ?? "—"}</td>
-                          <td className="px-3 py-2 max-w-[180px]">
-                            {f.domain ? (
-                              /* Domain name takes priority — shown in teal monospace */
-                              <span className="text-xs text-teal-300 font-mono truncate block" title={f.domain}>
-                                {f.domain}
+                      {data.flows.map((f, i) => {
+                        const exp = explainAppOrPort(f.app_label, f.domain, f.dst_port || 0);
+                        return (
+                          <tr key={i} className="hover:bg-white/[0.03] transition-colors">
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              <span className="font-mono text-xs text-blue-400 block">{f.dst_ip || "—"}</span>
+                              {f.dst_ip && <IpDetails ip={f.dst_ip} />}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-400">{f.dst_port ?? "—"}</td>
+                            <td className="px-3 py-2 max-w-[180px]">
+                              <span className="text-xs text-teal-300 font-mono truncate block" title={exp.main}>
+                                {exp.main}
                               </span>
-                            ) : f.app_label && !f.app_label.startsWith('Port ') ? (
-                              /* Named protocol — purple */
-                              <span className="text-xs text-purple-300 truncate block">{f.app_label}</span>
-                            ) : f.app_label ? (
-                              /* Port-only entry — muted */
-                              <span className="text-xs text-slate-500 truncate block">{f.app_label}</span>
-                            ) : (
-                              <span className="text-xs text-slate-600">—</span>
-                            )}
-                            {/* Show app_label as secondary if domain is set */}
-                            {f.domain && f.app_label && (
-                              <span className="text-[10px] text-slate-500 block">{f.app_label}</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-slate-400">{f.protocol || "—"}</td>
-                          <td className="px-3 py-2 text-right text-xs text-cyan-400 whitespace-nowrap">{fmtBytes(f.download)}</td>
-                          <td className="px-3 py-2 text-right text-xs text-green-400 whitespace-nowrap">{fmtBytes(f.upload)}</td>
-                          <td className="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">{f.last_seen?.slice(0, 16) || "—"}</td>
-                        </tr>
-                      ))}
+                              {exp.sub && (
+                                <span className="text-[10px] text-slate-500 block italic">{exp.sub}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-400">{f.protocol || "—"}</td>
+                            <td className="px-3 py-2 text-right text-xs text-cyan-400 whitespace-nowrap">{fmtBytes(f.download)}</td>
+                            <td className="px-3 py-2 text-right text-xs text-green-400 whitespace-nowrap">{fmtBytes(f.upload)}</td>
+                            <td className="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">{f.last_seen?.slice(0, 16) || "—"}</td>
+                          </tr>
+                        );
+                      })}
                     </TableWrap>
                   )
                 )}

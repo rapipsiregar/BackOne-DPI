@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { getUserByUsername } = require('../database');
+const { getUserByUsername, updateUserPassword, getDB } = require('../database');
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-backone-key';
@@ -23,7 +23,7 @@ router.post('/login', (req, res) => {
   }
 
   const token = jwt.sign(
-    { id: user.id, username: user.username, role: user.role, site_uuid: user.site_uuid },
+    { id: user.id, username: user.username, role: user.role, site_uuid: user.site_uuid, agent_uuid: user.agent_uuid },
     JWT_SECRET,
     { expiresIn: '1d' }
   );
@@ -38,7 +38,7 @@ router.post('/login', (req, res) => {
 
   res.json({
     message: 'Login successful',
-    user: { id: user.id, username: user.username, role: user.role, site_uuid: user.site_uuid }
+    user: { id: user.id, username: user.username, role: user.role, site_uuid: user.site_uuid, agent_uuid: user.agent_uuid }
   });
 });
 
@@ -56,9 +56,138 @@ router.get('/me', (req, res) => {
   }
 });
 
+router.post('/change-password', (req, res) => {
+  const token = req.cookies?.token;
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    // 1. Get user details from database
+    const user = getUserByUsername(decoded.username);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // 2. Verify current password
+    const isCurrentValid = bcrypt.compareSync(currentPassword, user.password_hash);
+    if (!isCurrentValid) {
+      return res.status(400).json({ error: 'Password saat ini salah' });
+    }
+
+    // 3. Validate new password strength
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        error: 'Password baru tidak memenuhi kriteria: minimal 8 karakter, serta mengandung huruf besar, huruf kecil, angka, dan karakter spesial.'
+      });
+    }
+
+    // 4. Hash new password and save to DB
+    const newHash = bcrypt.hashSync(newPassword, 10);
+    updateUserPassword(user.id, newHash);
+
+    return res.json({ ok: true, message: 'Password berhasil diubah!' });
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
 router.post('/logout', (req, res) => {
   res.clearCookie('token');
   res.json({ message: 'Logged out successfully' });
+});
+
+router.get('/geoip', async (req, res) => {
+  const ip = req.query.ip;
+  if (!ip) {
+    return res.status(400).json({ error: 'IP is required' });
+  }
+  
+  const d = getDB();
+  try {
+    // 1. Check local cache
+    let cached = d.prepare("SELECT * FROM geoip_cache WHERE ip_address = ?").get(ip);
+    if (cached) {
+      return res.json(cached);
+    }
+    
+    // 2. Check if private IP (IPv4 and IPv6 link local)
+    const parts = ip.split('.');
+    let isPrivate = false;
+    if (parts.length === 4) {
+      const o1 = parseInt(parts[0], 10);
+      const o2 = parseInt(parts[1], 10);
+      if (o1 === 10) isPrivate = true;
+      else if (o1 === 192 && o2 === 168) isPrivate = true;
+      else if (o1 === 172 && (o2 >= 16 && o2 <= 31)) isPrivate = true;
+      else if (o1 === 127) isPrivate = true;
+      else if (o1 === 169 && o2 === 254) isPrivate = true;
+    } else if (ip.startsWith('fe80:') || ip === '::1' || ip.startsWith('fd')) {
+      isPrivate = true;
+    }
+    
+    if (isPrivate) {
+      const privateInfo = {
+        ip_address: ip,
+        isp: 'Intranet / Private Network',
+        country: 'Local',
+        city: 'Local',
+        as_org: 'RFC 1918 Private Range'
+      };
+      d.prepare("INSERT OR IGNORE INTO geoip_cache (ip_address, isp, country, city, as_org) VALUES (?, ?, ?, ?, ?)").run(
+        privateInfo.ip_address, privateInfo.isp, privateInfo.country, privateInfo.city, privateInfo.as_org
+      );
+      return res.json(privateInfo);
+    }
+    
+    // 3. Query public GeoIP API (ip-api.com) with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second timeout
+    
+    const response = await fetch(`http://ip-api.com/json/${ip}`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
+    const geo = await response.json();
+    if (geo && geo.status === 'success') {
+      const publicInfo = {
+        ip_address: ip,
+        isp: geo.isp || 'Unknown ISP',
+        country: geo.country || 'Unknown Country',
+        city: geo.city || 'Unknown City',
+        as_org: geo.as || geo.org || 'Data Center'
+      };
+      
+      d.prepare("INSERT OR IGNORE INTO geoip_cache (ip_address, isp, country, city, as_org) VALUES (?, ?, ?, ?, ?)").run(
+        publicInfo.ip_address, publicInfo.isp, publicInfo.country, publicInfo.city, publicInfo.as_org
+      );
+      return res.json(publicInfo);
+    } else {
+      // Return temporary/fallback details for lookup failures without caching
+      return res.json({
+        ip_address: ip,
+        isp: 'Public IP',
+        country: 'Remote',
+        city: 'Remote',
+        as_org: 'Public Network'
+      });
+    }
+  } catch (err) {
+    return res.json({
+      ip_address: ip,
+      isp: 'Public IP',
+      country: 'Remote',
+      city: 'Remote',
+      as_org: 'Public Network'
+    });
+  }
 });
 
 module.exports = router;
