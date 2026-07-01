@@ -129,6 +129,7 @@ export interface DeviceStat {
   download: number;
   upload: number;
   last_seen: string;
+  is_gateway_routed?: number | null;
 }
 
 export interface ThreatStat {

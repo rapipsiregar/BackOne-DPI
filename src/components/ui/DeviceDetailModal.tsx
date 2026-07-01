@@ -313,7 +313,7 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                   data.flows.length === 0 ? <Empty msg="Tidak ada flows untuk device ini." /> : (
                     <TableWrap head={["Destination IP", "Port", "Domain / App", "Proto", "↓", "↑", "Last Seen"]}>
                       {data.flows.map((f, i) => {
-                        const exp = explainAppOrPort(f.app_label, f.domain, f.dst_port || 0);
+                        const exp = explainAppOrPort(f.app_label ?? null, f.domain ?? null, f.dst_port || 0);
                         return (
                           <tr key={i} className="hover:bg-white/[0.03] transition-colors">
                             <td className="px-3 py-2 whitespace-nowrap">

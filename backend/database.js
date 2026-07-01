@@ -1582,21 +1582,113 @@ function getLatestProtocols(limit = 20, siteUuid = null, agentUuid = null) {
 
 function getLatestCountries(limit = 15, siteUuid = null, agentUuid = null) {
   const d = getDB();
-  const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM intel_ip_reputation`).get();
-  if (!latest?.t) return [];
 
   if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
     const macs = AGENT_MAC_MAP[agentUuid];
     const placeholders = macs.map(() => '?').join(',');
-    return d.prepare(`
-      SELECT country AS country_name, SUM(download) AS download, SUM(upload) AS upload, COUNT(*) AS flow_count
-      FROM intel_ip_reputation
-      WHERE (mac_address IN (${placeholders}) OR local_ip IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders})))
-        AND country IS NOT NULL AND fetched_at = ?
-      GROUP BY country
+    
+    const rows = d.prepare(`
+      SELECT g.country AS country_name,
+             SUM(f.bytes_download) AS download,
+             SUM(f.bytes_upload) AS upload,
+             COUNT(*) AS flow_count
+      FROM (
+        SELECT dst_ip, bytes_download, bytes_upload 
+        FROM flows 
+        WHERE src_mac IN (${placeholders})
+        ORDER BY last_seen DESC, fetched_at DESC
+        LIMIT 500
+      ) f
+      JOIN geoip_cache g ON f.dst_ip = g.ip_address
+      WHERE g.country IS NOT NULL
+        AND g.country != 'Local'
+      GROUP BY g.country
       ORDER BY download DESC
       LIMIT ?
-    `).all(...macs, ...macs, latest.t, limit);
+    `).all(...macs, limit);
+
+    // Build dynamic name-to-code mapping from bandwidth_countries
+    const nameToCodeMap = {};
+    try {
+      const mappingRows = d.prepare("SELECT DISTINCT country_code, country_name FROM bandwidth_countries WHERE country_code IS NOT NULL").all();
+      for (const r of mappingRows) {
+        if (r.country_name) {
+          nameToCodeMap[r.country_name.toLowerCase().trim()] = r.country_code;
+        }
+      }
+    } catch (err) {
+      console.error('[DB] Failed to build country code mapping:', err);
+    }
+
+    // Fallback/standard mapping
+    const fallbackMap = {
+      'indonesia': 'ID',
+      'united states': 'US',
+      'united kingdom': 'GB',
+      'great britain': 'GB',
+      'singapore': 'SG',
+      'hong kong': 'HK',
+      'japan': 'JP',
+      'canada': 'CA',
+      'australia': 'AU',
+      'germany': 'DE',
+      'france': 'FR',
+      'india': 'IN',
+      'china': 'CN',
+      'south korea': 'KR',
+      'russia': 'RU',
+      'russian federation': 'RU',
+      'brazil': 'BR',
+      'italy': 'IT',
+      'spain': 'ES',
+      'netherlands': 'NL',
+      'the netherlands': 'NL',
+      'switzerland': 'CH',
+      'sweden': 'SE',
+      'norway': 'NO',
+      'finland': 'FI',
+      'denmark': 'DK',
+      'ireland': 'IE',
+      'belgium': 'BE',
+      'austria': 'AT',
+      'malaysia': 'MY',
+      'thailand': 'TH',
+      'vietnam': 'VN',
+      'philippines': 'PH',
+      'taiwan': 'TW',
+      'new zealand': 'NZ',
+      'south africa': 'ZA',
+      'mexico': 'MX',
+      'argentina': 'AR',
+      'chile': 'CL',
+      'colombia': 'CO',
+      'turkey': 'TR',
+      'saudi arabia': 'SA',
+      'united arab emirates': 'AE',
+      'egypt': 'EG',
+      'israel': 'IL',
+      'ukraine': 'UA',
+      'poland': 'PL',
+      'romania': 'RO',
+      'greece': 'GR',
+      'hungary': 'HU',
+      'bangladesh': 'BD',
+      'seychelles': 'SC',
+      'luxembourg': 'LU',
+      'pakistan': 'PK'
+    };
+
+    return rows.map(r => {
+      const normalizedName = r.country_name.toLowerCase().trim();
+      const code = nameToCodeMap[normalizedName] || fallbackMap[normalizedName] || null;
+      return {
+        country_code: code,
+        country_name: r.country_name,
+        download: r.download ?? 0,
+        upload: r.upload ?? 0,
+        flow_count: r.flow_count ?? 0
+      };
+    });
   }
 
   const countryLatest = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_countries`).get();
