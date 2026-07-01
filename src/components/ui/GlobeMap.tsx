@@ -173,7 +173,7 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
     });
 
     return points;
-  }, [arcsData]);
+  }, [arcsData, isLight]);
 
   return (
     <div
@@ -230,15 +230,27 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         ringPropagationSpeed={3}
         ringRepeatPeriod={1000}
 
-        // Labels configuration
-        labelsData={pointsData}
-        labelLat="lat"
-        labelLng="lng"
-        labelText="name"
-        labelSize={1.2}
-        labelDotRadius={0.5}
-        labelColor={() => isLight ? '#0f172a' : 'rgba(255, 255, 255, 0.8)'}
-        labelResolution={2}
+        // HTML Labels configuration for better readability with text-shadow
+        htmlElementsData={pointsData}
+        htmlLat="lat"
+        htmlLng="lng"
+        htmlAltitude={0.03}
+        htmlElement={(d: any) => {
+          const el = document.createElement('div');
+          el.innerHTML = d.name;
+          el.style.color = isLight ? '#0f172a' : '#f8fafc';
+          el.style.fontSize = '12px';
+          el.style.fontWeight = '700';
+          el.style.fontFamily = 'Inter, sans-serif';
+          // Creates a thick outline effect so text doesn't blend into arcs/continents
+          el.style.textShadow = isLight 
+            ? '0 0 4px #ffffff, 0 0 6px #ffffff, 0 0 8px #ffffff' 
+            : '0 0 4px #000000, 0 0 6px #000000, 0 0 8px #000000';
+          el.style.pointerEvents = 'none';
+          el.style.whiteSpace = 'nowrap';
+          el.style.transform = 'translate(-50%, -100%)'; // shift slightly up
+          return el;
+        }}
       />
     </div>
   );

@@ -418,7 +418,7 @@ body::after {
   position: fixed;
   inset: 0;
   z-index: -1;
-  transition: opacity 500ms ease-in-out;
+  transition: opacity 150ms ease-in-out;
   pointer-events: none;
   background-size: cover;
   background-attachment: fixed;
@@ -480,11 +480,12 @@ body::after {
 *::after {
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, background-image;
   transition-timing-function: ease-in-out;
-  transition-duration: 500ms;
+  transition-duration: 150ms;
 }
+
 /* View Transitions API (For perfect whole-screen crossfade including WebGL/Canvas) */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 500ms;
+  animation-duration: 150ms;
   animation-timing-function: ease-in-out;
 }

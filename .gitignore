@@ -41,7 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 # local databases & temporary files
-backend/netify_data.db*
+
 temp.json
 /scratch
 
