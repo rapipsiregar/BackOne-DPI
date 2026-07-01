@@ -1246,30 +1246,9 @@ async function fetchAgentDetails(agentUuid) {
     upload    : r.upload   ?? 0,
   }));
 
-  // ── 2. Distinct devices for this agent ─────────────────────────────────────
-  const devRows = d.prepare(`
-    SELECT f.src_ip       AS ip_address,
-           f.src_mac      AS mac_address,
-           d.device_label,
-           d.device_type,
-           d.os_label,
-           d.manufacturer,
-           SUM(f.bytes_download) AS dl,
-           SUM(f.bytes_upload)   AS ul,
-           MAX(f.last_seen) AS last_seen
-    FROM   flows f
-    LEFT JOIN (
-      SELECT ip_address, device_label, device_type, os_label, manufacturer
-      FROM   devices
-      GROUP  BY ip_address
-    ) d ON d.ip_address = f.src_ip
-    WHERE  f.src_mac IN (${ph})
-    GROUP  BY f.src_ip
-    ORDER  BY dl DESC
-    LIMIT  100
-  `).all(...macs);
-
-  const agentIPs = [...new Set(devRows.map(r => r.ip_address).filter(Boolean))];
+  // ── 2. Distinct devices for this agent (using aligned subnet and MAC mapping) ─
+  const resolvedDevices = db.getLatestDevices(100, null, agentUuid);
+  const agentIPs = resolvedDevices.map(d => d.ip_address).filter(Boolean);
   const phIPs    = agentIPs.length > 0 ? agentIPs.map(() => '?').join(',') : null;
 
   const latestEncAudit = d.prepare(`SELECT MAX(fetched_at) AS t FROM intel_encryption_audit`).get()?.t;
@@ -1285,59 +1264,32 @@ async function fetchAgentDetails(agentUuid) {
     phIPs ? d.prepare(`SELECT DISTINCT ip_address FROM intel_insecure_protocols WHERE ip_address IN (${phIPs})`).all(...agentIPs).map(r => r.ip_address) : []
   );
 
-  const devices = devRows.map(r => ({
+  const devices = resolvedDevices.map(r => ({
     ip_address   : r.ip_address,
     mac_address  : r.mac_address,
     device_label : r.device_label || r.ip_address || 'Unknown',
     device_type  : r.device_type  || null,
     os_label     : r.os_label     || null,
     manufacturer : r.manufacturer || null,
-    last_seen    : r.last_seen    || null,
-    download     : r.dl ?? 0,
-    upload       : r.ul ?? 0,
+    last_seen    : r.fetched_at   || null,
+    download     : r.download ?? 0,
+    upload       : r.upload ?? 0,
     encrypted_pct: riskMap[r.ip_address]?.encrypted_pct ?? null,
     risk_level   : riskMap[r.ip_address]?.risk_level    ?? null,
     has_insecure : insecureIPs.has(r.ip_address),
   }));
 
-  // ── 3. Recent flows for this agent ─────────────────────────────────────────
-  const flowRows = d.prepare(`
-    SELECT src_ip, dst_ip, dst_port, protocol, app_label, domain,
-           bytes_download AS download, bytes_upload AS upload, last_seen
-    FROM   flows
-    WHERE  src_mac IN (${ph})
-    ORDER  BY last_seen DESC
-    LIMIT  100
-  `).all(...macs);
+  // ── 3. Recent flows for this agent (using aligned flows list) ───────────────
+  const flows = db.getLatestFlows(100, null, agentUuid);
 
-  const flows = flowRows.map(r => ({
-    src_ip    : r.src_ip,
-    dst_ip    : r.dst_ip,
-    dst_port  : r.dst_port,
-    protocol  : r.protocol,
-    app_label : r.app_label,
-    domain    : r.domain,
-    download  : r.download ?? 0,
-    upload    : r.upload   ?? 0,
-    last_seen : r.last_seen,
-  }));
-
-  // ── 4. Summary stats ────────────────────────────────────────────────────────
-  const sumRow = d.prepare(`
-    SELECT COUNT(DISTINCT src_ip) AS device_count,
-           COUNT(*) AS flow_count,
-           SUM(bytes_download) AS total_download,
-           SUM(bytes_upload)   AS total_upload
-    FROM   flows
-    WHERE  src_mac IN (${ph})
-  `).get(...macs);
-
-  const summary = sumRow ? {
-    total_devices  : sumRow.device_count  ?? 0,
-    active_flows   : sumRow.flow_count    ?? 0,
-    bandwidth_down : sumRow.total_download ?? 0,
-    bandwidth_up   : sumRow.total_upload  ?? 0,
-  } : null;
+  // ── 4. Summary stats (aligned with dashboard stats query) ───────────────────
+  const stats = db.getStats(null, agentUuid);
+  const summary = {
+    total_devices  : stats.totalDevices,
+    active_flows   : stats.activeFlows,
+    bandwidth_down : stats.latestBw?.total_download ?? 0,
+    bandwidth_up   : stats.latestBw?.total_upload   ?? 0,
+  };
 
   // ── 5. Security Intel filtered by agent IPs & MACs ─────────────────────────
   const encryptionRows = (latestEncAudit && phIPs)

@@ -967,6 +967,8 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
 
   // 1. Process all devices in the devices table
   for (const dev of devices) {
+    if (!dev.ip_address) continue;
+    if (seenIps.has(dev.ip_address)) continue;
     seenIps.add(dev.ip_address);
     const flowInfo = flowMap.get(dev.ip_address);
     resolved.push(processDevice(dev.ip_address, dev.mac_address, dev, flowInfo));
@@ -1173,13 +1175,14 @@ function getStats(siteUuid = null, agentUuid = null) {
     const lastFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get()?.t ?? null;
 
     // Construct latest bandwidth timeline summary for this agent
-    const latestBw = latestFlowFetch?.t
+    const latestMacSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM mac_bandwidth`).get()?.t;
+    const latestBw = latestMacSnap
       ? d.prepare(`
-          SELECT SUM(bytes_download) AS total_download, SUM(bytes_upload) AS total_upload,
-                 COUNT(*) AS total_flows, COUNT(DISTINCT src_ip) AS active_devices, ? as fetched_at
-          FROM flows
-          WHERE src_mac IN (${placeholders}) AND fetched_at = ?
-        `).get(latestFlowFetch.t, ...macs, latestFlowFetch.t)
+          SELECT SUM(download) AS total_download, SUM(upload) AS total_upload,
+                 ? AS total_flows, ? AS active_devices, ? as fetched_at
+          FROM mac_bandwidth
+          WHERE mac_address IN (${placeholders}) AND fetched_at = ?
+        `).get(activeFlows, totalDevices, latestMacSnap, ...macs, latestMacSnap)
       : {};
 
     return { totalDevices, activeFlows, totalThreats, totalEvents, lastFetch, latestBw };
