@@ -22,22 +22,37 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ route: 
 
 async function handleProxy(req: NextRequest, { params }: { params: Promise<{ route: string[] }> }) {
   try {
-    const route = (await params).route.join('/');
-    const baseUrl = process.env.NETIFY_BASE_URL || 'https://manager.netify.ai/api/v1';
+    const routeArray = (await params).route;
+    const route = routeArray.join('/');
     
-    // Construct the destination URL including search parameters
+    let destinationUrl = '';
     const url = new URL(req.url);
-    const destinationUrl = `${baseUrl}/${route}${url.search}`;
+
+    if (routeArray[0] === 'auth' || routeArray[0] === 'dashboard') {
+      const localBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+      destinationUrl = `${localBase}/api/${route}${url.search}`;
+    } else {
+      const baseUrl = process.env.NETIFY_BASE_URL || 'https://manager.netify.ai/api/v1';
+      destinationUrl = `${baseUrl}/${route}${url.search}`;
+    }
     
     // Prepare headers
     const headers = new Headers();
     headers.set('Content-Type', 'application/json');
     
-    if (process.env.NETIFY_JWT_TOKEN && process.env.NETIFY_SITE_UUID) {
-      headers.set('x-api-key', process.env.NETIFY_JWT_TOKEN);
-      headers.set('x-net-site', process.env.NETIFY_SITE_UUID);
-    } else if (process.env.NETIFY_API_KEY) {
-      headers.set('x-api-key', process.env.NETIFY_API_KEY);
+    if (routeArray[0] !== 'auth' && routeArray[0] !== 'dashboard') {
+      if (process.env.NETIFY_JWT_TOKEN && process.env.NETIFY_SITE_UUID) {
+        headers.set('x-api-key', process.env.NETIFY_JWT_TOKEN);
+        headers.set('x-net-site', process.env.NETIFY_SITE_UUID);
+      } else if (process.env.NETIFY_API_KEY) {
+        headers.set('x-api-key', process.env.NETIFY_API_KEY);
+      }
+    } else {
+      // For local auth/dashboard routes, pass along the cookie for authentication
+      const cookie = req.headers.get('cookie');
+      if (cookie) {
+        headers.set('cookie', cookie);
+      }
     }
     
     // Some requests like GET cannot have a body

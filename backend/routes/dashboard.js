@@ -6,8 +6,8 @@ const { runPoll } = require('../scheduler');
 
 // GET /api/dashboard/summary — kartu ringkasan (top of page)
 router.get('/summary', (req, res) => {
-  const stats    = db.getStats();
-  const timeline = db.getBandwidthTimeline(1);
+  const stats    = db.getStats(req.user?.site_uuid);
+  const timeline = db.getBandwidthTimeline(1, req.user?.site_uuid);
   const latest   = timeline[0] ?? {};
 
   res.json({
@@ -27,54 +27,54 @@ router.get('/summary', (req, res) => {
 // GET /api/dashboard/apps — top aplikasi
 router.get('/apps', (req, res) => {
   const limit = parseInt(req.query.limit ?? 10);
-  const data  = db.getLatestBandwidthApps(limit);
+  const data  = db.getLatestBandwidthApps(limit, req.user?.site_uuid);
   res.json({ ok: true, data });
 });
 
 // GET /api/dashboard/devices — daftar device
 router.get('/devices', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  const data  = db.getLatestDevices(limit);
+  const data  = db.getLatestDevices(limit, req.user?.site_uuid);
   res.json({ ok: true, data });
 });
 
 // GET /api/dashboard/flows — flow aktif
 router.get('/flows', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  const data  = db.getLatestFlows(limit);
+  const data  = db.getLatestFlows(limit, req.user?.site_uuid);
   res.json({ ok: true, data });
 });
 
 // GET /api/dashboard/threats — ancaman keamanan
 router.get('/threats', (req, res) => {
   const limit = parseInt(req.query.limit ?? 20);
-  const data  = db.getLatestThreats(limit);
+  const data  = db.getLatestThreats(limit, req.user?.site_uuid);
   res.json({ ok: true, data });
 });
 
 // GET /api/dashboard/protocols — top protokol
 router.get('/protocols', (req, res) => {
-  const data = db.getLatestProtocols();
+  const data = db.getLatestProtocols(20, req.user?.site_uuid);
   res.json({ ok: true, data });
 });
 
 // GET /api/dashboard/countries — top negara
 router.get('/countries', (req, res) => {
-  const data = db.getLatestCountries();
+  const data = db.getLatestCountries(15, req.user?.site_uuid);
   res.json({ ok: true, data });
 });
 
 // GET /api/dashboard/dns — top DNS queries
 router.get('/dns', (req, res) => {
   const limit = parseInt(req.query.limit ?? 20);
-  const data  = db.getLatestDNS(limit);
+  const data  = db.getLatestDNS(limit, req.user?.site_uuid);
   res.json({ ok: true, data });
 });
 
 // GET /api/dashboard/events — events terbaru
 router.get('/events', (req, res) => {
   const limit = parseInt(req.query.limit ?? 20);
-  const rawData  = db.getLatestEvents(limit);
+  const rawData  = db.getLatestEvents(limit, req.user?.site_uuid);
   const mappedData = rawData.map(r => ({
     id: r.id,
     event_id: r.event_id,
@@ -90,7 +90,7 @@ router.get('/events', (req, res) => {
 // GET /api/dashboard/timeline — bandwidth timeline (grafik)
 router.get('/timeline', (req, res) => {
   const points = parseInt(req.query.points ?? 60);
-  const data   = db.getBandwidthTimeline(points);
+  const data   = db.getBandwidthTimeline(points, req.user?.site_uuid);
   res.json({ ok: true, data });
 });
 
@@ -102,67 +102,67 @@ router.post('/refresh', async (req, res) => {
 
 // ─── ROUTES FITUR BARU 1-11 ───────────────────────────────────────────────────
 router.get('/app-categories', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('app_categories', 'download', 15) });
+  res.json({ ok: true, data: db.getLatest('app_categories', 'download', 15, req.user?.site_uuid) });
 });
 router.get('/continents', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('continents', 'download', 10) });
+  res.json({ ok: true, data: db.getLatest('continents', 'download', 10, req.user?.site_uuid) });
 });
 router.get('/regions', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('regions', 'download', 20) });
+  res.json({ ok: true, data: db.getLatest('regions', 'download', 20, req.user?.site_uuid) });
 });
 router.get('/cities', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('cities', 'download', 20) });
+  res.json({ ok: true, data: db.getLatest('cities', 'download', 20, req.user?.site_uuid) });
 });
 router.get('/vlans', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('vlans', 'download', 20) });
+  res.json({ ok: true, data: db.getLatest('vlans', 'download', 20, req.user?.site_uuid) });
 });
 router.get('/interfaces', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('interfaces', 'download', 20) });
+  res.json({ ok: true, data: db.getLatest('interfaces', 'download', 20, req.user?.site_uuid) });
 });
 router.get('/flow-types', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('flow_types', 'download', 10) });
+  res.json({ ok: true, data: db.getLatest('flow_types', 'download', 10, req.user?.site_uuid) });
 });
 router.get('/flow-origins', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('flow_origins', 'download', 10) });
+  res.json({ ok: true, data: db.getLatest('flow_origins', 'download', 10, req.user?.site_uuid) });
 });
 router.get('/ip-versions', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('ip_versions', 'download', 5) });
+  res.json({ ok: true, data: db.getLatest('ip_versions', 'download', 5, req.user?.site_uuid) });
 });
 router.get('/remote-ips', (req, res) => {
   const limit = parseInt(req.query.limit ?? 20);
-  res.json({ ok: true, data: db.getLatest('remote_ips', 'download', limit) });
+  res.json({ ok: true, data: db.getLatest('remote_ips', 'download', limit, req.user?.site_uuid) });
 });
 router.get('/mac-bandwidth', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  res.json({ ok: true, data: db.getLatest('mac_bandwidth', 'download', limit) });
+  res.json({ ok: true, data: db.getLatest('mac_bandwidth', 'download', limit, req.user?.site_uuid) });
 });
 
 // ─── FIX: ROUTES YANG SEBELUMNYA HILANG ──────────────────────────────────────
 
 // TLS Versions
 router.get('/tls-versions', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('tls_versions', 'download', 10) });
+  res.json({ ok: true, data: db.getLatest('tls_versions', 'download', 10, req.user?.site_uuid) });
 });
 
 // TLS Ciphers
 router.get('/tls-ciphers', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('tls_ciphers', 'download', 15) });
+  res.json({ ok: true, data: db.getLatest('tls_ciphers', 'download', 15, req.user?.site_uuid) });
 });
 
 // TLS Security Level
 router.get('/tls-security', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('tls_security', 'download', 10) });
+  res.json({ ok: true, data: db.getLatest('tls_security', 'download', 10, req.user?.site_uuid) });
 });
 
 // NetBIOS Hostnames (Windows devices)
 router.get('/netbios', (req, res) => {
   const limit = parseInt(req.query.limit ?? 30);
-  res.json({ ok: true, data: db.getLatest('netbios_hostnames', 'download', limit) });
+  res.json({ ok: true, data: db.getLatest('netbios_hostnames', 'download', limit, req.user?.site_uuid) });
 });
 
 // Discovery OS (sistem operasi yang terdeteksi)
 router.get('/discovery-os', (req, res) => {
-  res.json({ ok: true, data: db.getLatest('discovery_os', 'download', 20) });
+  res.json({ ok: true, data: db.getLatest('discovery_os', 'download', 20, req.user?.site_uuid) });
 });
 
 // ─── ROUTES DPI 12-21 ─────────────────────────────────────────────────────────
@@ -170,110 +170,110 @@ router.get('/discovery-os', (req, res) => {
 // 12. DHCP Class Fingerprint
 router.get('/dhcp-fingerprints', (req, res) => {
   const limit = parseInt(req.query.limit ?? 30);
-  res.json({ ok: true, data: db.getLatest('dhcp_fingerprints', 'download', limit) });
+  res.json({ ok: true, data: db.getLatest('dhcp_fingerprints', 'download', limit, req.user?.site_uuid) });
 });
 
 // 13. HTTP User-Agent
 router.get('/http-user-agents', (req, res) => {
   const limit = parseInt(req.query.limit ?? 30);
-  res.json({ ok: true, data: db.getLatest('http_user_agents', 'download', limit) });
+  res.json({ ok: true, data: db.getLatest('http_user_agents', 'download', limit, req.user?.site_uuid) });
 });
 
 // 14. HTTPS SNI Hostname
 router.get('/sni-hostnames', (req, res) => {
   const limit = parseInt(req.query.limit ?? 30);
-  res.json({ ok: true, data: db.getLatest('sni_hostnames', 'download', limit) });
+  res.json({ ok: true, data: db.getLatest('sni_hostnames', 'download', limit, req.user?.site_uuid) });
 });
 
 // 15. SSL Server Common Name
 router.get('/ssl-server-cn', (req, res) => {
   const limit = parseInt(req.query.limit ?? 30);
-  res.json({ ok: true, data: db.getLatest('ssl_server_cn', 'download', limit) });
+  res.json({ ok: true, data: db.getLatest('ssl_server_cn', 'download', limit, req.user?.site_uuid) });
 });
 
 // 17. QUIC Hostname
 router.get('/quic-hostnames', (req, res) => {
   const limit = parseInt(req.query.limit ?? 30);
-  res.json({ ok: true, data: db.getLatest('quic_hostnames', 'download', limit) });
+  res.json({ ok: true, data: db.getLatest('quic_hostnames', 'download', limit, req.user?.site_uuid) });
 });
 
 // 18. BitTorrent Info Hash
 router.get('/bittorrent-hashes', (req, res) => {
   const limit = parseInt(req.query.limit ?? 30);
-  res.json({ ok: true, data: db.getLatest('bittorrent_hashes', 'download', limit) });
+  res.json({ ok: true, data: db.getLatest('bittorrent_hashes', 'download', limit, req.user?.site_uuid) });
 });
 
 // 19. SSH Version
 router.get('/ssh-versions', (req, res) => {
   const limit = parseInt(req.query.limit ?? 20);
-  res.json({ ok: true, data: db.getLatest('ssh_versions', 'download', limit) });
+  res.json({ ok: true, data: db.getLatest('ssh_versions', 'download', limit, req.user?.site_uuid) });
 });
 
 // 21. mDNS Hostname (Chromecast, Apple TV, etc.)
 router.get('/mdns-hostnames', (req, res) => {
   const limit = parseInt(req.query.limit ?? 30);
-  res.json({ ok: true, data: db.getLatest('mdns_hostnames', 'download', limit) });
+  res.json({ ok: true, data: db.getLatest('mdns_hostnames', 'download', limit, req.user?.site_uuid) });
 });
 
 // ─── INTELLIGENCE ROUTES 22-30 ────────────────────────────────────────────────
 
 // Stats ringkasan semua intelligence (untuk badge count di tab)
 router.get('/intelligence/stats', (req, res) => {
-  res.json({ ok: true, data: db.getIntelStats() });
+  res.json({ ok: true, data: db.getIntelStats(req.user?.site_uuid) });
 });
 
 // 22. Cryptocurrency Mining
 router.get('/intelligence/crypto-mining', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  res.json({ ok: true, data: db.getIntelData('intel_crypto_mining', limit) });
+  res.json({ ok: true, data: db.getIntelData('intel_crypto_mining', limit, req.user?.site_uuid) });
 });
 
 // 23. Device Discovery
 router.get('/intelligence/device-discovery', (req, res) => {
   const limit = parseInt(req.query.limit ?? 100);
-  res.json({ ok: true, data: db.getIntelData('intel_device_discovery', limit) });
+  res.json({ ok: true, data: db.getIntelData('intel_device_discovery', limit, req.user?.site_uuid) });
 });
 
 // 24. Encryption Audit
 router.get('/intelligence/encryption-audit', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  res.json({ ok: true, data: db.getIntelData('intel_encryption_audit', limit) });
+  res.json({ ok: true, data: db.getIntelData('intel_encryption_audit', limit, req.user?.site_uuid) });
 });
 
 // 25. Insecure Protocols
 router.get('/intelligence/insecure-protocols', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  res.json({ ok: true, data: db.getIntelData('intel_insecure_protocols', limit) });
+  res.json({ ok: true, data: db.getIntelData('intel_insecure_protocols', limit, req.user?.site_uuid) });
 });
 
 // 26. IP Reputation
 router.get('/intelligence/ip-reputation', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  res.json({ ok: true, data: db.getIntelData('intel_ip_reputation', limit) });
+  res.json({ ok: true, data: db.getIntelData('intel_ip_reputation', limit, req.user?.site_uuid) });
 });
 
 // 27. Server Discovery
 router.get('/intelligence/server-discovery', (req, res) => {
   const limit = parseInt(req.query.limit ?? 100);
-  res.json({ ok: true, data: db.getIntelData('intel_server_discovery', limit) });
+  res.json({ ok: true, data: db.getIntelData('intel_server_discovery', limit, req.user?.site_uuid) });
 });
 
 // 28. Tor Detection
 router.get('/intelligence/tor', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  res.json({ ok: true, data: db.getIntelData('intel_tor_detection', limit) });
+  res.json({ ok: true, data: db.getIntelData('intel_tor_detection', limit, req.user?.site_uuid) });
 });
 
 // 29. Unencrypted Passwords
 router.get('/intelligence/unencrypted-passwords', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  res.json({ ok: true, data: db.getIntelData('intel_unencrypted_passwords', limit) });
+  res.json({ ok: true, data: db.getIntelData('intel_unencrypted_passwords', limit, req.user?.site_uuid) });
 });
 
 // 30. VPN Detection
 router.get('/intelligence/vpn', (req, res) => {
   const limit = parseInt(req.query.limit ?? 50);
-  res.json({ ok: true, data: db.getIntelData('intel_vpn_detection', limit) });
+  res.json({ ok: true, data: db.getIntelData('intel_vpn_detection', limit, req.user?.site_uuid) });
 });
 
 // ─── LOOKUP ROUTES ────────────────────────────────────────────────────────────

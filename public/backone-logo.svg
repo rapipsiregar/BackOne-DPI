@@ -1,0 +1,21 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f00a38" />
+      <stop offset="50%" stop-color="#7a0799" />
+      <stop offset="100%" stop-color="#0400ff" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Gradient Circle Background -->
+  <circle cx="100" cy="100" r="100" fill="url(#bgGradient)" />
+  
+  <!-- White Abstract Shape (BackOne Logo) -->
+  <path d="M 50 45
+           L 90 45
+           C 145 45, 165 65, 165 105
+           C 165 155, 110 180, 55 180
+           C 115 160, 125 100, 50 95
+           Z" 
+        fill="#FFFFFF" />
+</svg>

@@ -12,10 +12,11 @@ import {
   Zap,
   Radio,
   Lock,
-  Search
+  Search,
+  LogOut
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const navigation = [
   { name: "Summary", href: "/", icon: LayoutDashboard },
@@ -37,6 +38,17 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+      router.refresh();
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   return (
     <div className="flex h-full w-64 flex-col border-r border-border/50 bg-sidebar/80 backdrop-blur-2xl relative">
@@ -44,11 +56,9 @@ export function Sidebar() {
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
       
       <div className="flex h-[72px] shrink-0 items-center px-6 border-b border-border/50 relative z-10">
-        <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 mr-3 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-          <Shield className="h-5 w-5 text-primary" />
-        </div>
+        <img src="/backone-logo.svg" alt="BackOne Logo" className="w-8 h-8 mr-3 rounded-full drop-shadow-[0_0_10px_rgba(255,0,0,0.3)]" />
         <span className="text-lg font-bold text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
-          Netify
+          BackOne
         </span>
       </div>
       <div className="flex flex-1 flex-col overflow-y-auto relative z-10">
@@ -90,6 +100,16 @@ export function Sidebar() {
             );
           })}
         </nav>
+      </div>
+
+      <div className="p-4 border-t border-border/50 relative z-10 shrink-0">
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all duration-200"
+        >
+          <LogOut className="mr-3 h-5 w-5" />
+          Logout
+        </button>
       </div>
     </div>
   );
