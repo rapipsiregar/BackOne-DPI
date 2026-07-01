@@ -874,6 +874,40 @@ function resolveDeviceMetadata(ip, mac, dbLabel, dbManufacturer, dbType) {
   return { label, manufacturer, type, os };
 }
 
+function deviceMatchesAgent(ip, mac, agentUuid) {
+  if (!agentUuid) return true;
+  const macs = AGENT_MAC_MAP[agentUuid];
+  if (!macs) return false;
+
+  // 1. Direct MAC check
+  if (macs.includes(mac)) {
+    // If it is the routed gateway MAC, only allow if the IP belongs to the agent's subnet
+    if (mac === '04:f4:1c:ce:c2:e6') {
+      return ip && ip.startsWith('10.6.');
+    }
+    return true;
+  }
+
+  // 2. Subnet checks for client IPs
+  if (ip) {
+    if (agentUuid === '8A-V3-PB-85') {
+      return ip.startsWith('10.6.');
+    }
+    if (agentUuid === 'F6-2V-DT-8A') {
+      return ip.startsWith('10.250.') || ip.startsWith('192.168.') || ip.startsWith('10.121.');
+    }
+    if (agentUuid === '2F-TF-1D-GK') {
+      return ip.startsWith('10.0.') || ip.startsWith('10.1.') || ip.startsWith('10.26.') ||
+             ip.startsWith('10.43.') || ip.startsWith('10.35.') || ip.startsWith('10.21.') ||
+             ip.startsWith('10.7.') || ip.startsWith('10.182.') || ip.startsWith('10.109.') ||
+             ip.startsWith('10.181.') || ip.startsWith('10.75.') || ip.startsWith('10.202.') ||
+             ip.startsWith('10.93.');
+    }
+  }
+
+  return false;
+}
+
 function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
   const d      = getDB();
   const latest = d.prepare(`SELECT MAX(fetched_at) as t FROM devices`).get();
@@ -948,27 +982,7 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
   // 3. Filter list based on role (Admin vs Agent)
   let filtered = resolved;
   if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
-    const macs = AGENT_MAC_MAP[agentUuid];
-    filtered = resolved.filter(dev => {
-      // Direct MAC check
-      if (macs.includes(dev.mac_address)) {
-        // But if it is the routed gateway MAC, only keep if it belongs to the agent's subnet/IP range
-        if (dev.mac_address === '04:f4:1c:ce:c2:e6') {
-          return dev.ip_address.startsWith('10.6.');
-        }
-        return true;
-      }
-      // Subnet check for client IPs
-      if (dev.ip_address) {
-        const octets = dev.ip_address.split('.');
-        if (octets.length === 4) {
-          if (agentUuid === '8A-V3-PB-85') return octets[0] === '10' && octets[1] === '6';
-          if (agentUuid === '2F-TF-1D-GK') return octets[0] === '10' && octets[1] === '6';
-          if (agentUuid === 'F6-2V-DT-8A') return octets[0] === '10' && octets[1] === '6';
-        }
-      }
-      return false;
-    });
+    filtered = resolved.filter(dev => deviceMatchesAgent(dev.ip_address, dev.mac_address, agentUuid));
   } else if (siteUuid) {
     filtered = resolved.filter(dev => dev.site_uuid === siteUuid);
   }
