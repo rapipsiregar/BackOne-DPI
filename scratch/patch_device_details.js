@@ -1,18 +1,18 @@
 // patch_device_details.js — replaces fetchDeviceDetails in netify.js
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 const filePath = path.join(__dirname, '..', 'backend', 'netify.js');
 let content = fs.readFileSync(filePath, 'utf8');
 
 const startMarker = '// Fetch data for a specific device IP — from local DB flows + intel tables\r\nasync function fetchDeviceDetails(ip) {';
-const endMarker   = '}\r\n\r\n// Fetch data for a specific application';
+const endMarker = '}\r\n\r\n// Fetch data for a specific application';
 
 const startIdx = content.indexOf(startMarker);
-const endIdx   = content.indexOf('// Fetch data for a specific application');
+const endIdx = content.indexOf('// Fetch data for a specific application');
 
 if (startIdx === -1) { console.error('START not found'); process.exit(1); }
-if (endIdx   === -1) { console.error('END not found'); process.exit(1); }
+if (endIdx === -1) { console.error('END not found'); process.exit(1); }
 
 console.log(`Found fetchDeviceDetails: char ${startIdx} → ${endIdx}`);
 
