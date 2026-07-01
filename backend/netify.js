@@ -1756,8 +1756,8 @@ async function fetchDeviceDetails(ip) {
   return {
     ip,
     mac_address    : mac,
-    total_download : sumRow?.total_download ?? 0,
-    total_upload   : sumRow?.total_upload   ?? 0,
+    total_download : deviceRow?.download || sumRow?.total_download || 0,
+    total_upload   : deviceRow?.upload || sumRow?.total_upload || 0,
     flow_count     : sumRow?.flow_count     ?? 0,
     device_info,
     top_apps,

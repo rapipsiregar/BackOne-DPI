@@ -883,125 +883,99 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null) {
   const intelList = d.prepare("SELECT * FROM intel_device_discovery").all();
   const intelMap = new Map(intelList.map(i => [i.ip_address, i]));
 
-  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
-    const macs = AGENT_MAC_MAP[agentUuid];
-    const placeholders = macs.map(() => '?').join(',');
-    
-    // Find latest fetched_at in flows
-    const latestFlowFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
-    
-    // Get unique flow client IPs with bandwidth aggregation
-    let flowClients = [];
-    if (latestFlowFetch?.t) {
-      flowClients = d.prepare(`
-        SELECT src_ip, src_mac, SUM(bytes_download) as flow_download, SUM(bytes_upload) as flow_upload
-        FROM flows
-        WHERE src_mac IN (${placeholders}) AND fetched_at = ?
-        GROUP BY src_ip
-        ORDER BY flow_download DESC
-      `).all(...macs, latestFlowFetch.t);
-    }
+  // Get all devices in latest snapshot from devices table
+  const devices = d.prepare(`SELECT * FROM devices WHERE fetched_at = ?`).all(latest.t);
 
-    // Get all devices in latest snapshot
-    const devices = d.prepare(`SELECT * FROM devices WHERE fetched_at = ?`).all(latest.t);
-    const devicesMap = new Map(devices.map(dev => [dev.ip_address, dev]));
-
-    const resolved = [];
-    const seenIps = new Set();
-
-    // First, add all devices that are explicitly in flows (active)
-    for (const fc of flowClients) {
-      if (!fc.src_ip) continue;
-      seenIps.add(fc.src_ip);
-      
-      const devInfo = devicesMap.get(fc.src_ip);
-      const intelInfo = intelMap.get(fc.src_ip);
-      
-      const dbLabel = devInfo ? devInfo.device_label : (intelInfo ? intelInfo.device_label : null);
-      const dbMan = devInfo ? devInfo.manufacturer : (intelInfo ? intelInfo.manufacturer : null);
-      const dbType = intelInfo ? intelInfo.device_type : null;
-      
-      const meta = resolveDeviceMetadata(fc.src_ip, fc.src_mac, dbLabel, dbMan, dbType);
-      
-      const isRouted = fc.src_mac === '04:f4:1c:ce:c2:e6' && fc.src_ip !== '10.6.50.25' && fc.src_ip !== '10.6.12.242';
-
-      resolved.push({
-        id: devInfo ? devInfo.id : null,
-        site_uuid: devInfo ? devInfo.site_uuid : siteUuid,
-        fetched_at: latest.t,
-        mac_address: fc.src_mac,
-        ip_address: fc.src_ip,
-        device_label: meta.label,
-        device_type: meta.type,
-        os_label: meta.os,
-        manufacturer: meta.manufacturer,
-        download: fc.flow_download,
-        upload: fc.flow_upload,
-        total: fc.flow_download + fc.flow_upload,
-        is_gateway_routed: isRouted ? 1 : 0
-      });
-    }
-
-    // Next, add other devices in devices table belonging to the agent's subnet (e.g. inactive/idle)
-    for (const dev of devices) {
-      if (seenIps.has(dev.ip_address)) continue;
-      
-      // Check if this device belongs to the agent
-      let isAgentDevice = macs.includes(dev.mac_address);
-      if (!isAgentDevice && dev.ip_address) {
-        const devOctets = dev.ip_address.split('.');
-        if (devOctets.length === 4) {
-          const prefix3 = devOctets.slice(0, 3).join('.');
-          isAgentDevice = flowClients.some(fc => fc.src_ip && fc.src_ip.startsWith(prefix3));
-        }
-      }
-
-      if (isAgentDevice) {
-        const intelInfo = intelMap.get(dev.ip_address);
-        const meta = resolveDeviceMetadata(dev.ip_address, dev.mac_address, dev.device_label, dev.manufacturer, intelInfo ? intelInfo.device_type : null);
-        
-        const isRouted = dev.mac_address === '04:f4:1c:ce:c2:e6' && dev.ip_address !== '10.6.50.25' && dev.ip_address !== '10.6.12.242';
-
-        resolved.push({
-          ...dev,
-          device_label: meta.label,
-          device_type: meta.type,
-          os_label: meta.os,
-          manufacturer: meta.manufacturer,
-          download: dev.download || 0,
-          upload: dev.upload || 0,
-          total: dev.total || 0,
-          is_gateway_routed: isRouted ? 1 : 0
-        });
-      }
-    }
-
-    // Sort by download desc
-    resolved.sort((a, b) => b.download - a.download);
-    return resolved.slice(0, limit);
+  // Get active flow bandwidth in latest flows snapshot
+  const latestFlowFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
+  let flowsBandwidth = [];
+  if (latestFlowFetch?.t) {
+    flowsBandwidth = d.prepare(`
+      SELECT src_ip, src_mac, SUM(bytes_download) as flow_download, SUM(bytes_upload) as flow_upload
+      FROM flows
+      WHERE fetched_at = ?
+      GROUP BY src_ip
+    `).all(latestFlowFetch.t);
   }
+  const flowMap = new Map(flowsBandwidth.map(f => [f.src_ip, f]));
 
-  // Admin view: apply metadata parsing and gateway routed check for all devices
-  const rows = d.prepare(`
-    SELECT * FROM devices WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
-  `).all({ fetched_at: latest.t, limit, siteUuid });
+  const resolved = [];
+  const seenIps = new Set();
 
-  return rows.map(dev => {
-    const intelInfo = intelMap.get(dev.ip_address);
-    const meta = resolveDeviceMetadata(dev.ip_address, dev.mac_address, dev.device_label, dev.manufacturer, intelInfo ? intelInfo.device_type : null);
-    
-    const isRouted = dev.mac_address === '04:f4:1c:ce:c2:e6' && dev.ip_address !== '10.6.50.25' && dev.ip_address !== '10.6.12.242';
+  function processDevice(ip, mac, dbDev, flowInfo) {
+    const intelInfo = intelMap.get(ip);
+    const dbLabel = dbDev ? dbDev.device_label : (intelInfo ? intelInfo.device_label : null);
+    const dbMan = dbDev ? dbDev.manufacturer : (intelInfo ? intelInfo.manufacturer : null);
+    const dbType = intelInfo ? intelInfo.device_type : null;
+
+    const meta = resolveDeviceMetadata(ip, mac, dbLabel, dbMan, dbType);
+    const isRouted = mac === '04:f4:1c:ce:c2:e6' && ip !== '10.6.50.25' && ip !== '10.6.12.242';
+
+    const download = flowInfo ? flowInfo.flow_download : (dbDev ? dbDev.download : 0);
+    const upload = flowInfo ? flowInfo.flow_upload : (dbDev ? dbDev.upload : 0);
 
     return {
-      ...dev,
-      mac_address: dev.mac_address,
+      id: dbDev ? dbDev.id : null,
+      site_uuid: dbDev ? dbDev.site_uuid : siteUuid,
+      fetched_at: latest.t,
+      mac_address: mac,
+      ip_address: ip,
       device_label: meta.label,
       device_type: meta.type,
       os_label: meta.os,
       manufacturer: meta.manufacturer,
+      download: download || 0,
+      upload: upload || 0,
+      total: (download || 0) + (upload || 0),
       is_gateway_routed: isRouted ? 1 : 0
     };
-  });
+  }
+
+  // 1. Process all devices in the devices table
+  for (const dev of devices) {
+    seenIps.add(dev.ip_address);
+    const flowInfo = flowMap.get(dev.ip_address);
+    resolved.push(processDevice(dev.ip_address, dev.mac_address, dev, flowInfo));
+  }
+
+  // 2. Process any active flow IPs that are NOT present in the devices table (e.g. dynamic client IPs)
+  for (const flow of flowsBandwidth) {
+    if (!flow.src_ip || seenIps.has(flow.src_ip)) continue;
+    seenIps.add(flow.src_ip);
+    resolved.push(processDevice(flow.src_ip, flow.src_mac, null, flow));
+  }
+
+  // 3. Filter list based on role (Admin vs Agent)
+  let filtered = resolved;
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    const macs = AGENT_MAC_MAP[agentUuid];
+    filtered = resolved.filter(dev => {
+      // Direct MAC check
+      if (macs.includes(dev.mac_address)) {
+        // But if it is the routed gateway MAC, only keep if it belongs to the agent's subnet/IP range
+        if (dev.mac_address === '04:f4:1c:ce:c2:e6') {
+          return dev.ip_address.startsWith('10.6.');
+        }
+        return true;
+      }
+      // Subnet check for client IPs
+      if (dev.ip_address) {
+        const octets = dev.ip_address.split('.');
+        if (octets.length === 4) {
+          if (agentUuid === '8A-V3-PB-85') return octets[0] === '10' && octets[1] === '6';
+          if (agentUuid === '2F-TF-1D-GK') return octets[0] === '10' && octets[1] === '6';
+          if (agentUuid === 'F6-2V-DT-8A') return octets[0] === '10' && octets[1] === '6';
+        }
+      }
+      return false;
+    });
+  } else if (siteUuid) {
+    filtered = resolved.filter(dev => dev.site_uuid === siteUuid);
+  }
+
+  // 4. Sort by download DESC
+  filtered.sort((a, b) => b.download - a.download);
+  return filtered.slice(0, limit);
 }
 
 function getLatestFlows(limit = 100, siteUuid = null, agentUuid = null) {

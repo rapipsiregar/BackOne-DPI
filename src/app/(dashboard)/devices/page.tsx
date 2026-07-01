@@ -38,21 +38,27 @@ export default function DevicesPage() {
     },
     {
       header: "MAC Address",
-      accessor: (row) =>
-        row.mac_address ? (
-          <div className="flex flex-col gap-1">
-            <code className="text-xs bg-secondary/50 px-1 py-0.5 rounded text-muted-foreground w-fit">
+      accessor: (row) => {
+        const isRouted = row.is_gateway_routed === 1;
+        const hasMan = row.manufacturer && row.manufacturer !== "-" && row.manufacturer !== "Unknown";
+        const info = hasMan ? row.manufacturer : (row.device_type && row.device_type !== "-" && row.device_type !== "Generic Client" ? row.device_type : "");
+
+        return row.mac_address ? (
+          <div className="flex flex-col gap-0.5">
+            <code className="text-xs bg-secondary/50 px-1 py-0.5 rounded text-muted-foreground w-fit font-mono">
               {row.mac_address}
             </code>
-            {row.is_gateway_routed === 1 && (
-              <span className="text-[10px] text-amber-500/80 font-sans italic">
-                Via Routed Gateway
+            {(isRouted || info) && (
+              <span className={`text-[10px] font-sans font-medium ${isRouted ? "text-amber-500/90 italic" : "text-slate-400/80"}`}>
+                {isRouted ? "Via Routed Gateway" : ""}
+                {isRouted && info ? ` • ${info}` : (!isRouted ? info : "")}
               </span>
             )}
           </div>
         ) : (
           "-"
-        ),
+        );
+      },
     },
     { header: "Type", accessor: (row) => row.device_type || "-" },
     { header: "OS", accessor: (row) => row.os_label || "-" },
