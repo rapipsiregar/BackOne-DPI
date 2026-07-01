@@ -128,10 +128,15 @@ export function Sidebar() {
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
       
       <div className="flex h-[72px] shrink-0 items-center px-6 border-b border-border/50 relative z-10">
-        <img src="/backone-logo.svg" alt="BackOne Logo" className="w-8 h-8 mr-3 rounded-full drop-shadow-[0_0_10px_rgba(255,0,0,0.3)]" />
-        <span className="text-lg font-bold text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
-          BackOne
-        </span>
+        <img src="/backone-logo.png" alt="BackOne Logo" className="w-8 h-8 mr-3 rounded-full drop-shadow-[0_0_10px_rgba(255,0,0,0.3)]" />
+        <div className="flex flex-col">
+          <span className="text-lg font-bold text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70 leading-tight">
+            BackOne
+          </span>
+          <span className="text-[10px] font-medium text-muted-foreground tracking-wide mt-0.5">
+            Deep Package Inspection
+          </span>
+        </div>
       </div>
       <div className="flex flex-1 flex-col overflow-y-auto relative z-10">
         <nav className="flex-1 space-y-1.5 px-3 py-6">

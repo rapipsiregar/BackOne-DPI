@@ -46,7 +46,7 @@ export default function LoginPage() {
 
       <div className="z-10 w-full max-w-md p-8 bg-sidebar/80 backdrop-blur-2xl rounded-2xl border border-border/50 shadow-2xl relative">
         <div className="flex flex-col items-center mb-8">
-          <img src="/backone-logo.svg" alt="BackOne" className="w-16 h-16 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)] mb-4" />
+          <img src="/backone-logo.png" alt="BackOne" className="w-16 h-16 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)] mb-4" />
           <h1 className="text-2xl font-bold text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
             BackOne Dashboard
           </h1>

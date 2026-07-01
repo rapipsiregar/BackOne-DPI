@@ -11,7 +11,7 @@ export function middleware(request: NextRequest) {
   // The actual API routes inside /api are protected by Express backend (or Next.js API routes)
   // We don't intercept /api requests here to avoid breaking them, but we protect the UI pages
   
-  if (pathname.startsWith('/api') || pathname.startsWith('/_next') || pathname === '/favicon.ico' || pathname.endsWith('.svg')) {
+  if (pathname.startsWith('/api') || pathname.startsWith('/_next') || pathname === '/favicon.ico' || pathname.endsWith('.svg') || pathname.endsWith('.png')) {
     return NextResponse.next();
   }
 

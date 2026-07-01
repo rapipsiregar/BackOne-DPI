@@ -7,7 +7,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "BackOne Dashboard",
+  title: "BackOne - Deep Package Inspection",
   description: "BackOne by PT. Data Bisnis Solusi - Network Intelligence Dashboard",
 };
 

@@ -51,68 +51,80 @@ export default function NetworkIntelligencePage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* App Categories */}
+        {/* Left Column: App Categories List */}
         <Card className="bg-card/80 backdrop-blur-xl border-border/50 animate-slide-up" style={{ animationDelay: '100ms' }}>
           <CardHeader className="border-b border-border/50 pb-4 mb-4">
-            <CardTitle className="text-lg text-white">App Categories</CardTitle>
+            <CardTitle className="text-lg text-white">App Categories List</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={appCategories.data || []}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="download"
-                    nameKey="category_label"
-                  >
-                    {(appCategories.data || []).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip 
-                    contentStyle={{ backgroundColor: '#161b22', borderColor: '#30363d', color: '#c9d1d9' }}
-                    formatter={(val: any) => fmtBytes(val as number)}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+          <CardContent>
             <DataTable data={appCategories.data || []} columns={appCols} />
           </CardContent>
         </Card>
 
-        {/* Continents */}
-        <Card className="bg-card/80 backdrop-blur-xl border-border/50 animate-slide-up" style={{ animationDelay: '200ms' }}>
-          <CardHeader className="border-b border-border/50 pb-4 mb-4">
-            <CardTitle className="text-lg text-white">Continents (Download Volume)</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={continents.data || []} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#30363d" horizontal={true} vertical={false} />
-                  <XAxis type="number" stroke="#8b949e" tickFormatter={(v) => `${(v/1000000000).toFixed(1)}GB`} />
-                  <YAxis dataKey="continent_name" type="category" stroke="#8b949e" fontSize={12} />
-                  <RechartsTooltip 
-                    cursor={{fill: '#21262d'}}
-                    contentStyle={{ backgroundColor: '#161b22', borderColor: '#30363d', color: '#c9d1d9' }}
-                    formatter={(val: any) => fmtBytes(val as number)}
-                  />
-                  <Bar dataKey="download" fill="#58a6ff" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 border border-border rounded-md p-4 bg-secondary/30">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Most of your traffic is bound for {continents.data && continents.data.length > 0 ? continents.data[0].continent_name : "unknown destinations"}. Ensure your firewall rules are optimized for latency across trans-oceanic cables.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Right Column: Graphs */}
+        <div className="flex flex-col gap-6">
+          {/* App Categories Graph */}
+          <Card className="bg-card/80 backdrop-blur-xl border-border/50 animate-slide-up" style={{ animationDelay: '200ms' }}>
+            <CardHeader className="border-b border-border/50 pb-4 mb-4">
+              <CardTitle className="text-lg text-white">App Categories Chart</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={appCategories.data || []}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="download"
+                      nameKey="category_label"
+                    >
+                      {(appCategories.data || []).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: '#161b22', borderColor: '#30363d', color: '#c9d1d9' }}
+                      formatter={(val: any) => fmtBytes(val as number)}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Continents Graph */}
+          <Card className="bg-card/80 backdrop-blur-xl border-border/50 animate-slide-up" style={{ animationDelay: '300ms' }}>
+            <CardHeader className="border-b border-border/50 pb-4 mb-4">
+              <CardTitle className="text-lg text-white">Continents (Download Volume)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={continents.data || []} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#30363d" horizontal={true} vertical={false} />
+                    <XAxis type="number" stroke="#8b949e" tickFormatter={(v) => `${(v/1000000000).toFixed(1)}GB`} />
+                    <YAxis dataKey="continent_name" type="category" stroke="#8b949e" fontSize={12} />
+                    <RechartsTooltip 
+                      cursor={{fill: '#21262d'}}
+                      contentStyle={{ backgroundColor: '#161b22', borderColor: '#30363d', color: '#c9d1d9' }}
+                      formatter={(val: any) => fmtBytes(val as number)}
+                    />
+                    <Bar dataKey="download" fill="#58a6ff" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-4 border border-border rounded-md p-4 bg-secondary/30">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Most of your traffic is bound for {continents.data && continents.data.length > 0 ? continents.data[0].continent_name : "unknown destinations"}. Ensure your firewall rules are optimized for latency across trans-oceanic cables.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

@@ -9,9 +9,10 @@ import {
   Pie,
   Cell
 } from "recharts";
-import { useState, useEffect } from "react";
-import { useDashboardSummary, useTimeline, useTopApps, useTopProtocols } from "@/lib/api";
+import { useState, useEffect, useMemo } from "react";
+import { useDashboardSummary, useTimeline, useTopApps, useTopProtocols, useCountries } from "@/lib/api";
 import { fmtBytes } from "@/lib/utils";
+import { GlobeMap } from "@/components/ui/GlobeMap";
 import Link from "next/link";
 
 const COLORS = ['#58a6ff', '#3fb950', '#f0883e', '#bc8cff', '#f85149'];
@@ -22,6 +23,16 @@ export default function SummaryPage() {
   const timeline = useTimeline(24);
   const topApps = useTopApps(7);
   const topProtocols = useTopProtocols();
+  const countries = useCountries(20);
+
+  const mapData = useMemo(() => {
+    if (!countries.data) return [];
+    return countries.data.map((row) => ({
+      countryCode: row.country_code,
+      value: row.download + row.upload,
+      label: row.country_name,
+    }));
+  }, [countries.data]);
 
   useEffect(() => {
     setMounted(true);
@@ -150,80 +161,10 @@ export default function SummaryPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7 animate-slide-up" style={{ animationDelay: '300ms' }}>
-        {/* Timeline Chart */}
-        <Card className="col-span-4 bg-card/80 backdrop-blur-xl border-border/50">
-          <CardHeader>
-            <CardTitle className="text-lg text-white">Bandwidth Timeline</CardTitle>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <div className="h-[350px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={timeline.data} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
-                  <defs>
-                    <linearGradient id="colorDownload" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorUpload" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis 
-                    dataKey="fetched_at" 
-                    stroke="#a1a1aa" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false}
-                    tickMargin={10}
-                    tickFormatter={(val) => {
-                      try {
-                        return new Date(val).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                      } catch (e) {
-                        return val;
-                      }
-                    }}
-                  />
-                  <YAxis 
-                    stroke="#a1a1aa" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false} 
-                    tickFormatter={(val) => {
-                      if (val === 0) return '0 B';
-                      const k = 1024;
-                      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-                      const i = Math.floor(Math.log(val) / Math.log(k));
-                      return parseFloat((val / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-                    }} 
-                  />
-                  <RechartsTooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'rgba(24, 24, 27, 0.9)', 
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)', 
-                      borderRadius: '8px',
-                      color: '#fafafa',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
-                    }}
-                    itemStyle={{ color: '#fafafa', fontSize: '13px', fontWeight: 500 }}
-                    labelFormatter={(label) => {
-                      try {
-                        return new Date(label).toLocaleString();
-                      } catch (e) {
-                        return label;
-                      }
-                    }}
-                    formatter={(value: any, name: any) => [fmtBytes(value as number), name === 'total_download' ? 'Download' : 'Upload']}
-                  />
-                  <Area type="monotone" dataKey="total_download" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorDownload)" activeDot={{ r: 6, fill: "#3b82f6", stroke: "#18181b", strokeWidth: 2 }} />
-                  <Area type="monotone" dataKey="total_upload" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorUpload)" activeDot={{ r: 6, fill: "#10b981", stroke: "#18181b", strokeWidth: 2 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Global Connections Map (Replaces Timeline) */}
+        <div className="col-span-4 relative flex items-center justify-center">
+          <GlobeMap data={mapData} />
+        </div>
 
         {/* Top Apps & Protocols */}
         <div className="col-span-3 space-y-6">
@@ -315,6 +256,8 @@ export default function SummaryPage() {
           </Card>
         </div>
       </div>
+
+
     </div>
   );
 }

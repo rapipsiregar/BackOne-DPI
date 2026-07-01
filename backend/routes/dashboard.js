@@ -277,14 +277,57 @@ router.get('/intelligence/vpn', (req, res) => {
 });
 
 // ─── LOOKUP ROUTES ────────────────────────────────────────────────────────────
+let cachedApplications = null;
+let lastCacheTime = 0;
+
 router.get('/lookup/applications', async (req, res) => {
   try {
     const page   = parseInt(req.query.page ?? 1);
     const limit  = parseInt(req.query.limit ?? 50);
-    const search = String(req.query.search ?? '');
-    const { fetchLookupApplications } = require('../netify');
-    const data = await fetchLookupApplications(page, limit, search);
-    res.json({ ok: true, data });
+    const search = String(req.query.search ?? '').toLowerCase();
+    
+    // Refresh cache every 24 hours
+    if (!cachedApplications || Date.now() - lastCacheTime > 86400000) {
+      const { fetchLookupApplications } = require('../netify');
+      // Fetch all apps at once (Netify DB has ~2530 entries)
+      const data = await fetchLookupApplications(1, 10000, '');
+      if (data && data.applications && data.applications.length > 0) {
+        cachedApplications = data.applications;
+        lastCacheTime = Date.now();
+      } else {
+        // Fallback if failed to fetch
+        return res.json({ ok: true, data: { applications: [], pagination: { total_records: 0, total_pages: 0, current_page: 1 } } });
+      }
+    }
+
+    // Local Search Filtering
+    let filteredApps = cachedApplications;
+    if (search) {
+      filteredApps = cachedApplications.filter(app => 
+        (app.label && app.label.toLowerCase().includes(search)) || 
+        (app.tag && app.tag.toLowerCase().includes(search)) ||
+        (app.name && app.name.toLowerCase().includes(search))
+      );
+    }
+
+    // Local Pagination
+    const total_records = filteredApps.length;
+    const total_pages = Math.ceil(total_records / limit) || 1;
+    const start_idx = (page - 1) * limit;
+    const paginatedApps = filteredApps.slice(start_idx, start_idx + limit);
+
+    res.json({ 
+      ok: true, 
+      data: {
+        applications: paginatedApps,
+        pagination: {
+          total_records,
+          total_pages,
+          current_page: page,
+          limit
+        }
+      } 
+    });
   } catch (err) {
     res.status(500).json({ ok: false, message: err.message });
   }
