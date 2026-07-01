@@ -8,9 +8,14 @@ import { ShieldCheck, Loader2 } from "lucide-react";
 import { useThreats, ThreatStat } from "@/lib/api";
 import { IpDetails } from "@/components/ui/IpDetails";
 
-export default function ThreatsPage() {
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+
+function ThreatsContent() {
   const [mounted, setMounted] = useState(false);
   const threats = useThreats(100);
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
   useEffect(() => {
     setMounted(true);
@@ -24,7 +29,7 @@ export default function ThreatsPage() {
     if (s.includes('high') || s.includes('critical')) return <Badge variant="red">{sev}</Badge>;
     if (s.includes('med')) return <Badge variant="orange">{sev}</Badge>;
     if (s.includes('low')) return <Badge variant="yellow">{sev}</Badge>;
-    return <Badge variant="green">{sev}</Badge>;
+    return <Badge variant="blue">{sev}</Badge>;
   };
 
   const columns: Column<ThreatStat>[] = [
@@ -79,9 +84,22 @@ export default function ThreatsPage() {
                      (row.threat_type || "").toLowerCase().includes(q) ||
                      (row.app_label || "").toLowerCase().includes(q);
             }}
+            getRowClassName={(row) => {
+              return highlightId && row.id.toString() === highlightId
+                ? "bg-red-500/15 border-l-2 border-red-500 animate-pulse font-semibold"
+                : "";
+            }}
           />
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function ThreatsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>
+      <ThreatsContent />
+    </Suspense>
   );
 }

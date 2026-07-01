@@ -6,9 +6,14 @@ import { DataTable, Column } from "@/components/ui/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Loader2, AlertCircle, Info, AlertTriangle } from "lucide-react";
 
-export default function EventsPage() {
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+
+function EventsContent() {
   const [mounted, setMounted] = useState(false);
   const { data, isLoading } = useEvents(100); // fetch 100 events
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
   useEffect(() => {
     setMounted(true);
@@ -85,9 +90,22 @@ export default function EventsPage() {
                 (row.message || "").toLowerCase().includes(q)
               );
             }}
+            getRowClassName={(row) => {
+              return highlightId && row.id.toString() === highlightId
+                ? "bg-yellow-500/10 border-l-2 border-yellow-500 animate-pulse font-semibold"
+                : "";
+            }}
           />
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function EventsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>
+      <EventsContent />
+    </Suspense>
   );
 }

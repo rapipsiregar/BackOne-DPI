@@ -1691,10 +1691,20 @@ function getIntelStats(siteUuid = null, agentUuid = null) {
   return counts;
 }
 
+function getDataInterval() {
+  const d = getDB();
+  const row = d.prepare("SELECT MIN(fetched_at) as start_t, MAX(fetched_at) as end_t FROM devices").get();
+  return {
+    start: row?.start_t || null,
+    end: row?.end_t || null
+  };
+}
+
 module.exports = {
   getUserByUsername,
   updateUserPassword,
   getDB,
+  getDataInterval,
   insertBandwidthApps, insertDevices, insertFlows, insertThreats,
   insertProtocols, insertCountries, insertDNS, insertEvents,
   insertBandwidthTimeline,

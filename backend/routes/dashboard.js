@@ -385,4 +385,14 @@ router.get('/security-devices', async (req, res) => {
   }
 });
 
+// GET /api/dashboard/data-interval
+router.get('/data-interval', (req, res) => {
+  try {
+    const data = db.getDataInterval();
+    res.json({ ok: true, data });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
 module.exports = router;

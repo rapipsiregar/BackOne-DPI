@@ -15,6 +15,7 @@ interface DataTableProps<T> {
   searchPlaceholder?: string;
   searchFilter?: (row: T, query: string) => boolean;
   isLoading?: boolean;
+  getRowClassName?: (row: T) => string;
 }
 
 export function DataTable<T>({ 
@@ -22,7 +23,8 @@ export function DataTable<T>({
   columns, 
   searchPlaceholder = "Search...", 
   searchFilter,
-  isLoading
+  isLoading,
+  getRowClassName
 }: DataTableProps<T>) {
   const [query, setQuery] = useState("");
 
@@ -84,7 +86,10 @@ export function DataTable<T>({
                 </tr>
               ) : (
                 filteredData.map((row, i) => (
-                  <tr key={i} className="hover:bg-primary/5 transition-colors duration-200 group">
+                  <tr 
+                    key={i} 
+                    className={`hover:bg-primary/5 transition-colors duration-200 group ${getRowClassName ? getRowClassName(row) : ""}`}
+                  >
                     {columns.map((col, j) => (
                       <td key={j} className={`px-4 py-3 whitespace-nowrap text-foreground group-hover:text-white transition-colors ${col.className || ""}`}>
                         {col.accessor(row, i)}
