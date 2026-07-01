@@ -546,7 +546,12 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                         <TableWrap head={["Destination IP", "Port", "Protocol", "Username", "Severity", "↓"]}>
                           {data.unencrypted_passwords.map((p, i) => (
                             <tr key={i} className="hover:bg-white/[0.03] transition-colors">
-                              <td className="px-3 py-2 font-mono text-xs text-red-400">{p.dst_ip || "—"}</td>
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="font-mono text-xs text-red-400">{p.dst_ip || "—"}</span>
+                                  {p.dst_ip && <IpDetails ip={p.dst_ip} />}
+                                </div>
+                              </td>
                               <td className="px-3 py-2 text-xs text-slate-400">{p.dst_port ?? "—"}</td>
                               <td className="px-3 py-2 text-xs text-slate-300">{p.protocol || "—"}</td>
                               <td className="px-3 py-2 text-xs text-yellow-300 font-mono">{p.username || "—"}</td>
@@ -569,7 +574,12 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                     <TableWrap head={["Remote IP", "Reputation", "Score", "Country", "App", "Blacklisted", "↓"]}>
                       {data.ip_reputation.map((r, i) => (
                         <tr key={i} className="hover:bg-white/[0.03] transition-colors">
-                          <td className="px-3 py-2 font-mono text-xs text-red-400">{r.remote_ip || "—"}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-mono text-xs text-red-400">{r.remote_ip || "—"}</span>
+                              {r.remote_ip && <IpDetails ip={r.remote_ip} />}
+                            </div>
+                          </td>
                           <td className="px-3 py-2 text-xs text-slate-300">{r.reputation || "—"}</td>
                           <td className="px-3 py-2 text-xs text-yellow-400">{r.score ?? "—"}</td>
                           <td className="px-3 py-2 text-xs text-slate-400">{r.country || "—"}</td>
@@ -605,7 +615,12 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                                 <span className="text-blue-400 font-medium">{v.vpn_type || "Unknown VPN"}</span>
                                 <span className="text-slate-500">{v.country || "—"}</span>
                               </div>
-                              {v.remote_ip && <p className="text-slate-400 font-mono">→ {v.remote_ip}</p>}
+                              {v.remote_ip && (
+                                <div className="text-slate-400 font-mono flex flex-col gap-0.5 mt-0.5">
+                                  <span>→ {v.remote_ip}</span>
+                                  <IpDetails ip={v.remote_ip} />
+                                </div>
+                              )}
                               <div className="flex gap-2 text-slate-500">
                                 <span>{v.protocol || "—"}</span>
                                 {v.confidence !== null && v.confidence !== undefined && (

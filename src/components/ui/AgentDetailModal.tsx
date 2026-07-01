@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { fetchAgentDetails, AgentDetails } from "@/lib/api";
 import { fmtBytes } from "@/lib/utils";
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
+import { IpDetails } from "@/components/ui/IpDetails";
 import {
   Loader2, X, Server, Monitor, Activity, Globe, Shield,
   Bell, Wifi, AlertTriangle, Lock, Unlock, ChevronRight,
@@ -242,8 +243,13 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                       {data.flows.map((f, i) => (
                         <tr key={i} className="hover:bg-white/[0.03] transition-colors">
                           <td className="px-3 py-2 font-mono text-xs text-blue-400 whitespace-nowrap">{f.src_ip || "—"}</td>
-                          <td className="px-3 py-2 font-mono text-xs text-slate-300 whitespace-nowrap">
-                            {f.dst_ip || "—"}{f.dst_port ? <span className="text-slate-500">:{f.dst_port}</span> : ""}
+                           <td className="px-3 py-2 whitespace-nowrap">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-mono text-xs text-slate-300">
+                                {f.dst_ip || "—"}{f.dst_port ? <span className="text-slate-500">:{f.dst_port}</span> : ""}
+                              </span>
+                              {f.dst_ip && <IpDetails ip={f.dst_ip} />}
+                            </div>
                           </td>
                           <td className="px-3 py-2 text-xs text-purple-300 max-w-[140px] truncate">{f.app_label || f.domain || "—"}</td>
                           <td className="px-3 py-2 text-xs text-slate-400">{f.protocol || "—"}</td>
@@ -350,7 +356,14 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                                   </span>
                                 </td>
                                 <td className="px-3 py-2 text-xs text-purple-300 truncate max-w-[100px]">{r.app_label || "—"}</td>
-                                <td className="px-3 py-2 font-mono text-xs text-slate-400">{r.dst_ip ? `${r.dst_ip}:${r.dst_port ?? "?"}` : "—"}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="font-mono text-xs text-slate-400">
+                                      {r.dst_ip ? `${r.dst_ip}:${r.dst_port ?? "?"}` : "—"}
+                                    </span>
+                                    {r.dst_ip && <IpDetails ip={r.dst_ip} />}
+                                  </div>
+                                </td>
                                 <td className="px-3 py-2 text-right text-xs text-cyan-400">{fmtBytes(r.download)}</td>
                                 <td className="px-3 py-2 text-right text-xs text-green-400">{fmtBytes(r.upload)}</td>
                               </tr>
@@ -373,7 +386,14 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                             return (
                               <tr key={i} className="hover:bg-white/[0.03]">
                                 <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.ip_address || "—"}</td>
-                                <td className="px-3 py-2 font-mono text-xs text-slate-400">{r.dst_ip ? `${r.dst_ip}:${r.dst_port ?? "?"}` : "—"}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="font-mono text-xs text-slate-400">
+                                      {r.dst_ip ? `${r.dst_ip}:${r.dst_port ?? "?"}` : "—"}
+                                    </span>
+                                    {r.dst_ip && <IpDetails ip={r.dst_ip} />}
+                                  </div>
+                                </td>
                                 <td className="px-3 py-2 text-xs text-slate-300">{r.protocol || "—"}</td>
                                 <td className="px-3 py-2 text-xs text-yellow-300 font-mono">{r.username || "—"}</td>
                                 <td className="px-3 py-2">
@@ -452,7 +472,10 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                                   <span className="font-mono text-blue-400">{r.ip_address || "—"}</span>
                                   <span className="text-purple-400">{r.vpn_type || "—"}</span>
                                 </div>
-                                <div className="text-slate-500 mt-0.5">Remote: {r.remote_ip || "—"} • {r.country || "—"}</div>
+                                 <div className="text-slate-500 mt-0.5 flex flex-col gap-0.5">
+                                   <span>Remote: {r.remote_ip || "—"} • {r.country || "—"}</span>
+                                   {r.remote_ip && <IpDetails ip={r.remote_ip} />}
+                                 </div>
                                 {r.confidence && <div className="text-slate-500">Confidence: {(r.confidence * 100).toFixed(0)}%</div>}
                               </div>
                             ))}</div>
@@ -470,7 +493,12 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                         <TableWrap head={["IP", "Hostname", "Server Type", "Port", "Protocol", "OS"]}>
                           {data.server_discovery!.map((r, i) => (
                             <tr key={i} className="hover:bg-white/[0.03]">
-                              <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.ip_address || "—"}</td>
+                               <td className="px-3 py-2 whitespace-nowrap">
+                                 <div className="flex flex-col gap-0.5">
+                                   <span className="font-mono text-xs text-blue-400">{r.ip_address || "—"}</span>
+                                   {r.ip_address && <IpDetails ip={r.ip_address} />}
+                                 </div>
+                               </td>
                               <td className="px-3 py-2 text-xs text-slate-300 truncate max-w-[120px]">{r.hostname || "—"}</td>
                               <td className="px-3 py-2 text-xs text-cyan-400">{r.server_type || "—"}</td>
                               <td className="px-3 py-2 text-xs text-slate-400">{r.port ?? "—"}</td>

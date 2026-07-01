@@ -9,6 +9,7 @@ import {
 } from "@/lib/api-advanced";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DataTable, Column } from "@/components/ui/DataTable";
+import { IpDetails } from "@/components/ui/IpDetails";
 import { Loader2, Bitcoin, Shield, Server, Lock, AlertTriangle, Key, Globe, Network, ShieldAlert } from "lucide-react";
 
 export default function IntelligencePage() {
@@ -123,7 +124,15 @@ export default function IntelligencePage() {
             columns={[
               { header: "IP Address", accessor: (row: any) => row.ip_address },
               { header: "VPN Type", accessor: (row: any) => row.vpn_type },
-              { header: "Remote IP", accessor: (row: any) => row.remote_ip },
+              {
+                header: "Remote IP",
+                accessor: (row: any) => row.remote_ip ? (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono text-xs text-blue-400">{row.remote_ip}</span>
+                    <IpDetails ip={row.remote_ip} />
+                  </div>
+                ) : "—"
+              },
               { header: "Country", accessor: (row: any) => row.country },
             ]}
           />
@@ -133,7 +142,15 @@ export default function IntelligencePage() {
           <DataTable 
             data={ipReputation} isLoading={loadingIpRep}
             columns={[
-              { header: "IP Address", accessor: (row: any) => row.ip_address },
+              {
+                header: "IP Address",
+                accessor: (row: any) => row.ip_address ? (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono text-xs text-blue-400">{row.ip_address}</span>
+                    <IpDetails ip={row.ip_address} />
+                  </div>
+                ) : "—"
+              },
               { header: "Reputation", accessor: (row: any) => row.reputation },
               { header: "App", accessor: (row: any) => row.app_label },
               { header: "Country", accessor: (row: any) => row.country },
@@ -190,7 +207,15 @@ export default function IntelligencePage() {
           <DataTable 
             data={serverDiscovery} isLoading={loadingServer}
             columns={[
-              { header: "IP Address", accessor: (row: any) => row.ip_address },
+              {
+                header: "IP Address",
+                accessor: (row: any) => row.ip_address ? (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono text-xs text-blue-400">{row.ip_address}</span>
+                    <IpDetails ip={row.ip_address} />
+                  </div>
+                ) : "—"
+              },
               { header: "Server Type", accessor: (row: any) => row.server_type },
               { header: "Port", accessor: (row: any) => row.port },
               { header: "OS", accessor: (row: any) => row.os_label },

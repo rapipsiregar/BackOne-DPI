@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { useState, useEffect } from "react";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { useThreats, ThreatStat } from "@/lib/api";
+import { IpDetails } from "@/components/ui/IpDetails";
 
 export default function ThreatsPage() {
   const [mounted, setMounted] = useState(false);
@@ -31,7 +32,15 @@ export default function ThreatsPage() {
     { header: "Type", accessor: (row) => row.threat_type || 'Unknown' },
     { header: "Severity", accessor: (row) => getSeverityBadge(row.severity) },
     { header: "Source IP", accessor: (row) => <span className="font-medium text-blue-400">{row.ip_address || '-'}</span> },
-    { header: "Dest IP", accessor: (row) => row.dst_ip || '-' },
+    {
+      header: "Dest IP",
+      accessor: (row) => row.dst_ip ? (
+        <div className="flex flex-col gap-0.5">
+          <span className="font-mono text-xs text-blue-400">{row.dst_ip}</span>
+          <IpDetails ip={row.dst_ip} />
+        </div>
+      ) : '-'
+    },
     { header: "MAC Address", accessor: (row) => row.mac_address ? <code className="text-xs bg-secondary/50 px-1 py-0.5 rounded text-muted-foreground">{row.mac_address}</code> : '-' },
     { header: "App", accessor: (row) => row.app_label || '-' },
     { header: "Domain", accessor: (row) => row.domain || '-' },

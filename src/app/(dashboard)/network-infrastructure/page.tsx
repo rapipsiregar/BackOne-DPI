@@ -9,6 +9,7 @@ import {
   useIpVersions, useRemoteIps, useMacBandwidth, 
   useFlowTypes, useFlowOrigins 
 } from "@/lib/api-advanced";
+import { IpDetails } from "@/components/ui/IpDetails";
 
 export default function NetworkInfrastructurePage() {
   // Routing & Geography Tab
@@ -135,7 +136,15 @@ export default function NetworkInfrastructurePage() {
                     data={remoteIps} 
                     isLoading={loadingRemoteIps}
                     columns={[
-                      { header: "IP Address", accessor: (row: any) => row.remote_ip },
+                      {
+                        header: "IP Address",
+                        accessor: (row: any) => row.remote_ip ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-mono text-xs text-blue-400">{row.remote_ip}</span>
+                            <IpDetails ip={row.remote_ip} />
+                          </div>
+                        ) : "—"
+                      },
                       { header: "IP Version", accessor: (row) => `IPv${row.ip_version}` },
                       { header: "Download", accessor: (row) => formatBytes(row.download) },
                       { header: "Upload", accessor: (row) => formatBytes(row.upload) },
