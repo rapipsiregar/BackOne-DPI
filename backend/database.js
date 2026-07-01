@@ -16,12 +16,14 @@ const AGENT_MAC_MAP = {
     '70:85:6c:81:50:d4', '70:85:6c:6d:f7:17', '60:be:b4:29:d3:33',
     '60:be:b4:26:4c:d6', '60:be:b4:29:d3:32'
   ],
+  '1R-79-J9-YE': ['a2:cc:8e:7d:39:51', 'f2:69:9d:a1:5e:11', '8e:91:0f:6e:24:63'],
 };
 
 const AGENT_NUMERIC_IDS = {
-  '2F-TF-1D-GK': ['4894730147'],
+  '2F-TF-1D-GK': ['4897042839'],
   '8A-V3-PB-85': ['4895530456'],
-  'F6-2V-DT-8A': ['4895853843', '4897042839'],
+  'F6-2V-DT-8A': ['4894730147'],
+  '1R-79-J9-YE': ['4895853843'],
 };
 
 function getAgentTrafficRatio(agentUuid) {
@@ -2383,6 +2385,7 @@ function getDataInterval() {
 module.exports = {
   getUserByUsername,
   updateUserPassword,
+  syncAgentUsers,
   getDB,
   getDataInterval,
   insertBandwidthApps, insertDevices, insertFlows, insertThreats,
@@ -2416,4 +2419,61 @@ function getUserByUsername(username) {
 
 function updateUserPassword(userId, newPasswordHash) {
   return getDB().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newPasswordHash, userId);
+}
+
+function syncAgentUsers(agents) {
+  const d = getDB();
+  const bcrypt = require('bcryptjs');
+  const hash = bcrypt.hashSync('agent123', 10);
+  const siteUuid = process.env.NETIFY_SITE_UUID || '6681452d_9cae_4ff4_8ae8_0d504774265e';
+
+  // Hardcoded labels map for friendly user mapping
+  const AGENT_LABELS = {
+    '2F-TF-1D-GK': 'JRP Cibubur',
+    '8A-V3-PB-85': 'IFG LT.18',
+    'F6-2V-DT-8A': 'CPI Balaraja',
+    '1R-79-J9-YE': 'CPI Balaraja WAN'
+  };
+
+  for (const agent of agents) {
+    const uuid = agent.uuid;
+    if (!uuid) continue;
+    const label = AGENT_LABELS[uuid] || agent.label || uuid;
+
+    // Create username = lowercase uuid (e.g. '1r-79-j9-ye')
+    const usernameUuidLower = uuid.toLowerCase();
+    const exists1 = d.prepare("SELECT count(*) as count FROM users WHERE username = ?").get(usernameUuidLower);
+    if (exists1.count === 0) {
+      d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)")
+       .run(usernameUuidLower, hash, 'AGENT_VIEWER', siteUuid, uuid);
+      console.log(`[DB] Created default user: ${usernameUuidLower} / agent123`);
+    }
+
+    // Create username = uppercase uuid (e.g. '1R-79-J9-YE')
+    const usernameUuidUpper = uuid.toUpperCase();
+    const exists1u = d.prepare("SELECT count(*) as count FROM users WHERE username = ?").get(usernameUuidUpper);
+    if (exists1u.count === 0) {
+      d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)")
+       .run(usernameUuidUpper, hash, 'AGENT_VIEWER', siteUuid, uuid);
+      console.log(`[DB] Created default user: ${usernameUuidUpper} / agent123`);
+    }
+
+    // Create username = sanitized lowercase label (e.g. 'agent_cpi_balaraja_wan')
+    const sanitizedLabel = label.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
+    const usernameLabel = sanitizedLabel.startsWith('agent_') ? sanitizedLabel : `agent_${sanitizedLabel}`;
+    const exists2 = d.prepare("SELECT count(*) as count FROM users WHERE username = ?").get(usernameLabel);
+    if (exists2.count === 0) {
+      d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)")
+       .run(usernameLabel, hash, 'AGENT_VIEWER', siteUuid, uuid);
+      console.log(`[DB] Created default user: ${usernameLabel} / agent123`);
+    }
+
+    // Create username = name/label directly (e.g. 'CPI Balaraja WAN' -> 'CPI Balaraja WAN' or 'JRP Cibubur')
+    const exists3 = d.prepare("SELECT count(*) as count FROM users WHERE username = ?").get(label);
+    if (exists3.count === 0) {
+      d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)")
+       .run(label, hash, 'AGENT_VIEWER', siteUuid, uuid);
+      console.log(`[DB] Created default user: ${label} / agent123`);
+    }
+  }
 }

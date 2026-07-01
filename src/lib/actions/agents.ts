@@ -59,6 +59,36 @@ export async function getAgents(): Promise<Agent[]> {
       const dbPath = path.join(process.cwd(), 'backend', 'netify_data.db');
       const db = new Database(dbPath);
 
+      // Query the Informatics API dynamically for all active agents
+      let apiAgents: any[] = [];
+      try {
+        const res = await fetch("https://informatics.netify.ai/api/v1/data/stats/top/agent/download?filter_interval=43200&settings_limit=100", {
+          method: "GET",
+          headers: {
+            "Accept": "application/json",
+            "x-api-key": API_KEY,
+            "x-net-site": SITE_UUID || ""
+          },
+          cache: "no-store"
+        });
+        if (res.ok) {
+          const json = await res.json();
+          apiAgents = json.data || [];
+        }
+      } catch (err) {
+        console.error("Failed to fetch dynamic agents from Netify API:", err);
+      }
+
+      // If API query fails or is empty, use the hardcoded agent list as fallback
+      if (apiAgents.length === 0) {
+        apiAgents = [
+          { agent: { id: 4897042839, uuid: "2F-TF-1D-GK", label: "2F-TF-1D-GK" } },
+          { agent: { id: 4895530456, uuid: "8A-V3-PB-85", label: "8A-V3-PB-85" } },
+          { agent: { id: 4894730147, uuid: "F6-2V-DT-8A", label: "F6-2V-DT-8A" } },
+          { agent: { id: 4895853843, uuid: "1R-79-J9-YE", label: "1R-79-J9-YE" } }
+        ];
+      }
+
       const AGENT_MAC_MAP: Record<string, string[]> = {
         '2F-TF-1D-GK': ['60:be:b4:1f:05:96'],
         '8A-V3-PB-85': ['04:f4:1c:ce:c2:e6'],
@@ -68,41 +98,47 @@ export async function getAgents(): Promise<Agent[]> {
           '70:85:6c:81:50:d4', '70:85:6c:6d:f7:17', '60:be:b4:29:d3:33',
           '60:be:b4:26:4c:d6', '60:be:b4:29:d3:32'
         ],
+        '1R-79-J9-YE': ['a2:cc:8e:7d:39:51', 'f2:69:9d:a1:5e:11', '8e:91:0f:6e:24:63'],
       };
 
       const AGENT_LABELS: Record<string, string> = {
         "2F-TF-1D-GK": "JRP Cibubur",
         "8A-V3-PB-85": "IFG LT.18",
-        "F6-2V-DT-8A": "CPI Balaraja"
+        "F6-2V-DT-8A": "CPI Balaraja",
+        "1R-79-J9-YE": "CPI Balaraja WAN"
       };
 
       const latestBwTime = db.prepare("SELECT MAX(fetched_at) as t FROM mac_bandwidth").get()?.t;
 
-      const agents: Agent[] = Object.keys(AGENT_MAC_MAP).map((uuid, idx) => {
-        const macs = AGENT_MAC_MAP[uuid];
-        const placeholders = macs.map(() => '?').join(',');
+      const agents: Agent[] = apiAgents.map((item: any, idx: number) => {
+        const uuid = item.agent?.uuid || "";
+        const id = item.agent?.id || idx;
+        const macs = AGENT_MAC_MAP[uuid] || [];
         
-        const bw = latestBwTime 
-          ? db.prepare(`
-              SELECT SUM(download) as dl, SUM(upload) as ul 
-              FROM mac_bandwidth 
-              WHERE mac_address IN (${placeholders}) AND fetched_at = ?
-            `).get(...macs, latestBwTime)
-          : { dl: 0, ul: 0 };
+        let dl = 0;
+        let ul = 0;
+        if (macs.length > 0 && latestBwTime) {
+          const placeholders = macs.map(() => '?').join(',');
+          const bw = db.prepare(`
+            SELECT SUM(download) as dl, SUM(upload) as ul 
+            FROM mac_bandwidth 
+            WHERE mac_address IN (${placeholders}) AND fetched_at = ?
+          `).get(...macs, latestBwTime);
+          dl = bw?.dl ?? 0;
+          ul = bw?.ul ?? 0;
+        }
 
-        const dl = bw?.dl ?? 0;
-        const ul = bw?.ul ?? 0;
         const totalMB = ((dl + ul) / (1024 * 1024)).toFixed(2);
         
         return {
-          id: idx,
+          id: id,
           uuid: uuid,
           serial: uuid,
           site_uuid: SITE_UUID || "",
           organization_uuid: "",
           provisioned: true,
           activated: true,
-          label: AGENT_LABELS[uuid] || uuid,
+          label: AGENT_LABELS[uuid] || item.agent?.label || uuid,
           created_at: { human: "N/A", date: "", unix_time: 0 },
           updated_at: { human: "N/A", date: "", unix_time: 0 },
           last_seen_at: { 

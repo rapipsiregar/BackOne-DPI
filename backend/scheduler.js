@@ -16,6 +16,17 @@ async function runPoll() {
   console.log(`[Scheduler] Mulai polling... (${fetchedAt})`);
 
   try {
+    // 0. Sync agents and seed default user accounts dynamically
+    try {
+      const apiAgents = await netify.fetchAgents();
+      if (apiAgents && apiAgents.length > 0) {
+        db.syncAgentUsers(apiAgents);
+        console.log(`[Scheduler] OK Sync Agents  : ${apiAgents.length} agen terdeteksi`);
+      }
+    } catch (err) {
+      console.error('[Scheduler] Gagal sync agent users:', err.message);
+    }
+
     // 1. Top Aplikasi
     const apps = await netify.fetchTopApps(1440, 20);
     if (apps && Array.isArray(apps)) {

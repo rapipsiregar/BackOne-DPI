@@ -1194,6 +1194,7 @@ const AGENT_LABELS = {
   '2F-TF-1D-GK': 'JRP Cibubur',
   '8A-V3-PB-85': 'IFG LT.18',
   'F6-2V-DT-8A': 'CPI Balaraja',
+  '1R-79-J9-YE': 'CPI Balaraja WAN',
 };
 
 // Maps each agent UUID to its gateway/interface MAC address(es) in flows
@@ -1202,6 +1203,7 @@ const AGENT_MAC_MAP = {
   '8A-V3-PB-85': ['04:f4:1c:ce:c2:e6'],
   'F6-2V-DT-8A': ['2c:7b:a0:d8:86:91', '16:11:ac:73:34:1d', 'bc:45:5b:ca:d5:be',
                    'de:ed:cc:57:58:34', 'f4:6d:3f:ef:01:a0', '60:be:b4:29:d3:36'],
+  '1R-79-J9-YE': ['a2:cc:8e:7d:39:51', 'f2:69:9d:a1:5e:11', '8e:91:0f:6e:24:63'],
 };
 
 // Build SQL IN clause placeholders
@@ -2078,6 +2080,7 @@ async function fetchSecurityDevices(siteUuid = null, agentUuid = null) {
 
 module.exports = {
   fetchLookupApplications,
+  fetchAgents,
   fetchTopApps, fetchTopDevices, fetchTopProtocols, fetchTopCountries,
   fetchTopDomains, fetchBandwidthSummary, fetchDiscoveredDevices,
   fetchCyberThreats, fetchFlows, fetchEvents,
@@ -2810,4 +2813,14 @@ async function fetchVPNDetection(limit = 50) {
   }
 
   return results.slice(0, limit);
+}
+
+async function fetchAgents() {
+  const data = await netifyFetch('/data/stats/top/agent/download', { filter_interval: 43200, settings_limit: 100 });
+  if (!data || !Array.isArray(data)) return [];
+  return data.map(r => ({
+    id: r.agent?.id,
+    uuid: r.agent?.uuid,
+    label: r.agent?.label,
+  }));
 }

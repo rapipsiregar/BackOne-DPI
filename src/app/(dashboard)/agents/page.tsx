@@ -30,6 +30,7 @@ export default function AgentsPage() {
     '2F-TF-1D-GK': 'JRP Cibubur',
     '8A-V3-PB-85': 'IFG LT.18',
     'F6-2V-DT-8A': 'CPI Balaraja',
+    '1R-79-J9-YE': 'CPI Balaraja WAN',
   };
 
   // Form state
