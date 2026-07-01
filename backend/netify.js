@@ -1224,18 +1224,7 @@ async function fetchAgentDetails(agentUuid) {
   const ph = inClause(macs);
 
   // ── 1. Top apps by this agent (from flows) ─────────────────────────────────
-  const appRows = d.prepare(`
-    SELECT app_label,
-           SUM(bytes_download) AS download,
-           SUM(bytes_upload)   AS upload,
-           COUNT(*)            AS flow_count
-    FROM   flows
-    WHERE  src_mac IN (${ph})
-      AND  app_label IS NOT NULL
-    GROUP  BY app_label
-    ORDER  BY download DESC
-    LIMIT  15
-  `).all(...macs);
+  const appRows = db.getLatestBandwidthApps(15, null, agentUuid);
 
   const top_apps = appRows.map(r => ({
     app_id    : null,
@@ -1333,21 +1322,8 @@ async function fetchAgentDetails(agentUuid) {
     vpn_detections       : vpnRows,
   };
 
-  // ── 6. Events filtered by agent IPs & MACs ─────────────────────────────────
-  const eventsByIP  = phIPs ? d.prepare(`SELECT event_id, event_type, severity, ip_address, mac_address, description, event_at FROM events WHERE ip_address IN (${phIPs}) ORDER BY event_at DESC LIMIT 100`).all(...agentIPs) : [];
-  const eventsByMAC = d.prepare(`SELECT event_id, event_type, severity, ip_address, mac_address, description, event_at FROM events WHERE mac_address IN (${ph}) ORDER BY event_at DESC LIMIT 100`).all(...macs);
-
-  const seenEvt = new Set();
-  const allEvents = [];
-  for (const r of [...eventsByIP, ...eventsByMAC]) {
-    const key = r.event_id || `${r.ip_address}:${r.event_at}`;
-    if (!seenEvt.has(key)) {
-      seenEvt.add(key);
-      allEvents.push({ event_id: r.event_id, event_type: r.event_type, severity: r.severity, ip_address: r.ip_address, mac_address: r.mac_address, description: r.description, event_at: r.event_at });
-    }
-  }
-  allEvents.sort((a, b) => (b.event_at || '').localeCompare(a.event_at || ''));
-  const events = allEvents.slice(0, 100);
+  // ── 6. Events filtered by agent (aligned with events page) ───────────────
+  const events = db.getLatestEvents(200, null, agentUuid);
 
   // ── 7. MAC bandwidth for this agent's MACs ──────────────────────────────────
   const latestMacSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM mac_bandwidth`).get()?.t;
