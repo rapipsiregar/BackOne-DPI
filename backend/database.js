@@ -104,7 +104,7 @@ function initSchema() {
   const adminExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'admin'").get();
   if (adminExists.count === 0) {
     const hash = bcrypt.hashSync('admin123', 10);
-    d.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)").run('admin', hash, 'SUPER_ADMIN');
+    d.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?, ?)").run('admin', hash, 'SUPER_ADMIN');
     console.log('[DB] Created default admin user (admin / admin123)');
   }
 
@@ -569,17 +569,17 @@ function initSchema() {
 
 // ─── INSERT FUNCTIONS ─────────────────────────────────────────────────────────
 
-function insertBandwidthApps(rows, fetchedAt, siteUuid) {
+function insertBandwidthApps(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO bandwidth_apps
-    (site_uuid, fetched_at, app_id, app_label, app_tag, category, favicon, download, upload, total, flow_count)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (agent_uuid, site_uuid, fetched_at, app_id, app_label, app_tag, category, favicon, download, upload, total, flow_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-        siteUuid, fetchedAt,
+        agentUuid, siteUuid, fetchedAt,
         r.app_id ?? null,
         r.app_label ?? 'Unknown',
         r.app_tag ?? null,
@@ -594,17 +594,17 @@ function insertBandwidthApps(rows, fetchedAt, siteUuid) {
   })(rows);
 }
 
-function insertDevices(rows, fetchedAt, siteUuid) {
+function insertDevices(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO devices
-    (site_uuid, fetched_at, mac_address, ip_address, device_label, device_type, os_label, manufacturer, download, upload, last_seen)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (agent_uuid, site_uuid, fetched_at, mac_address, ip_address, device_label, device_type, os_label, manufacturer, download, upload, last_seen)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-        siteUuid, fetchedAt,
+        agentUuid, siteUuid, fetchedAt,
         r.mac_address ?? null,
         r.ip_address ?? null,
         r.device_label ?? r.ip_address ?? 'Unknown',
@@ -619,17 +619,17 @@ function insertDevices(rows, fetchedAt, siteUuid) {
   })(rows);
 }
 
-function insertFlows(rows, fetchedAt, siteUuid) {
+function insertFlows(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO flows
-    (site_uuid, fetched_at, flow_id, src_ip, src_mac, dst_ip, dst_port, protocol, app_label, domain, bytes_download, bytes_upload, first_seen, last_seen)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (agent_uuid, site_uuid, fetched_at, flow_id, src_ip, src_mac, dst_ip, dst_port, protocol, app_label, domain, bytes_download, bytes_upload, first_seen, last_seen)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-        siteUuid, fetchedAt,
+        agentUuid, siteUuid, fetchedAt,
         r.flow_id ?? null,
         r.src_ip ?? null,
         r.src_mac ?? null,
@@ -647,17 +647,17 @@ function insertFlows(rows, fetchedAt, siteUuid) {
   })(rows);
 }
 
-function insertThreats(rows, fetchedAt, siteUuid) {
+function insertThreats(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO threats
-    (site_uuid, fetched_at, threat_id, threat_type, severity, mac_address, ip_address, dst_ip, app_label, domain, description, detected_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (agent_uuid, site_uuid, fetched_at, threat_id, threat_type, severity, mac_address, ip_address, dst_ip, app_label, domain, description, detected_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-        siteUuid, fetchedAt,
+        agentUuid, siteUuid, fetchedAt,
         r.threat_id ?? null,
         r.threat_type ?? null,
         r.severity ?? null,
@@ -673,18 +673,18 @@ function insertThreats(rows, fetchedAt, siteUuid) {
   })(rows);
 }
 
-function insertProtocols(rows, fetchedAt, siteUuid) {
+function insertProtocols(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO bandwidth_protocols
-    (site_uuid, fetched_at, protocol_id, protocol_label, download, upload, flow_count)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    (agent_uuid, site_uuid, fetched_at, protocol_id, protocol_label, download, upload, flow_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
   d.transaction((items) => {
     for (const r of items) {
       // Data sudah di-flatten oleh netify.js — akses langsung tanpa nested
       stmt.run(
-        siteUuid, fetchedAt,
+        agentUuid, siteUuid, fetchedAt,
         r.protocol_id ?? null,
         r.protocol_label ?? 'Unknown',
         r.download ?? 0,
@@ -695,18 +695,18 @@ function insertProtocols(rows, fetchedAt, siteUuid) {
   })(rows);
 }
 
-function insertCountries(rows, fetchedAt, siteUuid) {
+function insertCountries(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO bandwidth_countries
-    (site_uuid, fetched_at, country_code, country_name, download, upload, flow_count)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    (agent_uuid, site_uuid, fetched_at, country_code, country_name, download, upload, flow_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
   d.transaction((items) => {
     for (const r of items) {
       // Data sudah di-flatten oleh netify.js — akses langsung tanpa nested
       stmt.run(
-        siteUuid, fetchedAt,
+        agentUuid, siteUuid, fetchedAt,
         r.country_code ?? null,
         r.country_name ?? 'Unknown',
         r.download ?? 0,
@@ -717,17 +717,17 @@ function insertCountries(rows, fetchedAt, siteUuid) {
   })(rows);
 }
 
-function insertDNS(rows, fetchedAt, siteUuid) {
+function insertDNS(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO dns_queries
-    (site_uuid, fetched_at, domain, query_count, app_label, category)
-    VALUES (?, ?, ?, ?, ?, ?)
+    (agent_uuid, site_uuid, fetched_at, domain, query_count, app_label, category)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-        siteUuid, fetchedAt,
+        agentUuid, siteUuid, fetchedAt,
         r.domain ?? null,
         r.query_count ?? 0,
         r.app_label ?? null,
@@ -737,17 +737,17 @@ function insertDNS(rows, fetchedAt, siteUuid) {
   })(rows);
 }
 
-function insertEvents(rows, fetchedAt, siteUuid) {
+function insertEvents(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`
     INSERT INTO events
-    (site_uuid, fetched_at, event_id, event_type, severity, mac_address, ip_address, description, event_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (agent_uuid, site_uuid, fetched_at, event_id, event_type, severity, mac_address, ip_address, description, event_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   d.transaction((items) => {
     for (const r of items) {
       stmt.run(
-        siteUuid, fetchedAt,
+        agentUuid, siteUuid, fetchedAt,
         r.event_id ?? null,
         r.event_type ?? null,
         r.severity ?? null,
@@ -760,13 +760,14 @@ function insertEvents(rows, fetchedAt, siteUuid) {
   })(rows);
 }
 
-function insertBandwidthTimeline(summary, fetchedAt, siteUuid) {
+function insertBandwidthTimeline(summary, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   d.prepare(`
     INSERT INTO bandwidth_timeline
-    (site_uuid, fetched_at, total_download, total_upload, total_flows, active_devices, download_speed, upload_speed, flow_speed)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (agent_uuid, site_uuid, fetched_at, total_download, total_upload, total_flows, active_devices, download_speed, upload_speed, flow_speed)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
+    agentUuid,
     siteUuid,
     fetchedAt,
     summary.download ?? 0,
@@ -846,8 +847,8 @@ function getLatestBandwidthApps(limit = 20, siteUuid = null, agentUuid = null) {
   const appsLatest = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_apps`).get();
   if (!appsLatest?.t) return [];
   const rows = d.prepare(`
-    SELECT * FROM bandwidth_apps WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
-  `).all({ fetched_at: appsLatest.t, limit, siteUuid });
+    SELECT * FROM bandwidth_apps WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) AND  fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
+  `).all({ fetched_at: appsLatest.t, limit, siteUuid, agentUuid });
   return correlateAppLabels(rows);
 }
 
@@ -1093,7 +1094,7 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null, search
       SELECT ip_address, mac_address, device_label, device_type, os_label, manufacturer, 
              MAX(download) as download, MAX(upload) as upload, MAX(fetched_at) as fetched_at, site_uuid, id
       FROM devices
-      WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (
+      WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) AND (
         ip_address LIKE @q OR 
         mac_address LIKE @q OR 
         device_label LIKE @q OR 
@@ -1110,7 +1111,7 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null, search
              SUM(bytes_download) as download, SUM(bytes_upload) as upload, 
              MAX(last_seen) as last_seen, MAX(fetched_at) as fetched_at, site_uuid
       FROM flows
-      WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (
+      WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) AND (
         src_ip LIKE @q OR 
         src_mac LIKE @q OR 
         app_label LIKE @q OR
@@ -1544,8 +1545,8 @@ function getLatestFlows(limit = 100, siteUuid = null, agentUuid = null) {
     `).all(...macs, limit);
   } else {
     rows = d.prepare(`
-      SELECT * FROM flows WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY bytes_download DESC LIMIT @limit
-    `).all({ fetched_at: latest.t, limit, siteUuid });
+      SELECT * FROM flows WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) AND  fetched_at = @fetched_at ORDER BY bytes_download DESC LIMIT @limit
+    `).all({ fetched_at: latest.t, limit, siteUuid, agentUuid });
   }
 
   const mapped = rows.map(r => ({
@@ -1569,7 +1570,7 @@ function getLatestThreats(limit = 50, siteUuid = null, agentUuid = null) {
       LIMIT ?
     `).all(...macs, ...macs, limit);
   }
-  return d.prepare(`SELECT * FROM threats WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT @limit`).all({ limit, siteUuid });
+  return d.prepare(`SELECT * FROM threats WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) ORDER BY fetched_at DESC LIMIT @limit`).all({ limit, siteUuid, agentUuid });
 }
 
 function getLatestProtocols(limit = 20, siteUuid = null, agentUuid = null) {
@@ -1593,8 +1594,8 @@ function getLatestProtocols(limit = 20, siteUuid = null, agentUuid = null) {
   const protoLatest = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_protocols`).get();
   if (!protoLatest?.t) return [];
   return d.prepare(`
-    SELECT * FROM bandwidth_protocols WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
-  `).all({ fetched_at: protoLatest.t, limit, siteUuid });
+    SELECT * FROM bandwidth_protocols WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) AND fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
+  `).all({ fetched_at: protoLatest.t, limit, siteUuid, agentUuid });
 }
 
 function getLatestCountries(limit = 15, siteUuid = null, agentUuid = null) {
@@ -1711,8 +1712,8 @@ function getLatestCountries(limit = 15, siteUuid = null, agentUuid = null) {
   const countryLatest = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_countries`).get();
   if (!countryLatest?.t) return [];
   return d.prepare(`
-    SELECT * FROM bandwidth_countries WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
-  `).all({ fetched_at: countryLatest.t, limit, siteUuid });
+    SELECT * FROM bandwidth_countries WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) AND fetched_at = @fetched_at ORDER BY download DESC LIMIT @limit
+  `).all({ fetched_at: countryLatest.t, limit, siteUuid, agentUuid });
 }
 
 function getLatestDNS(limit = 20, siteUuid = null, agentUuid = null) {
@@ -1736,8 +1737,8 @@ function getLatestDNS(limit = 20, siteUuid = null, agentUuid = null) {
   const dnsLatest = d.prepare(`SELECT MAX(fetched_at) as t FROM dns_queries`).get();
   if (!dnsLatest?.t) return [];
   return d.prepare(`
-    SELECT * FROM dns_queries WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND  fetched_at = @fetched_at ORDER BY query_count DESC LIMIT @limit
-  `).all({ fetched_at: dnsLatest.t, limit, siteUuid });
+    SELECT * FROM dns_queries WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) AND  fetched_at = @fetched_at ORDER BY query_count DESC LIMIT @limit
+  `).all({ fetched_at: dnsLatest.t, limit, siteUuid, agentUuid });
 }
 
 function getLatestEvents(limit = 50, siteUuid = null, agentUuid = null) {
@@ -1752,7 +1753,7 @@ function getLatestEvents(limit = 50, siteUuid = null, agentUuid = null) {
       LIMIT ?
     `).all(...macs, ...macs, limit);
   }
-  return d.prepare(`SELECT * FROM events WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT @limit`).all({ limit, siteUuid });
+  return d.prepare(`SELECT * FROM events WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) ORDER BY fetched_at DESC LIMIT @limit`).all({ limit, siteUuid, agentUuid });
 }
 
 function getBandwidthTimeline(points = 60, siteUuid = null, agentUuid = null) {
@@ -1780,7 +1781,7 @@ function getBandwidthTimeline(points = 60, siteUuid = null, agentUuid = null) {
     `).all(...macs, ...macs, points).reverse();
   }
   return d.prepare(`
-    SELECT * FROM bandwidth_timeline WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT @limit
+    SELECT * FROM bandwidth_timeline WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) ORDER BY fetched_at DESC LIMIT @limit
   `).all({ limit: points, siteUuid }).reverse();
 }
 
@@ -1849,141 +1850,141 @@ function getStats(siteUuid = null, agentUuid = null) {
   // Fallback to site-wide stats if no agentUuid
   const latestDevFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM devices`).get();
   const totalDevices = latestDevFetch?.t
-    ? (d.prepare(`SELECT COUNT(*) as n FROM devices WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at`).get({ fetched_at: latestDevFetch.t, siteUuid })?.n ?? 0)
+    ? (d.prepare(`SELECT COUNT(*) as n FROM devices WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) AND fetched_at = @fetched_at`).get({ fetched_at: latestDevFetch.t, siteUuid })?.n ?? 0)
     : 0;
 
   const latestFlowFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM flows`).get();
   const activeFlows = latestFlowFetch?.t
-    ? (d.prepare(`SELECT COUNT(*) as n FROM flows WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at`).get({ fetched_at: latestFlowFetch.t, siteUuid })?.n ?? 0)
+    ? (d.prepare(`SELECT COUNT(*) as n FROM flows WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) AND fetched_at = @fetched_at`).get({ fetched_at: latestFlowFetch.t, siteUuid })?.n ?? 0)
     : 0;
 
-  const totalThreats = d.prepare(`SELECT COUNT(*) as n FROM threats WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid)`).get({ siteUuid })?.n ?? 0;
-  const totalEvents = d.prepare(`SELECT COUNT(*) as n FROM events WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid)`).get({ siteUuid })?.n ?? 0;
+  const totalThreats = d.prepare(`SELECT COUNT(*) as n FROM threats WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid)`).get({ siteUuid, agentUuid })?.n ?? 0;
+  const totalEvents = d.prepare(`SELECT COUNT(*) as n FROM events WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid)`).get({ siteUuid, agentUuid })?.n ?? 0;
   const lastFetch = d.prepare(`SELECT MAX(fetched_at) as t FROM bandwidth_timeline`).get()?.t ?? null;
-  const latestBw = d.prepare(`SELECT * FROM bandwidth_timeline WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT 1`).get({ siteUuid });
+  const latestBw = d.prepare(`SELECT * FROM bandwidth_timeline WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) ORDER BY fetched_at DESC LIMIT 1`).get({ siteUuid, agentUuid });
 
   return { totalDevices, activeFlows, totalThreats, totalEvents, lastFetch, latestBw };
 }
 
 // ─── INSERT FITUR BARU 1-11 ───────────────────────────────────────────────────
-function insertAppCategories(rows, fetchedAt, siteUuid) {
+function insertAppCategories(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO app_categories
-    (site_uuid, fetched_at, category_label, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, category_label, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.category_label, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.category_label, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertContinents(rows, fetchedAt, siteUuid) {
+function insertContinents(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO continents
-    (site_uuid, fetched_at, continent_name, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, continent_name, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.continent_name, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.continent_name, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertRegions(rows, fetchedAt, siteUuid) {
+function insertRegions(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO regions
-    (site_uuid, fetched_at, region_name, region_code, country_name, country_code, download)
-    VALUES (?, ?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, region_name, region_code, country_name, country_code, download)
+    VALUES (?, ?, ?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.region_name, r.region_code, r.country_name, r.country_code, r.download);
+        agentUuid, siteUuid, fetchedAt, r.region_name, r.region_code, r.country_name, r.country_code, r.download);
   })(rows);
 }
 
-function insertCities(rows, fetchedAt, siteUuid) {
+function insertCities(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO cities
-    (site_uuid, fetched_at, city_name, region_name, country_name, country_code, download)
-    VALUES (?, ?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, city_name, region_name, country_name, country_code, download)
+    VALUES (?, ?, ?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.city_name, r.region_name, r.country_name, r.country_code, r.download);
+        agentUuid, siteUuid, fetchedAt, r.city_name, r.region_name, r.country_name, r.country_code, r.download);
   })(rows);
 }
 
-function insertVLANs(rows, fetchedAt, siteUuid) {
+function insertVLANs(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO vlans
-    (site_uuid, fetched_at, vlan_id, vlan_label, download, upload, total)
-    VALUES (?, ?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, vlan_id, vlan_label, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.vlan_id, r.vlan_label, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.vlan_id, r.vlan_label, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertInterfaces(rows, fetchedAt, siteUuid) {
+function insertInterfaces(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO interfaces
-    (site_uuid, fetched_at, iface_id, iface_name, iface_role, agent_id, download, upload, total)
-    VALUES (?, ?,?,?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, iface_id, iface_name, iface_role, agent_id, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.iface_id, r.iface_name, r.iface_role, String(r.agent_id ?? ''), r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.iface_id, r.iface_name, r.iface_role, String(r.agent_id ?? ''), r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertFlowTypes(rows, fetchedAt, siteUuid) {
+function insertFlowTypes(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO flow_types
-    (site_uuid, fetched_at, flow_type_label, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, flow_type_label, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.flow_type_label, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.flow_type_label, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertFlowOrigins(rows, fetchedAt, siteUuid) {
+function insertFlowOrigins(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO flow_origins
-    (site_uuid, fetched_at, flow_origin_label, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, flow_origin_label, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.flow_origin_label, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.flow_origin_label, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertIPVersions(rows, fetchedAt, siteUuid) {
+function insertIPVersions(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO ip_versions
-    (site_uuid, fetched_at, ip_version_label, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, ip_version_label, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.ip_version_label, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.ip_version_label, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertRemoteIPs(rows, fetchedAt, siteUuid) {
+function insertRemoteIPs(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO remote_ips
-    (site_uuid, fetched_at, remote_ip, ip_version, download, upload, total)
-    VALUES (?, ?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, remote_ip, ip_version, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.remote_ip, r.ip_version, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.remote_ip, r.ip_version, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertMACBandwidth(rows, fetchedAt, siteUuid) {
+function insertMACBandwidth(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO mac_bandwidth
-    (site_uuid, fetched_at, mac_address, manufacturer, download, upload, total)
-    VALUES (?, ?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, mac_address, manufacturer, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.mac_address, r.manufacturer, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.mac_address, r.manufacturer, r.download, r.upload, r.total);
   })(rows);
 }
 
@@ -2048,7 +2049,7 @@ function getLatest(table, orderBy = 'download', limit = 50, siteUuid = null, age
   }
 
   // Fallback to standard site-wide select
-  rows = d.prepare(`SELECT * FROM ${table} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND fetched_at = @fetched_at ORDER BY ${orderBy} DESC LIMIT @limit`).all({ fetched_at: latest.t, limit, siteUuid });
+  rows = d.prepare(`SELECT * FROM ${table} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) AND fetched_at = @fetched_at ORDER BY ${orderBy} DESC LIMIT @limit`).all({ fetched_at: latest.t, limit, siteUuid, agentUuid });
 
   // If agentUuid is provided, scale down numerical values by traffic ratio to match the agent's footprint
   if (agentUuid && !['mac_bandwidth', 'interfaces'].includes(table)) {
@@ -2067,272 +2068,272 @@ function getLatest(table, orderBy = 'download', limit = 50, siteUuid = null, age
 }
 
 // DPI Fields
-function insertTLSVersions(rows, fetchedAt, siteUuid) {
+function insertTLSVersions(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO tls_versions
-    (site_uuid, fetched_at, tls_version, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, tls_version, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.tls_version, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.tls_version, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertTLSCiphers(rows, fetchedAt, siteUuid) {
+function insertTLSCiphers(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO tls_ciphers
-    (site_uuid, fetched_at, tls_cipher, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, tls_cipher, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.tls_cipher, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.tls_cipher, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertTLSSecurity(rows, fetchedAt, siteUuid) {
+function insertTLSSecurity(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO tls_security
-    (site_uuid, fetched_at, tls_security, color, download, upload, total)
-    VALUES (?, ?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, tls_security, color, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.tls_security, r.color, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.tls_security, r.color, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertNetBIOSHostnames(rows, fetchedAt, siteUuid) {
+function insertNetBIOSHostnames(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO netbios_hostnames
-    (site_uuid, fetched_at, hostname, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, hostname, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.hostname, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.hostname, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertDiscoveryOS(rows, fetchedAt, siteUuid) {
+function insertDiscoveryOS(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO discovery_os
-    (site_uuid, fetched_at, os_label, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, os_label, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.os_label, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.os_label, r.download, r.upload, r.total);
   })(rows);
 }
 
 // ─── INSERT DPI 12-21 ────────────────────────────────────────────────────────
 
-function insertDHCPFingerprints(rows, fetchedAt, siteUuid) {
+function insertDHCPFingerprints(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO dhcp_fingerprints
-    (site_uuid, fetched_at, fingerprint, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, fingerprint, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.fingerprint, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.fingerprint, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertHTTPUserAgents(rows, fetchedAt, siteUuid) {
+function insertHTTPUserAgents(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO http_user_agents
-    (site_uuid, fetched_at, user_agent, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, user_agent, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.user_agent, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.user_agent, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertSNIHostnames(rows, fetchedAt, siteUuid) {
+function insertSNIHostnames(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO sni_hostnames
-    (site_uuid, fetched_at, sni_hostname, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, sni_hostname, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.sni_hostname, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.sni_hostname, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertSSLServerCN(rows, fetchedAt, siteUuid) {
+function insertSSLServerCN(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO ssl_server_cn
-    (site_uuid, fetched_at, ssl_server_cn, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, ssl_server_cn, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.ssl_server_cn, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.ssl_server_cn, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertQUICHostnames(rows, fetchedAt, siteUuid) {
+function insertQUICHostnames(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO quic_hostnames
-    (site_uuid, fetched_at, quic_hostname, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, quic_hostname, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.quic_hostname, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.quic_hostname, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertBitTorrentHashes(rows, fetchedAt, siteUuid) {
+function insertBitTorrentHashes(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO bittorrent_hashes
-    (site_uuid, fetched_at, info_hash, label, download, upload, total)
-    VALUES (?, ?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, info_hash, label, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.info_hash, r.label, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.info_hash, r.label, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertSSHVersions(rows, fetchedAt, siteUuid) {
+function insertSSHVersions(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO ssh_versions
-    (site_uuid, fetched_at, ssh_version, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, ssh_version, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.ssh_version, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.ssh_version, r.download, r.upload, r.total);
   })(rows);
 }
 
-function insertMDNSHostnames(rows, fetchedAt, siteUuid) {
+function insertMDNSHostnames(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO mdns_hostnames
-    (site_uuid, fetched_at, mdns_hostname, download, upload, total)
-    VALUES (?, ?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, mdns_hostname, download, upload, total)
+    VALUES (?, ?, ?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.mdns_hostname, r.download, r.upload, r.total);
+        agentUuid, siteUuid, fetchedAt, r.mdns_hostname, r.download, r.upload, r.total);
   })(rows);
 }
 
 // ─── INSERT INTELLIGENCE 22-30 ────────────────────────────────────────────────
 
-function insertCryptoMining(rows, fetchedAt, siteUuid) {
+function insertCryptoMining(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO intel_crypto_mining
-    (site_uuid, fetched_at, detected_at, ip_address, mac_address, pool_host, pool_ip, protocol, app_label, confidence, download, upload)
-    VALUES (?, ?,?,?,?,?,?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, detected_at, ip_address, mac_address, pool_host, pool_ip, protocol, app_label, confidence, download, upload)
+    VALUES (?, ?, ?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+        agentUuid, siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.pool_host, r.pool_ip, r.protocol, r.app_label, r.confidence,
       r.download ?? 0, r.upload ?? 0
     );
   })(rows);
 }
 
-function insertDeviceDiscovery(rows, fetchedAt, siteUuid) {
+function insertDeviceDiscovery(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO intel_device_discovery
-    (site_uuid, fetched_at, detected_at, ip_address, mac_address, device_label, device_type, os_label, manufacturer, is_new)
-    VALUES (?, ?,?,?,?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, detected_at, ip_address, mac_address, device_label, device_type, os_label, manufacturer, is_new)
+    VALUES (?, ?, ?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+        agentUuid, siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.device_label, r.device_type, r.os_label, r.manufacturer,
       r.is_new ? 1 : 0
     );
   })(rows);
 }
 
-function insertEncryptionAudit(rows, fetchedAt, siteUuid) {
+function insertEncryptionAudit(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO intel_encryption_audit
-    (site_uuid, fetched_at, detected_at, ip_address, mac_address, device_label, encrypted_pct, unencrypted, encrypted, total, risk_level)
-    VALUES (?, ?,?,?,?,?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, detected_at, ip_address, mac_address, device_label, encrypted_pct, unencrypted, encrypted, total, risk_level)
+    VALUES (?, ?, ?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+        agentUuid, siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.device_label, r.encrypted_pct, r.unencrypted ?? 0, r.encrypted ?? 0,
       r.total ?? 0, r.risk_level
     );
   })(rows);
 }
 
-function insertInsecureProtocols(rows, fetchedAt, siteUuid) {
+function insertInsecureProtocols(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO intel_insecure_protocols
-    (site_uuid, fetched_at, detected_at, protocol, ip_address, mac_address, dst_ip, dst_port, app_label, download, upload, risk, source)
-    VALUES (?, ?,?,?,?,?,?,?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, detected_at, protocol, ip_address, mac_address, dst_ip, dst_port, app_label, download, upload, risk, source)
+    VALUES (?, ?, ?,?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.protocol, r.ip_address, r.mac_address,
+        agentUuid, siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.protocol, r.ip_address, r.mac_address,
       r.dst_ip, r.dst_port, r.app_label, r.download ?? 0, r.upload ?? 0,
       r.risk ?? 'Medium', r.source ?? 'api'
     );
   })(rows);
 }
 
-function insertIPReputation(rows, fetchedAt, siteUuid) {
+function insertIPReputation(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO intel_ip_reputation
-    (site_uuid, fetched_at, detected_at, ip_address, local_ip, mac_address, reputation, score, country, app_label, download, upload, blacklisted)
-    VALUES (?, ?,?,?,?,?,?,?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, detected_at, ip_address, local_ip, mac_address, reputation, score, country, app_label, download, upload, blacklisted)
+    VALUES (?, ?, ?,?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.local_ip, r.mac_address,
+        agentUuid, siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.local_ip, r.mac_address,
       r.reputation, r.score, r.country, r.app_label,
       r.download ?? 0, r.upload ?? 0, r.blacklisted ? 1 : 0
     );
   })(rows);
 }
 
-function insertServerDiscovery(rows, fetchedAt, siteUuid) {
+function insertServerDiscovery(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO intel_server_discovery
-    (site_uuid, fetched_at, detected_at, ip_address, mac_address, server_type, hostname, port, protocol, os_label, download, upload)
-    VALUES (?, ?,?,?,?,?,?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, detected_at, ip_address, mac_address, server_type, hostname, port, protocol, os_label, download, upload)
+    VALUES (?, ?, ?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+        agentUuid, siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.server_type, r.hostname, r.port, r.protocol, r.os_label,
       r.download ?? 0, r.upload ?? 0
     );
   })(rows);
 }
 
-function insertTorDetection(rows, fetchedAt, siteUuid) {
+function insertTorDetection(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO intel_tor_detection
-    (site_uuid, fetched_at, detected_at, ip_address, mac_address, exit_node, circuit_id, download, upload, country)
-    VALUES (?, ?,?,?,?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, detected_at, ip_address, mac_address, exit_node, circuit_id, download, upload, country)
+    VALUES (?, ?, ?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+        agentUuid, siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.exit_node, r.circuit_id, r.download ?? 0, r.upload ?? 0, r.country
     );
   })(rows);
 }
 
-function insertUnencryptedPasswords(rows, fetchedAt, siteUuid) {
+function insertUnencryptedPasswords(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO intel_unencrypted_passwords
-    (site_uuid, fetched_at, detected_at, ip_address, mac_address, dst_ip, dst_port, protocol, username, download, upload, severity)
-    VALUES (?, ?,?,?,?,?,?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, detected_at, ip_address, mac_address, dst_ip, dst_port, protocol, username, download, upload, severity)
+    VALUES (?, ?, ?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+        agentUuid, siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.dst_ip, r.dst_port, r.protocol, r.username,
       r.download ?? 0, r.upload ?? 0, r.severity ?? 'Critical'
     );
   })(rows);
 }
 
-function insertVPNDetection(rows, fetchedAt, siteUuid) {
+function insertVPNDetection(rows, fetchedAt, siteUuid, agentUuid) {
   const d = getDB();
   const stmt = d.prepare(`INSERT INTO intel_vpn_detection
-    (site_uuid, fetched_at, detected_at, ip_address, mac_address, vpn_type, remote_ip, protocol, download, upload, country, confidence)
-    VALUES (?, ?,?,?,?,?,?,?,?,?,?,?)`);
+    (agent_uuid, site_uuid, fetched_at, detected_at, ip_address, mac_address, vpn_type, remote_ip, protocol, download, upload, country, confidence)
+    VALUES (?, ?, ?,?,?,?,?,?,?,?,?,?,?)`);
   d.transaction(items => {
     for (const r of items) stmt.run(
-      siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
+        agentUuid, siteUuid, fetchedAt, r.detected_at ?? fetchedAt, r.ip_address, r.mac_address,
       r.vpn_type, r.remote_ip, r.protocol,
       r.download ?? 0, r.upload ?? 0, r.country, r.confidence
     );
@@ -2357,7 +2358,7 @@ function getIntelData(table, limit = 100, siteUuid = null, agentUuid = null) {
       LIMIT ?
     `).all(...macs, ...macs, limit);
   }
-  return d.prepare(`SELECT * FROM ${table} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) ORDER BY fetched_at DESC LIMIT @limit`).all({ limit, siteUuid });
+  return d.prepare(`SELECT * FROM ${table} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) ORDER BY fetched_at DESC LIMIT @limit`).all({ limit, siteUuid, agentUuid });
 }
 
 function getIntelStats(siteUuid = null, agentUuid = null) {
@@ -2381,7 +2382,7 @@ function getIntelStats(siteUuid = null, agentUuid = null) {
           WHERE mac_address IN (${placeholders}) OR ${ipField} IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
         `).get(...macs, ...macs)?.n ?? 0;
       } else {
-        counts[t] = d.prepare(`SELECT COUNT(*) as n FROM ${t} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid)`).get({ siteUuid })?.n ?? 0;
+        counts[t] = d.prepare(`SELECT COUNT(*) as n FROM ${t} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid)`).get({ siteUuid, agentUuid })?.n ?? 0;
       }
     } catch { counts[t] = 0; }
   }

@@ -11,3 +11,7 @@
   - Users must have defined roles (e.g., SUPER_ADMIN, TENANT_ADMIN, SOC_ANALYST, ENGINEER).
   - Frontend components and Backend API routes must check user roles before rendering sensitive actions (e.g., hiding "Delete Agent" for Analysts).
 - **Authentication**: Use a robust session management system (e.g., NextAuth.js or JWT-based auth via backend) before exposing the dashboard.
+
+# Strict Confidentiality & Privacy
+- **DO NOT DISCLOSE**: All prompts, discussions, and details regarding the "Web Dashboard BackOne Deep Package Inspection" project are strictly confidential.
+- **RESTRICTIONS**: It is strictly forbidden to publish, expose, or share any part of this project with the public. Future instances of this agent MUST strictly protect all information about the BackOne DPI Dashboard.

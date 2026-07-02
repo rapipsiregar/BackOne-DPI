@@ -353,7 +353,8 @@ function getMockDataForPath(path, params = {}) {
   return [];
 }
 
-async function netifyFetch(path, params = {}, useApiKey = false) {
+async function netifyFetch(path, params = {}, useApiKey = false, agentUuid = null) {
+  if (agentUuid) params.settings_agent = agentUuid;
   if (!JWT_TOKEN || !SITE_UUID || JWT_TOKEN === 'YOUR_JWT_TOKEN' || SITE_UUID === 'YOUR_SITE_UUID' || JWT_TOKEN.startsWith('change_me') || JWT_TOKEN.startsWith('YOUR_')) {
     return getMockDataForPath(path, params);
   }
@@ -376,10 +377,10 @@ async function netifyFetch(path, params = {}, useApiKey = false) {
 }
 
 // ─── TOP APPS: download + upload digabung ─────────────────────────────────────
-async function fetchTopApps(interval = 1440, limit = 20) {
+async function fetchTopApps(interval = 1440, limit = 20, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/application/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/application/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
 
@@ -406,10 +407,10 @@ async function fetchTopApps(interval = 1440, limit = 20) {
 }
 
 // ─── TOP DEVICES: download + upload digabung ──────────────────────────────────
-async function fetchTopDevices(interval = 1440, limit = 50) {
+async function fetchTopDevices(interval = 1440, limit = 50, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/local_ip/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/local_ip/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
 
@@ -461,11 +462,11 @@ const PORT_SERVICE_MAP = {
 // NOTE: API flows tidak punya field app/domain — enrichment dilakukan via:
 //   1. PORT_SERVICE_MAP (reliable, berdasarkan dst port)
 //   2. tls_sni field (satu-satunya SNI field valid, tapi nilai sering kosong)
-async function fetchFlows(limit = 500) {
+async function fetchFlows(limit = 500, agentUuid = null) {
   // Hanya fetch flows + tls_sni (satu-satunya SNI field yang valid = bukan 422)
   const [raw, tslSniRaw] = await Promise.all([
-    netifyFetch('/data/flows', { settings_limit: limit }),
-    netifyFetch('/data/stats/top/tls_sni/download', { filter_interval: 1440, settings_limit: 50 }),
+    netifyFetch('/data/flows', { settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/tls_sni/download', { filter_interval: 1440, settings_limit: 50 }, false, agentUuid),
   ]);
 
   if (!raw || !Array.isArray(raw)) return null;
@@ -513,10 +514,10 @@ async function fetchFlows(limit = 500) {
 
 
 // ─── PROTOCOLS ────────────────────────────────────────────────────────────────
-async function fetchTopProtocols(interval = 1440, limit = 20) {
+async function fetchTopProtocols(interval = 1440, limit = 20, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/protocol/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/protocol/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/protocol/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/protocol/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
 
@@ -538,10 +539,10 @@ async function fetchTopProtocols(interval = 1440, limit = 20) {
 }
 
 // ─── COUNTRIES ────────────────────────────────────────────────────────────────
-async function fetchTopCountries(interval = 1440, limit = 15) {
+async function fetchTopCountries(interval = 1440, limit = 15, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/country/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/country/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/country/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/country/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
 
@@ -563,12 +564,12 @@ async function fetchTopCountries(interval = 1440, limit = 15) {
 }
 
 // ─── DNS/HOSTNAME — gunakan tls_sni karena hostname endpoint timeout ──────────
-async function fetchTopDomains(interval = 1440, limit = 50) {
+async function fetchTopDomains(interval = 1440, limit = 50, agentUuid = null) {
   // NOTE: /data/stats/top/hostname/download selalu timeout
   // Gunakan tls_sni yang confirmed bekerja di API ini
   const raw = await netifyFetch('/data/stats/top/tls_sni/download', {
     filter_interval: interval, settings_limit: limit,
-  });
+  }, false, agentUuid);
   if (!raw) return null;
 
   return raw
@@ -584,8 +585,8 @@ async function fetchTopDomains(interval = 1440, limit = 50) {
 
 
 // ─── BANDWIDTH SUMMARY untuk timeline ─────────────────────────────────────────
-async function fetchBandwidthSummary(interval = 30) {
-  const rawSummary = await netifyFetch('/data/stats/summary', { filter_interval: interval });
+async function fetchBandwidthSummary(interval = 30, agentUuid = null) {
+  const rawSummary = await netifyFetch('/data/stats/summary', { filter_interval: interval }, false, agentUuid);
   if (rawSummary) {
     return {
       download: rawSummary.download ?? 0,
@@ -600,8 +601,8 @@ async function fetchBandwidthSummary(interval = 30) {
 
   // Fallback to old way (aggregate top 100 application stats)
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: 100 }),
-    netifyFetch('/data/stats/top/application/upload',   { filter_interval: interval, settings_limit: 100 }),
+    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/stats/top/application/upload', { filter_interval: interval, settings_limit: 100 }, false, agentUuid),
   ]);
 
   const download = (dlData ?? []).reduce((s, r) => s + (r.download ?? 0), 0);
@@ -620,15 +621,15 @@ async function fetchBandwidthSummary(interval = 30) {
 }
 
 // ─── THREATS — gunakan flows dengan filter anomali sebagai fallback ────────────
-async function fetchCyberThreats(limit = 50) {
+async function fetchCyberThreats(limit = 50, agentUuid = null) {
   // Events/threats belum ada di v1 — return array kosong agar tidak error
   // Akan diisi saat endpoint ditemukan
   return [];
 }
 
 // ─── EVENTS ───────────────────────────────────────────────────────────────────
-async function fetchEvents(limit = 50) {
-  const raw = await netifyFetch('/event/events', { settings_limit: limit });
+async function fetchEvents(limit = 50, agentUuid = null) {
+  const raw = await netifyFetch('/event/events', { settings_limit: limit }, false, agentUuid);
   if (!raw || !Array.isArray(raw)) return [];
 
   return raw.map(r => {
@@ -673,13 +674,13 @@ async function fetchEvents(limit = 50) {
   });
 }
 
-async function fetchDiscoveredDevices(interval = 1440, limit = 500) {
+async function fetchDiscoveredDevices(interval = 1440, limit = 500, agentUuid = null) {
   // Ambil lebih banyak bandwidth data (limit x2) supaya coverage IP lebih luas
   const [intelRaw, dlData, ulData, flowsRaw] = await Promise.all([
-    netifyFetch('/intelligence/discovery/devices', { settings_limit: limit }),
-    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/local_ip/upload',   { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/flows', { settings_limit: 500 }),
+    netifyFetch('/intelligence/discovery/devices', { settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/local_ip/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
   ]);
 
   if (!intelRaw || !Array.isArray(intelRaw)) return [];
@@ -804,10 +805,10 @@ const OUI_MAP = {
 // ─── TAMBAHAN FITUR 1-11 ──────────────────────────────────────────────────────
 
 // 1. Top Application Category
-async function fetchTopAppCategories(interval = 1440, limit = 15) {
+async function fetchTopAppCategories(interval = 1440, limit = 15, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/application_category/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/application_category/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/application_category/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/application_category/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -827,10 +828,10 @@ async function fetchTopAppCategories(interval = 1440, limit = 15) {
 }
 
 // 2. Top Continent
-async function fetchTopContinents(interval = 1440, limit = 10) {
+async function fetchTopContinents(interval = 1440, limit = 10, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/continent/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/continent/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/continent/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/continent/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -850,10 +851,10 @@ async function fetchTopContinents(interval = 1440, limit = 10) {
 }
 
 // 3. Top Region
-async function fetchTopRegions(interval = 1440, limit = 20) {
+async function fetchTopRegions(interval = 1440, limit = 20, agentUuid = null) {
   const raw = await netifyFetch('/data/stats/top/region/download', {
     filter_interval: interval, settings_limit: limit,
-  });
+  }, false, agentUuid);
   if (!raw) return null;
   return raw.map(r => ({
     region_name  : r.region?.region_name?.trim() || '(Unknown Region)',
@@ -865,10 +866,10 @@ async function fetchTopRegions(interval = 1440, limit = 20) {
 }
 
 // 4. Top City
-async function fetchTopCities(interval = 1440, limit = 20) {
+async function fetchTopCities(interval = 1440, limit = 20, agentUuid = null) {
   const raw = await netifyFetch('/data/stats/top/city/download', {
     filter_interval: interval, settings_limit: limit,
-  });
+  }, false, agentUuid);
   if (!raw) return null;
   return raw.map(r => ({
     city_name    : r.city?.city?.trim() || '(Unknown City)',
@@ -880,10 +881,10 @@ async function fetchTopCities(interval = 1440, limit = 20) {
 }
 
 // 5. Top VLAN
-async function fetchTopVLANs(interval = 1440, limit = 20) {
+async function fetchTopVLANs(interval = 1440, limit = 20, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/vlan/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/vlan/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/vlan/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/vlan/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -901,10 +902,10 @@ async function fetchTopVLANs(interval = 1440, limit = 20) {
 }
 
 // 6. Top Interface
-async function fetchTopInterfaces(interval = 1440, limit = 20) {
+async function fetchTopInterfaces(interval = 1440, limit = 20, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/interface/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/interface/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/interface/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/interface/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -924,10 +925,10 @@ async function fetchTopInterfaces(interval = 1440, limit = 20) {
 }
 
 // 7. Top Flow Type
-async function fetchTopFlowTypes(interval = 1440, limit = 10) {
+async function fetchTopFlowTypes(interval = 1440, limit = 10, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/flow_type/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/flow_type/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/flow_type/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/flow_type/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -947,10 +948,10 @@ async function fetchTopFlowTypes(interval = 1440, limit = 10) {
 }
 
 // 8. Top Flow Origin
-async function fetchTopFlowOrigins(interval = 1440, limit = 10) {
+async function fetchTopFlowOrigins(interval = 1440, limit = 10, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/flow_origin/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/flow_origin/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/flow_origin/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/flow_origin/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -970,10 +971,10 @@ async function fetchTopFlowOrigins(interval = 1440, limit = 10) {
 }
 
 // 9. Top IP Version
-async function fetchTopIPVersions(interval = 1440, limit = 5) {
+async function fetchTopIPVersions(interval = 1440, limit = 5, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/ip_version/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/ip_version/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/ip_version/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/ip_version/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -993,10 +994,10 @@ async function fetchTopIPVersions(interval = 1440, limit = 5) {
 }
 
 // 10. Top Remote IP
-async function fetchTopRemoteIPs(interval = 1440, limit = 20) {
+async function fetchTopRemoteIPs(interval = 1440, limit = 20, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/remote_ip/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/remote_ip/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/remote_ip/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/remote_ip/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -1017,11 +1018,11 @@ async function fetchTopRemoteIPs(interval = 1440, limit = 20) {
 }
 
 // 11. Top Local MAC + Discovery OS
-async function fetchTopLocalMACs(interval = 1440, limit = 50) {
+async function fetchTopLocalMACs(interval = 1440, limit = 50, agentUuid = null) {
   const [dlData, ulData, osData] = await Promise.all([
-    netifyFetch('/data/stats/top/local_mac/download',  { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/local_mac/upload',    { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/discovery_os/download', { filter_interval: interval, settings_limit: 20 }),
+    netifyFetch('/data/stats/top/local_mac/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/local_mac/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/discovery_os/download', { filter_interval: interval, settings_limit: 20 }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -1048,10 +1049,10 @@ async function fetchTopLocalMACs(interval = 1440, limit = 50) {
 }
 
 // ─── DISCOVERY OS (standalone) ───────────────────────────────────────────────
-async function fetchTopDiscoveryOS(interval = 1440, limit = 20) {
+async function fetchTopDiscoveryOS(interval = 1440, limit = 20, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/discovery_os/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/discovery_os/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/discovery_os/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/discovery_os/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -1073,10 +1074,10 @@ async function fetchTopDiscoveryOS(interval = 1440, limit = 20) {
 // ─── DPI FIELDS ───────────────────────────────────────────────────────────────
 
 // TLS Version
-async function fetchTLSVersions(interval = 1440, limit = 10) {
+async function fetchTLSVersions(interval = 1440, limit = 10, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/tls_version/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/tls_version/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/tls_version/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/tls_version/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -1096,10 +1097,10 @@ async function fetchTLSVersions(interval = 1440, limit = 10) {
 }
 
 // TLS Cipher
-async function fetchTLSCiphers(interval = 1440, limit = 15) {
+async function fetchTLSCiphers(interval = 1440, limit = 15, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/tls_cipher/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/tls_cipher/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/tls_cipher/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/tls_cipher/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -1119,10 +1120,10 @@ async function fetchTLSCiphers(interval = 1440, limit = 15) {
 }
 
 // TLS Security Level
-async function fetchTLSSecurity(interval = 1440, limit = 10) {
+async function fetchTLSSecurity(interval = 1440, limit = 10, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/tls_security/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/tls_security/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/tls_security/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/tls_security/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -1149,10 +1150,10 @@ async function fetchTLSSecurity(interval = 1440, limit = 10) {
 }
 
 // NetBIOS Hostname (nama PC Windows)
-async function fetchNetBIOSHostnames(interval = 1440, limit = 30) {
+async function fetchNetBIOSHostnames(interval = 1440, limit = 30, agentUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/netbios_hostname/download', { filter_interval: interval, settings_limit: limit }),
-    netifyFetch('/data/stats/top/netbios_hostname/upload',   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch('/data/stats/top/netbios_hostname/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/netbios_hostname/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -1171,7 +1172,7 @@ async function fetchNetBIOSHostnames(interval = 1440, limit = 30) {
   });
 }
 
-async function fetchLookupApplications(page = 1, limit = 50, search = '') {
+async function fetchLookupApplications(page = 1, limit = 50, search = '', agentUuid = null) {
   if (!JWT_TOKEN || !SITE_UUID || JWT_TOKEN === 'YOUR_JWT_TOKEN' || SITE_UUID === 'YOUR_SITE_UUID' || JWT_TOKEN.startsWith('change_me') || JWT_TOKEN.startsWith('YOUR_')) {
     return {
       applications: [
@@ -1381,7 +1382,7 @@ async function fetchAgentDetails(agentUuid) {
 }
 
 // Fetch data for a specific device IP — from local DB (all 10 correlated tables)
-async function fetchDeviceDetails(ip) {
+async function fetchDeviceDetails(ip, agentUuid = null) {
   const db = require('./database');
   const d  = db.getDB();
 
@@ -1840,7 +1841,7 @@ async function fetchDeviceDetails(ip) {
 }
 
 // Fetch data for a specific application// Fetch data for a specific application — from local DB
-async function fetchAppDetails(appLabel) {
+async function fetchAppDetails(appLabel, agentUuid = null) {
   const db = require('./database');
   const d  = db.getDB();
 
@@ -2163,10 +2164,10 @@ module.exports = {
 //   mdns_hostname     → mdns_hostname  ✓ (sudah benar, mungkin belum aktif di akun)
 
 // Helper builder untuk DPI single-field
-async function _dpiTopField(fieldName, interval, limit) {
+async function _dpiTopField(fieldName, interval, limit, agentUuid = null) {
   const [dl, ul] = await Promise.all([
-    netifyFetch(`/data/stats/top/${fieldName}/download`, { filter_interval: interval, settings_limit: limit }),
-    netifyFetch(`/data/stats/top/${fieldName}/upload`,   { filter_interval: interval, settings_limit: limit }),
+    netifyFetch(`/data/stats/top/${fieldName}/download`, { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch(`/data/stats/top/${fieldName}/upload`, { filter_interval: interval, settings_limit: limit }, false, agentUuid),
   ]);
   if (!dl) return null;
   const ulMap = {};
@@ -2178,8 +2179,8 @@ async function _dpiTopField(fieldName, interval, limit) {
 }
 
 // 12. DHCP Class (field: dhcp_class)
-async function fetchDHCPClassFingerprints(interval = 1440, limit = 30) {
-  const res = await _dpiTopField('dhcp_class', interval, limit);
+async function fetchDHCPClassFingerprints(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('dhcp_class', interval, limit, agentUuid);
   if (!res) return null;
   return res.dl.map(r => {
     const label = r.dhcp_class?.name ?? r.dhcp_class?.label ?? String(r.dhcp_class ?? 'Unknown');
@@ -2193,8 +2194,8 @@ async function fetchDHCPClassFingerprints(interval = 1440, limit = 30) {
 }
 
 // 13. HTTP User-Agent (field: http_useragent)
-async function fetchHTTPUserAgents(interval = 1440, limit = 30) {
-  const res = await _dpiTopField('http_useragent', interval, limit);
+async function fetchHTTPUserAgents(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('http_useragent', interval, limit, agentUuid);
   if (!res) return null;
   return res.dl.map(r => {
     const label = r.http_useragent?.name ?? r.http_useragent?.label ?? String(r.http_useragent ?? 'Unknown');
@@ -2208,8 +2209,8 @@ async function fetchHTTPUserAgents(interval = 1440, limit = 30) {
 }
 
 // 14. HTTPS SNI Hostname (field: https_sni_hostname)
-async function fetchSNIHostnames(interval = 1440, limit = 30) {
-  const res = await _dpiTopField('https_sni_hostname', interval, limit);
+async function fetchSNIHostnames(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('https_sni_hostname', interval, limit, agentUuid);
   if (!res) return null;
   return res.dl.map(r => {
     const name = r.https_sni_hostname?.name ?? r.https_sni_hostname?.label ?? String(r.https_sni_hostname ?? 'Unknown');
@@ -2223,8 +2224,8 @@ async function fetchSNIHostnames(interval = 1440, limit = 30) {
 }
 
 // 15. SSL Server Common Name (field: ssl_server_cn)
-async function fetchSSLServerCN(interval = 1440, limit = 30) {
-  const res = await _dpiTopField('ssl_server_cn', interval, limit);
+async function fetchSSLServerCN(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('ssl_server_cn', interval, limit, agentUuid);
   if (!res) return null;
   return res.dl.map(r => {
     const name = r.ssl_server_cn?.name ?? r.ssl_server_cn?.label ?? String(r.ssl_server_cn ?? 'Unknown');
@@ -2238,8 +2239,8 @@ async function fetchSSLServerCN(interval = 1440, limit = 30) {
 }
 
 // 17. QUIC Hostname (field: quic_hostname)
-async function fetchQUICHostnames(interval = 1440, limit = 30) {
-  const res = await _dpiTopField('quic_hostname', interval, limit);
+async function fetchQUICHostnames(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('quic_hostname', interval, limit, agentUuid);
   if (!res) return null;
   return res.dl.map(r => {
     const name = r.quic_hostname?.name ?? r.quic_hostname?.label ?? String(r.quic_hostname ?? 'Unknown');
@@ -2253,8 +2254,8 @@ async function fetchQUICHostnames(interval = 1440, limit = 30) {
 }
 
 // 18. BitTorrent Info Hash (field: bittorrent_info_hash)
-async function fetchBitTorrentInfoHashes(interval = 1440, limit = 30) {
-  const res = await _dpiTopField('bittorrent_info_hash', interval, limit);
+async function fetchBitTorrentInfoHashes(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('bittorrent_info_hash', interval, limit, agentUuid);
   if (!res) return null;
   return res.dl.map(r => {
     const hash  = r.bittorrent_info_hash?.hash  ?? r.bittorrent_info_hash?.name ?? String(r.bittorrent_info_hash ?? 'Unknown');
@@ -2270,8 +2271,8 @@ async function fetchBitTorrentInfoHashes(interval = 1440, limit = 30) {
 }
 
 // 19a. SSH Client (field: ssh_client)
-async function fetchSSHClients(interval = 1440, limit = 20) {
-  const res = await _dpiTopField('ssh_client', interval, limit);
+async function fetchSSHClients(interval = 1440, limit = 20, agentUuid = null) {
+  const res = await _dpiTopField('ssh_client', interval, limit, agentUuid);
   if (!res) return null;
   return res.dl.map(r => {
     const label = r.ssh_client?.name ?? r.ssh_client?.label ?? String(r.ssh_client ?? 'Unknown');
@@ -2286,8 +2287,8 @@ async function fetchSSHClients(interval = 1440, limit = 20) {
 }
 
 // 19b. SSH Server (field: ssh_server)
-async function fetchSSHServers(interval = 1440, limit = 20) {
-  const res = await _dpiTopField('ssh_server', interval, limit);
+async function fetchSSHServers(interval = 1440, limit = 20, agentUuid = null) {
+  const res = await _dpiTopField('ssh_server', interval, limit, agentUuid);
   if (!res) return null;
   return res.dl.map(r => {
     const label = r.ssh_server?.name ?? r.ssh_server?.label ?? String(r.ssh_server ?? 'Unknown');
@@ -2302,8 +2303,8 @@ async function fetchSSHServers(interval = 1440, limit = 20) {
 }
 
 // 21. mDNS Hostname (field: mdns_hostname)
-async function fetchMDNSHostnames(interval = 1440, limit = 30) {
-  const res = await _dpiTopField('mdns_hostname', interval, limit);
+async function fetchMDNSHostnames(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('mdns_hostname', interval, limit, agentUuid);
   if (!res) return null;
   return res.dl.map(r => {
     const name = r.mdns_hostname?.name ?? r.mdns_hostname?.label ?? String(r.mdns_hostname ?? 'Unknown');
@@ -2324,13 +2325,13 @@ async function fetchMDNSHostnames(interval = 1440, limit = 30) {
 
 // 22. Cryptocurrency Mining — derive dari apps dengan nama mengandung "crypto" / "mining"
 // + flows ke port mining pool (3333, 4444, 8333, 9999, 14444)
-async function fetchCryptoMining(interval = 1440, limit = 50) {
+async function fetchCryptoMining(interval = 1440, limit = 50, agentUuid = null) {
   const MINING_POOLS_PORTS = new Set([3333, 4444, 5555, 7777, 8333, 9332, 9999, 14444, 45560, 45700]);
   const MINING_APPS = ['bitcoin', 'crypto', 'mining', 'monero', 'ethereum', 'nicehash', 'nanopool', 'f2pool', 'antpool', 'slushpool'];
 
   const [appData, flowsRaw] = await Promise.all([
-    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: 100 }),
-    netifyFetch('/data/flows', { settings_limit: 500 }),
+    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
   ]);
 
   const results = [];
@@ -2384,10 +2385,10 @@ async function fetchCryptoMining(interval = 1440, limit = 50) {
 }
 
 // 23. Device Discovery — derive dari flows (perangkat unik dengan MAC)
-async function fetchDeviceDiscovery(limit = 100) {
+async function fetchDeviceDiscovery(limit = 100, agentUuid = null) {
   const [flowsRaw, dlData] = await Promise.all([
-    netifyFetch('/data/flows', { settings_limit: 500 }),
-    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: 1440, settings_limit: 200 }),
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
+    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: 1440, settings_limit: 200 }, false, agentUuid),
   ]);
 
   const seen = new Map();
@@ -2434,10 +2435,10 @@ async function fetchDeviceDiscovery(limit = 100) {
 }
 
 // 24. Encryption Audit — derive dari TLS security per-IP dari flows
-async function fetchEncryptionAudit(limit = 50) {
+async function fetchEncryptionAudit(limit = 50, agentUuid = null) {
   const [tlsSec, flowsRaw] = await Promise.all([
-    netifyFetch('/data/stats/top/tls_security/download', { filter_interval: 1440, settings_limit: 10 }),
-    netifyFetch('/data/flows', { settings_limit: 500 }),
+    netifyFetch('/data/stats/top/tls_security/download', { filter_interval: 1440, settings_limit: 10 }, false, agentUuid),
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
   ]);
 
   // Hitung per-IP: encrypted vs unencrypted flows
@@ -2485,7 +2486,7 @@ async function fetchEncryptionAudit(limit = 50) {
 }
 
 // 25. Insecure Protocols — derive dari top protocols (confirmed bekerja)
-async function fetchInsecureProtocols(interval = 1440, limit = 50) {
+async function fetchInsecureProtocols(interval = 1440, limit = 50, agentUuid = null) {
   const INSECURE = {
     'HTTP'   : { port: 80,   risk: 'High' },
     'FTP'    : { port: 21,   risk: 'Critical' },
@@ -2504,8 +2505,8 @@ async function fetchInsecureProtocols(interval = 1440, limit = 50) {
   };
 
   const [protoData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/protocol/download', { filter_interval: interval, settings_limit: 100 }),
-    netifyFetch('/data/stats/top/protocol/upload',   { filter_interval: interval, settings_limit: 100 }),
+    netifyFetch('/data/stats/top/protocol/download', { filter_interval: interval, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/stats/top/protocol/upload', { filter_interval: interval, settings_limit: 100 }, false, agentUuid),
   ]);
   if (!protoData) return [];
 
@@ -2538,7 +2539,7 @@ async function fetchInsecureProtocols(interval = 1440, limit = 50) {
 }
 
 // 26. IP Reputation — derive dari top remote_ip + cross-check negara berisiko tinggi
-async function fetchIPReputation(limit = 50) {
+async function fetchIPReputation(limit = 50, agentUuid = null) {
   // Negara dengan risiko tinggi berdasarkan threat intel umum
   const HIGH_RISK_COUNTRIES = new Set([
     'China', 'Russia', 'Iran', 'North Korea', 'Nigeria', 'Romania',
@@ -2546,8 +2547,8 @@ async function fetchIPReputation(limit = 50) {
   ]);
 
   const [ipData, countryData] = await Promise.all([
-    netifyFetch('/data/stats/top/remote_ip/download', { filter_interval: 1440, settings_limit: 100 }),
-    netifyFetch('/data/stats/top/country/download',   { filter_interval: 1440, settings_limit: 50 }),
+    netifyFetch('/data/stats/top/remote_ip/download', { filter_interval: 1440, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/stats/top/country/download', { filter_interval: 1440, settings_limit: 50 }, false, agentUuid),
   ]);
 
   const results = [];
@@ -2602,7 +2603,7 @@ async function fetchIPReputation(limit = 50) {
 }
 
 // 27. Server Discovery — derive dari flows dengan flow_origin=Server + port well-known server
-async function fetchServerDiscovery(limit = 100) {
+async function fetchServerDiscovery(limit = 100, agentUuid = null) {
   const SERVER_PORTS = {
     80: 'HTTP', 443: 'HTTPS', 22: 'SSH', 21: 'FTP', 25: 'SMTP',
     110: 'POP3', 143: 'IMAP', 3306: 'MySQL', 5432: 'PostgreSQL',
@@ -2612,8 +2613,8 @@ async function fetchServerDiscovery(limit = 100) {
   };
 
   const [flowOriginData, flowsRaw] = await Promise.all([
-    netifyFetch('/data/stats/top/flow_origin/download', { filter_interval: 1440, settings_limit: 10 }),
-    netifyFetch('/data/flows', { settings_limit: 500 }),
+    netifyFetch('/data/stats/top/flow_origin/download', { filter_interval: 1440, settings_limit: 10 }, false, agentUuid),
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
   ]);
 
   const serverMap = {};
@@ -2656,12 +2657,12 @@ async function fetchServerDiscovery(limit = 100) {
 }
 
 // 28. Tor Detection — derive dari top remote_ip + app/hostname matching Tor
-async function fetchTorDetection(limit = 50) {
+async function fetchTorDetection(limit = 50, agentUuid = null) {
   const TOR_INDICATORS = ['tor', '.onion', 'torproject', 'torbrowser'];
 
   const [appData, domainData] = await Promise.all([
-    netifyFetch('/data/stats/top/application/download', { filter_interval: 1440, settings_limit: 100 }),
-    netifyFetch('/data/stats/top/hostname/download',    { filter_interval: 1440, settings_limit: 100 }),
+    netifyFetch('/data/stats/top/application/download', { filter_interval: 1440, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/stats/top/hostname/download', { filter_interval: 1440, settings_limit: 100 }, false, agentUuid),
   ]);
 
   const results = [];
@@ -2711,7 +2712,7 @@ async function fetchTorDetection(limit = 50) {
 }
 
 // 29. Unencrypted Passwords — derive dari flows ke port cleartext auth
-async function fetchUnencryptedPasswords(limit = 50) {
+async function fetchUnencryptedPasswords(limit = 50, agentUuid = null) {
   // Port yang dikenal mengirim kredensial cleartext
   const CLEARTEXT_AUTH_PORTS = {
     21  : { protocol: 'FTP',    severity: 'Critical' },
@@ -2726,7 +2727,7 @@ async function fetchUnencryptedPasswords(limit = 50) {
     514 : { protocol: 'rsh',    severity: 'Critical' },
   };
 
-  const flowsRaw = await netifyFetch('/data/flows', { settings_limit: 500 });
+  const flowsRaw = await netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid);
   if (!flowsRaw) return [];
 
   const seen = new Map();
@@ -2760,7 +2761,7 @@ async function fetchUnencryptedPasswords(limit = 50) {
 }
 
 // 30. VPN Detection — derive dari apps/protocols/hostnames yang mengindikasikan VPN
-async function fetchVPNDetection(limit = 50) {
+async function fetchVPNDetection(limit = 50, agentUuid = null) {
   const VPN_APPS = [
     'openvpn', 'wireguard', 'nordvpn', 'expressvpn', 'surfshark', 'tunnelbear',
     'mullvad', 'protonvpn', 'ipvanish', 'pia', 'private internet access',
@@ -2772,9 +2773,9 @@ async function fetchVPNDetection(limit = 50) {
   const VPN_PORTS = new Set([1194, 51820, 500, 4500, 1701, 1723, 8388, 443]);
 
   const [appData, protoData, flowsRaw] = await Promise.all([
-    netifyFetch('/data/stats/top/application/download', { filter_interval: 1440, settings_limit: 100 }),
-    netifyFetch('/data/stats/top/protocol/download',    { filter_interval: 1440, settings_limit: 50 }),
-    netifyFetch('/data/flows', { settings_limit: 500 }),
+    netifyFetch('/data/stats/top/application/download', { filter_interval: 1440, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/stats/top/protocol/download', { filter_interval: 1440, settings_limit: 50 }, false, agentUuid),
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
   ]);
 
   const results = [];
@@ -2849,7 +2850,7 @@ async function fetchVPNDetection(limit = 50) {
 }
 
 async function fetchAgents() {
-  const data = await netifyFetch('/data/stats/top/agent/download', { filter_interval: 43200, settings_limit: 100 });
+  const data = await netifyFetch('/data/stats/top/agent/download', { filter_interval: 43200, settings_limit: 100 }, false, null);
   if (!data || !Array.isArray(data)) return [];
   return data.map(r => ({
     id: r.agent?.id,
