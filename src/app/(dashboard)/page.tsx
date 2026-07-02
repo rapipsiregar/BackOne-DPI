@@ -42,6 +42,9 @@ export default function SummaryPage() {
 
   const isLoading = summary.isLoading || timeline.isLoading || topApps.isLoading || topProtocols.isLoading;
 
+  const downloadSpeedBits = summary.data?.download_speed ? summary.data.download_speed * 8 : 0;
+  const uploadSpeedBits = summary.data?.upload_speed ? summary.data.upload_speed * 8 : 0;
+
   return (
     <div className="space-y-8 animate-fade-in pb-10">
       <div className="flex items-center justify-between">
@@ -69,6 +72,16 @@ export default function SummaryPage() {
               <div className="text-3xl font-bold text-white tracking-tight">
                 {summary.data ? fmtBytes(summary.data.bandwidth_down) : "0 B"}
               </div>
+              {summary.data?.download_speed !== undefined && summary.data.download_speed > 0 && (
+                <div className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1 group-hover:text-blue-400/80 transition-colors">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  Speed: {downloadSpeedBits >= 1e6 
+                    ? `${(downloadSpeedBits / 1e6).toFixed(1)} Mbps` 
+                    : downloadSpeedBits >= 1e3 
+                    ? `${(downloadSpeedBits / 1e3).toFixed(1)} Kbps` 
+                    : `${downloadSpeedBits} bps`}
+                </div>
+              )}
             </CardContent>
           </Card>
         </Link>
@@ -86,6 +99,16 @@ export default function SummaryPage() {
               <div className="text-3xl font-bold text-white tracking-tight">
                 {summary.data ? fmtBytes(summary.data.bandwidth_up) : "0 B"}
               </div>
+              {summary.data?.upload_speed !== undefined && summary.data.upload_speed > 0 && (
+                <div className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1 group-hover:text-emerald-400/80 transition-colors">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Speed: {uploadSpeedBits >= 1e6 
+                    ? `${(uploadSpeedBits / 1e6).toFixed(1)} Mbps` 
+                    : uploadSpeedBits >= 1e3 
+                    ? `${(uploadSpeedBits / 1e3).toFixed(1)} Kbps` 
+                    : `${uploadSpeedBits} bps`}
+                </div>
+              )}
             </CardContent>
           </Card>
         </Link>
@@ -120,6 +143,12 @@ export default function SummaryPage() {
               <div className="text-3xl font-bold text-white tracking-tight">
                 {summary.data?.active_flows?.toLocaleString() || "0"}
               </div>
+              {summary.data?.flow_speed !== undefined && summary.data.flow_speed > 0 && (
+                <div className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1 group-hover:text-purple-400/80 transition-colors">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                  Speed: {summary.data.flow_speed.toLocaleString()} /hr
+                </div>
+              )}
             </CardContent>
           </Card>
         </Link>

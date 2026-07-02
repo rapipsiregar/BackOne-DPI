@@ -6,9 +6,34 @@ const { runPoll } = require('../scheduler');
 
 // GET /api/dashboard/summary — kartu ringkasan (top of page)
 router.get('/summary', (req, res) => {
-  const stats = db.getStats(req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
-  const timeline = db.getBandwidthTimeline(1, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
+  const isAgent = req.user?.role === 'AGENT_VIEWER';
+  const stats = db.getStats(req.user?.site_uuid, isAgent ? req.user?.agent_uuid : null);
+  const timeline = db.getBandwidthTimeline(1, req.user?.site_uuid, isAgent ? req.user?.agent_uuid : null);
   const latest = timeline[0] ?? {};
+
+  let bandwidth_down = latest.total_download ?? 0;
+  let bandwidth_up = latest.total_upload ?? 0;
+  let active_flows = stats.activeFlows;
+  let download_speed = latest.download_speed ?? 0;
+  let upload_speed = latest.upload_speed ?? 0;
+  let flow_speed = latest.flow_speed ?? 0;
+
+  if (isAgent) {
+    const siteTimeline = db.getBandwidthTimeline(1, req.user?.site_uuid, null);
+    const siteLatest = siteTimeline[0] ?? {};
+    const siteStats = db.getStats(req.user?.site_uuid, null);
+
+    const download_ratio = siteLatest.total_download > 0 ? (bandwidth_down / siteLatest.total_download) : 0;
+    const upload_ratio = siteLatest.total_upload > 0 ? (bandwidth_up / siteLatest.total_upload) : 0;
+    const flow_ratio = siteStats.activeFlows > 0 ? (stats.activeFlows / siteStats.activeFlows) : download_ratio;
+
+    active_flows = Math.round((siteLatest.total_flows ?? 0) * flow_ratio);
+    download_speed = Math.round((siteLatest.download_speed ?? 0) * download_ratio);
+    upload_speed = Math.round((siteLatest.upload_speed ?? 0) * upload_ratio);
+    flow_speed = Math.round((siteLatest.flow_speed ?? 0) * flow_ratio);
+  } else {
+    active_flows = latest.total_flows ?? stats.activeFlows;
+  }
 
   res.json({
     ok: true,
@@ -17,9 +42,12 @@ router.get('/summary', (req, res) => {
       total_threats: stats.totalThreats,
       total_events: stats.totalEvents,
       last_fetch: stats.lastFetch,
-      bandwidth_down: latest.total_download ?? 0,
-      bandwidth_up: latest.total_upload ?? 0,
-      active_flows: stats.activeFlows,
+      bandwidth_down,
+      bandwidth_up,
+      active_flows,
+      download_speed,
+      upload_speed,
+      flow_speed,
     }
   });
 });

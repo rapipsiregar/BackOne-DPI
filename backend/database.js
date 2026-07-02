@@ -75,6 +75,17 @@ function initSchema() {
     // Column already exists, safe to ignore
   }
 
+  // Alter bandwidth_timeline table to add new speed columns dynamically if they do not exist
+  try {
+    d.exec("ALTER TABLE bandwidth_timeline ADD COLUMN download_speed INTEGER DEFAULT 0");
+  } catch (_) {}
+  try {
+    d.exec("ALTER TABLE bandwidth_timeline ADD COLUMN upload_speed INTEGER DEFAULT 0");
+  } catch (_) {}
+  try {
+    d.exec("ALTER TABLE bandwidth_timeline ADD COLUMN flow_speed INTEGER DEFAULT 0");
+  } catch (_) {}
+
   const adminExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'admin'").get();
   if (adminExists.count === 0) {
     const hash = bcrypt.hashSync('admin123', 10);
@@ -554,7 +565,9 @@ function initSchema() {
     site_uuid TEXT,
     fetched_at TEXT NOT NULL,
     total_download INTEGER DEFAULT 0, total_upload INTEGER DEFAULT 0,
-    total_flows INTEGER DEFAULT 0, active_devices INTEGER DEFAULT 0
+    total_flows INTEGER DEFAULT 0, active_devices INTEGER DEFAULT 0,
+    download_speed INTEGER DEFAULT 0, upload_speed INTEGER DEFAULT 0,
+    flow_speed INTEGER DEFAULT 0
   )`);
 
   d.exec(`CREATE TABLE IF NOT EXISTS geoip_cache (
@@ -766,10 +779,19 @@ function insertBandwidthTimeline(summary, fetchedAt, siteUuid) {
   const d = getDB();
   d.prepare(`
     INSERT INTO bandwidth_timeline
-    (site_uuid, fetched_at, total_download, total_upload, total_flows, active_devices)
-    VALUES (?, ?, ?, ?, ?, ?)
+    (site_uuid, fetched_at, total_download, total_upload, total_flows, active_devices, download_speed, upload_speed, flow_speed)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    siteUuid, fetchedAt, summary.download ?? 0, summary.upload ?? 0, summary.flows ?? 0, summary.devices ?? 0);
+    siteUuid,
+    fetchedAt,
+    summary.download ?? 0,
+    summary.upload ?? 0,
+    summary.flows ?? 0,
+    summary.devices ?? 0,
+    summary.download_speed ?? 0,
+    summary.upload_speed ?? 0,
+    summary.flow_speed ?? 0
+  );
 }
 
 // ─── QUERY FUNCTIONS ──────────────────────────────────────────────────────────

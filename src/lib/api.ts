@@ -96,6 +96,9 @@ export interface DashboardSummary {
   bandwidth_down: number;
   bandwidth_up: number;
   active_flows: number;
+  download_speed?: number;
+  upload_speed?: number;
+  flow_speed?: number;
 }
 
 export interface TimelinePoint {

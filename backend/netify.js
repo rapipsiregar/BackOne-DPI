@@ -17,6 +17,16 @@ function headersSite(useApiKey = false) {
 }
 
 function getMockDataForPath(path, params = {}) {
+  if (path.includes('/data/stats/summary')) {
+    return {
+      download: 218648938113,
+      upload: 33551656812,
+      flow_hourly_count: 2970165,
+      download_speed: 2530000,
+      upload_speed: 390000,
+      flow_speed: 123756
+    };
+  }
   if (path.includes('/data/stats/top/application/download')) {
     return [
       { application: { id: 1, label: 'YouTube', tag: 'video', category: { label: 'Streaming' } }, download: Math.floor(Math.random() * 50000000) + 10000000, flows: Math.floor(Math.random() * 200) + 50 },
@@ -575,7 +585,20 @@ async function fetchTopDomains(interval = 1440, limit = 50) {
 
 // ─── BANDWIDTH SUMMARY untuk timeline ─────────────────────────────────────────
 async function fetchBandwidthSummary(interval = 30) {
-  // Pakai interval PENDEK (30 menit) untuk timeline supaya ada variasi naik turun
+  const rawSummary = await netifyFetch('/data/stats/summary', { filter_interval: interval });
+  if (rawSummary) {
+    return {
+      download: rawSummary.download ?? 0,
+      upload: rawSummary.upload ?? 0,
+      flows: rawSummary.flow_hourly_count ?? 0,
+      download_speed: rawSummary.download_speed ?? 0,
+      upload_speed: rawSummary.upload_speed ?? 0,
+      flow_speed: rawSummary.flow_speed ?? 0,
+      devices: 0,
+    };
+  }
+
+  // Fallback to old way (aggregate top 100 application stats)
   const [dlData, ulData] = await Promise.all([
     netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: 100 }),
     netifyFetch('/data/stats/top/application/upload',   { filter_interval: interval, settings_limit: 100 }),
@@ -585,7 +608,15 @@ async function fetchBandwidthSummary(interval = 30) {
   const upload   = (ulData ?? []).reduce((s, r) => s + (r.upload   ?? 0), 0);
   const flows    = (dlData ?? []).reduce((s, r) => s + (r.flows    ?? 0), 0);
 
-  return { download, upload, flows, devices: dlData?.length ?? 0 };
+  return {
+    download,
+    upload,
+    flows,
+    download_speed: 0,
+    upload_speed: 0,
+    flow_speed: 0,
+    devices: dlData?.length ?? 0
+  };
 }
 
 // ─── THREATS — gunakan flows dengan filter anomali sebagai fallback ────────────
