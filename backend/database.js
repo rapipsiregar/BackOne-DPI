@@ -71,6 +71,8 @@ function initSchema() {
     role TEXT NOT NULL DEFAULT 'AGENT_VIEWER',
     site_uuid TEXT DEFAULT NULL,
     agent_uuid TEXT DEFAULT NULL,
+    account_name TEXT DEFAULT NULL,
+    profile_picture TEXT DEFAULT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   )`);
 
@@ -92,41 +94,18 @@ function initSchema() {
     d.exec("ALTER TABLE bandwidth_timeline ADD COLUMN flow_speed INTEGER DEFAULT 0");
   } catch (_) {}
 
+  try {
+    d.exec("ALTER TABLE users ADD COLUMN account_name TEXT DEFAULT NULL");
+    d.exec("ALTER TABLE users ADD COLUMN profile_picture TEXT DEFAULT NULL");
+  } catch (e) {
+    // Columns already exist, safe to ignore
+  }
+
   const adminExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'admin'").get();
   if (adminExists.count === 0) {
     const hash = bcrypt.hashSync('admin123', 10);
     d.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)").run('admin', hash, 'SUPER_ADMIN');
     console.log('[DB] Created default admin user (admin / admin123)');
-  }
-
-  const agentExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'agent1'").get();
-  if (agentExists.count === 0) {
-    const hash = bcrypt.hashSync('agent123', 10);
-    const site_uuid = process.env.NETIFY_SITE_UUID || '6681452d_9cae_4ff4_8ae8_0d504774265e';
-    d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)").run('agent1', hash, 'AGENT_VIEWER', site_uuid, '8A-V3-PB-85');
-    console.log('[DB] Created default agent user (agent1 / agent123)');
-  }
-
-  // Seed specific agent accounts for testing isolation
-  const agentJrpExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'agent_jrp'").get();
-  if (agentJrpExists.count === 0) {
-    const hash = bcrypt.hashSync('agent123', 10);
-    d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)").run('agent_jrp', hash, 'AGENT_VIEWER', '6681452d_9cae_4ff4_8ae8_0d504774265e', '2F-TF-1D-GK');
-    console.log('[DB] Created JRP Cibubur agent user (agent_jrp / agent123)');
-  }
-
-  const agentIfgExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'agent_ifg'").get();
-  if (agentIfgExists.count === 0) {
-    const hash = bcrypt.hashSync('agent123', 10);
-    d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)").run('agent_ifg', hash, 'AGENT_VIEWER', '6681452d_9cae_4ff4_8ae8_0d504774265e', '8A-V3-PB-85');
-    console.log('[DB] Created IFG LT.18 agent user (agent_ifg / agent123)');
-  }
-
-  const agentCpiExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'agent_cpi'").get();
-  if (agentCpiExists.count === 0) {
-    const hash = bcrypt.hashSync('agent123', 10);
-    d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)").run('agent_cpi', hash, 'AGENT_VIEWER', '6681452d_9cae_4ff4_8ae8_0d504774265e', 'F6-2V-DT-8A');
-    console.log('[DB] Created CPI Balaraja agent user (agent_cpi / agent123)');
   }
 
   d.exec(`CREATE TABLE IF NOT EXISTS tls_versions (
@@ -2421,6 +2400,9 @@ function getDataInterval() {
 module.exports = {
   getUserByUsername,
   updateUserPassword,
+  updateUserUsername,
+  updateUserAccountName,
+  updateUserProfilePicture,
   syncAgentUsers,
   getDB,
   getDataInterval,
@@ -2457,6 +2439,18 @@ function updateUserPassword(userId, newPasswordHash) {
   return getDB().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newPasswordHash, userId);
 }
 
+function updateUserUsername(userId, newUsername) {
+  return getDB().prepare('UPDATE users SET username = ? WHERE id = ?').run(newUsername, userId);
+}
+
+function updateUserAccountName(userId, newAccountName) {
+  return getDB().prepare('UPDATE users SET account_name = ? WHERE id = ?').run(newAccountName, userId);
+}
+
+function updateUserProfilePicture(userId, filename) {
+  return getDB().prepare('UPDATE users SET profile_picture = ? WHERE id = ?').run(filename, userId);
+}
+
 function syncAgentUsers(agents) {
   const d = getDB();
   const bcrypt = require('bcryptjs');
@@ -2482,7 +2476,7 @@ function syncAgentUsers(agents) {
     if (exists1.count === 0) {
       d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)")
        .run(usernameUuidLower, hash, 'AGENT_VIEWER', siteUuid, uuid);
-      console.log(`[DB] Created default user: ${usernameUuidLower} / agent123`);
+      console.log(`[DB] Created default user: ${usernameUuidLower} / 123`);
     }
 
     // Create username = uppercase uuid (e.g. '1R-79-J9-YE')
@@ -2491,7 +2485,7 @@ function syncAgentUsers(agents) {
     if (exists1u.count === 0) {
       d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)")
        .run(usernameUuidUpper, hash, 'AGENT_VIEWER', siteUuid, uuid);
-      console.log(`[DB] Created default user: ${usernameUuidUpper} / agent123`);
+      console.log(`[DB] Created default user: ${usernameUuidUpper} / 123`);
     }
 
     // Create username = sanitized lowercase label (e.g. 'agent_cpi_balaraja_wan')
@@ -2501,7 +2495,7 @@ function syncAgentUsers(agents) {
     if (exists2.count === 0) {
       d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)")
        .run(usernameLabel, hash, 'AGENT_VIEWER', siteUuid, uuid);
-      console.log(`[DB] Created default user: ${usernameLabel} / agent123`);
+      console.log(`[DB] Created default user: ${usernameLabel} / 123`);
     }
 
     // Create username = name/label directly (e.g. 'CPI Balaraja WAN' -> 'CPI Balaraja WAN' or 'JRP Cibubur')
@@ -2509,7 +2503,7 @@ function syncAgentUsers(agents) {
     if (exists3.count === 0) {
       d.prepare("INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid) VALUES (?, ?, ?, ?, ?)")
        .run(label, hash, 'AGENT_VIEWER', siteUuid, uuid);
-      console.log(`[DB] Created default user: ${label} / agent123`);
+      console.log(`[DB] Created default user: ${label} / 123`);
     }
   }
 }

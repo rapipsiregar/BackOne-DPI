@@ -30,6 +30,8 @@ export default function SummaryPage() {
     return countries.data.map((row) => ({
       countryCode: row.country_code,
       value: row.download + row.upload,
+      download: row.download,
+      upload: row.upload,
       label: row.country_name,
     }));
   }, [countries.data]);

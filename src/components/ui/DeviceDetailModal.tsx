@@ -75,7 +75,7 @@ function sevStyle(sev: string | null) {
     case "high":     return "bg-orange-500/15 text-orange-400 ring-1 ring-orange-500/30";
     case "warning":  return "bg-yellow-500/15 text-yellow-400 ring-1 ring-yellow-500/30";
     case "info":     return "bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/30";
-    default:         return "bg-slate-700/40 text-slate-400";
+    default:         return "bg-slate-700/40 text-muted-foreground";
   }
 }
 
@@ -87,17 +87,17 @@ function riskStyle(lvl: string | null) {
     case "sedang":   return { bar: "bg-yellow-500", badge: "bg-yellow-500/15 text-yellow-400 ring-1 ring-yellow-500/30" };
     case "low":
     case "aman":     return { bar: "bg-green-500",  badge: "bg-green-500/15 text-green-400 ring-1 ring-green-500/30" };
-    default:         return { bar: "bg-slate-500",  badge: "bg-slate-700/40 text-slate-400" };
+    default:         return { bar: "bg-slate-500",  badge: "bg-slate-700/40 text-muted-foreground" };
   }
 }
 
 function TableWrap({ head, children }: { head: string[]; children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-white/5">
+    <div className="overflow-x-auto rounded-xl border border-border/50">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-white/10 bg-white/[0.02]">
-            {head.map((h) => <th key={h} className="px-3 py-2 text-left font-medium text-slate-400 whitespace-nowrap">{h}</th>)}
+          <tr className="border-b border-border bg-muted/50">
+            {head.map((h) => <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{h}</th>)}
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">{children}</tbody>
@@ -107,7 +107,7 @@ function TableWrap({ head, children }: { head: string[]; children: React.ReactNo
 }
 
 function Empty({ msg }: { msg: string }) {
-  return <p className="text-slate-500 text-sm text-center py-10">{msg}</p>;
+  return <p className="text-muted-foreground text-sm text-center py-10">{msg}</p>;
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -116,6 +116,14 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
   const [isLoading, setIsLoading] = useState(true);
   const [error,     setError]     = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("info");
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 480);
+  };
 
   useEffect(() => {
     setIsLoading(true);
@@ -146,61 +154,61 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
   ];
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={handleClose}>
+      <div className={`absolute inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`} />
       <div
-        className="relative bg-[#0b0f16] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl shadow-black/70 animate-slide-up"
+        className={`relative bg-card border border-border rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl shadow-black/70 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-gradient-to-r from-cyan-900/30 to-teal-900/20 rounded-t-2xl flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-cyan-900/30 to-teal-900/20 rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-cyan-500/20 rounded-lg ring-1 ring-cyan-500/30">
               <Monitor className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white leading-tight">
+              <h3 className="text-base font-bold text-card-foreground leading-tight">
                 {di?.device_label || deviceLabel || ip}
               </h3>
               <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                 <span className="text-xs text-cyan-400 font-mono">{ip}</span>
                 {(di?.mac_address || macAddress) && (
-                  <span className="text-xs text-slate-500 font-mono">{di?.mac_address || macAddress}</span>
+                  <span className="text-xs text-muted-foreground font-mono">{di?.mac_address || macAddress}</span>
                 )}
                 {di?.os_label && (
                   <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">{di.os_label}</span>
                 )}
                 {di?.device_type && (
-                  <span className="text-xs text-slate-400 bg-white/5 px-2 py-0.5 rounded">{di.device_type}</span>
+                  <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded">{di.device_type}</span>
                 )}
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all flex-shrink-0">
+          <button onClick={handleClose} className="p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-lg transition-all flex-shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* ── Body ── */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
-              <p className="text-slate-400 text-sm">Loading device data…</p>
+              <p className="text-muted-foreground text-sm">Loading device data…</p>
             </div>
           ) : error ? (
             <div className="p-6 text-center text-red-400 text-sm">{error}</div>
           ) : data ? (
             <>
               {/* ── KPI bar ── */}
-              <div className="grid grid-cols-3 gap-3 px-6 py-3 border-b border-white/5 bg-white/[0.01] flex-shrink-0">
+              <div className="grid grid-cols-3 gap-3 px-6 py-3 border-b border-border/50 bg-muted/30 flex-shrink-0">
                 {[
                   { label: "Download",   value: fmtBytes(data.total_download), color: "text-cyan-400" },
                   { label: "Upload",     value: fmtBytes(data.total_upload),   color: "text-green-400" },
-                  { label: "Total Flows",value: data.flow_count,               color: "text-white" },
+                  { label: "Total Flows",value: data.flow_count,               color: "text-card-foreground" },
                 ].map(k => (
                   <div key={k.label} className="text-center">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">{k.label}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{k.label}</p>
                     <p className={`text-xl font-bold ${k.color}`}>{k.value}</p>
                   </div>
                 ))}
@@ -216,18 +224,18 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
 
               {/* ── MAC bandwidth strip ── */}
               {data.mac_bandwidth && (
-                <div className="mx-6 mt-2 flex items-center gap-3 px-3 py-2 bg-white/[0.02] border border-white/5 rounded-lg text-xs">
-                  <Wifi className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span className="text-slate-400 font-mono">{data.mac_bandwidth.mac_address}</span>
-                  <span className="text-slate-500">{data.mac_bandwidth.manufacturer || "Unknown"}</span>
+                <div className="mx-6 mt-2 flex items-center gap-3 px-3 py-2 bg-muted/50 border border-border/50 rounded-lg text-xs">
+                  <Wifi className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <span className="text-muted-foreground font-mono">{data.mac_bandwidth.mac_address}</span>
+                  <span className="text-muted-foreground">{data.mac_bandwidth.manufacturer || "Unknown"}</span>
                   <span className="ml-auto text-cyan-400">↓ {fmtBytes(data.mac_bandwidth.download)}</span>
                   <span className="text-green-400">↑ {fmtBytes(data.mac_bandwidth.upload)}</span>
-                  <span className="text-slate-400 font-medium">Total: {fmtBytes(data.mac_bandwidth.total)}</span>
+                  <span className="text-muted-foreground font-medium">Total: {fmtBytes(data.mac_bandwidth.total)}</span>
                 </div>
               )}
 
               {/* ── Tabs ── */}
-              <div className="flex gap-1 px-6 py-3 border-b border-white/5 flex-shrink-0 flex-wrap">
+              <div className="flex gap-1 px-6 py-3 border-b border-border/50 flex-shrink-0 flex-wrap">
                 {tabs.map((tab) => (
                   <button
                     key={tab.key}
@@ -235,7 +243,7 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                     className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       activeTab === tab.key
                         ? "bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-500/40"
-                        : "text-slate-400 hover:text-white hover:bg-white/5"
+                        : "text-muted-foreground hover:text-card-foreground hover:bg-secondary"
                     }`}
                   >
                     {tab.icon}
@@ -259,8 +267,8 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                 {activeTab === "info" && (
                   <div className="space-y-4">
                     {/* Device identity card */}
-                    <div className="p-4 bg-white/[0.02] border border-white/5 rounded-xl space-y-3">
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Informasi Device</p>
+                    <div className="p-4 bg-muted/50 border border-border/50 rounded-xl space-y-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Informasi Device</p>
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         {[
                           { label: "Label",        value: di?.device_label },
@@ -272,8 +280,8 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                           { label: "Is New",       value: di?.is_new === 1 ? "Perangkat Baru ✨" : di?.is_new === 0 ? "Dikenal" : null },
                         ].filter(f => f.value).map(f => (
                           <div key={f.label} className="flex flex-col gap-0.5">
-                            <span className="text-xs text-slate-500">{f.label}</span>
-                            <span className="text-xs font-medium text-white font-mono">{String(f.value)}</span>
+                            <span className="text-xs text-muted-foreground">{f.label}</span>
+                            <span className="text-xs font-medium text-card-foreground font-mono">{String(f.value)}</span>
                           </div>
                         ))}
                       </div>
@@ -282,22 +290,22 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                     {/* Top domains */}
                     {data.top_domains.length > 0 && (
                       <div>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Top Domains Diakses</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Top Domains Diakses</p>
                         <div className="space-y-1.5">
                           {data.top_domains.map((d, i) => {
                             const maxDl = Math.max(...data.top_domains.map(x => x.download), 1);
                             const pct = (d.download / maxDl) * 100;
                             return (
-                              <div key={i} className="flex items-center gap-3 p-2 bg-white/[0.02] rounded-lg">
+                              <div key={i} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
                                 <div className="flex-1 min-w-0">
                                   <p className="text-xs text-slate-200 truncate font-mono">{d.domain}</p>
-                                  <div className="h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
+                                  <div className="h-1 bg-secondary rounded-full mt-1 overflow-hidden">
                                     <div className="h-full bg-gradient-to-r from-teal-500 to-cyan-500 rounded-full" style={{ width: `${pct}%` }} />
                                   </div>
                                 </div>
                                 <div className="flex-shrink-0 text-right">
                                   <p className="text-xs text-cyan-400">{fmtBytes(d.download)}</p>
-                                  <p className="text-[10px] text-slate-500">{d.flow_count} flows</p>
+                                  <p className="text-[10px] text-muted-foreground">{d.flow_count} flows</p>
                                 </div>
                               </div>
                             );
@@ -320,19 +328,19 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                               <span className="font-mono text-xs text-blue-400 block">{f.dst_ip || "—"}</span>
                               {f.dst_ip && <IpDetails ip={f.dst_ip} />}
                             </td>
-                            <td className="px-3 py-2 text-xs text-slate-400">{f.dst_port ?? "—"}</td>
+                            <td className="px-3 py-2 text-xs text-muted-foreground">{f.dst_port ?? "—"}</td>
                             <td className="px-3 py-2 max-w-[180px]">
                               <span className="text-xs text-teal-300 font-mono truncate block" title={exp.main}>
                                 {exp.main}
                               </span>
                               {exp.sub && (
-                                <span className="text-[10px] text-slate-500 block italic">{exp.sub}</span>
+                                <span className="text-[10px] text-muted-foreground block italic">{exp.sub}</span>
                               )}
                             </td>
-                            <td className="px-3 py-2 text-xs text-slate-400">{f.protocol || "—"}</td>
+                            <td className="px-3 py-2 text-xs text-muted-foreground">{f.protocol || "—"}</td>
                             <td className="px-3 py-2 text-right text-xs text-cyan-400 whitespace-nowrap">{fmtBytes(f.download)}</td>
                             <td className="px-3 py-2 text-right text-xs text-green-400 whitespace-nowrap">{fmtBytes(f.upload)}</td>
-                            <td className="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">{f.last_seen?.slice(0, 16) || "—"}</td>
+                            <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{f.last_seen?.slice(0, 16) || "—"}</td>
                           </tr>
                         );
                       })}
@@ -347,15 +355,15 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                     : (
                       <div className="space-y-2">
                         {/* Legend */}
-                        <div className="flex items-center gap-3 pb-1 mb-1 border-b border-white/5 flex-wrap">
-                          <span className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                        <div className="flex items-center gap-3 pb-1 mb-1 border-b border-border/50 flex-wrap">
+                          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                             <Globe className="w-3 h-3 text-teal-400" /> Domain / Website
                           </span>
-                          <span className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                             <Shield className="w-3 h-3 text-blue-400" /> Protokol
                           </span>
-                          <span className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                            <Link className="w-3 h-3 text-slate-500" /> Port
+                          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <Link className="w-3 h-3 text-muted-foreground" /> Port
                           </span>
                         </div>
 
@@ -372,10 +380,10 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                                            : isProtocol ? 'from-blue-500 to-indigo-500'
                                            : 'from-slate-600 to-slate-500';
                           const iconBg     = isDomain ? 'bg-teal-500/15' : isProtocol ? 'bg-blue-500/15' : 'bg-slate-700/40';
-                          const iconColor  = isDomain ? 'text-teal-400' : isProtocol ? 'text-blue-400' : 'text-slate-500';
+                          const iconColor  = isDomain ? 'text-teal-400' : isProtocol ? 'text-blue-400' : 'text-muted-foreground';
 
                           return (
-                            <div key={i} className="p-3 bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 rounded-xl transition-colors">
+                            <div key={i} className="p-3 bg-white/[0.03] hover:bg-white/[0.06] border border-border/50 rounded-xl transition-colors">
                               <div className="flex items-start gap-3 mb-1.5">
                                 {/* Icon */}
                                 <div className={`w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center ${iconBg}`}>
@@ -391,7 +399,7 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                                   <div className="flex items-center gap-2 flex-wrap">
                                     {/* Main label: domain name or protocol */}
                                     <span className={`font-medium text-sm truncate max-w-[200px] ${
-                                      isDomain ? 'text-teal-200 font-mono' : isProtocol ? 'text-blue-200' : 'text-slate-400'
+                                      isDomain ? 'text-teal-200 font-mono' : isProtocol ? 'text-blue-200' : 'text-muted-foreground'
                                     }`}>
                                       {a.label}
                                     </span>
@@ -412,8 +420,8 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
 
                                 {/* Stats */}
                                 <div className="text-right flex-shrink-0">
-                                  <p className="text-xs font-mono text-white">{fmtBytes(total)}</p>
-                                  <p className="text-[10px] text-slate-500">{a.flow_count} flows</p>
+                                  <p className="text-xs font-mono text-card-foreground">{fmtBytes(total)}</p>
+                                  <p className="text-[10px] text-muted-foreground">{a.flow_count} flows</p>
                                 </div>
                               </div>
 
@@ -424,7 +432,7 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                               </div>
 
                               {/* Progress bar */}
-                              <div className="h-1 bg-white/5 rounded-full overflow-hidden ml-10">
+                              <div className="h-1 bg-secondary rounded-full overflow-hidden ml-10">
                                 <div
                                   className={`h-full bg-gradient-to-r ${barColor} rounded-full transition-all`}
                                   style={{ width: `${pct}%` }}
@@ -445,9 +453,9 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                   const { bar, badge } = riskStyle(enc.risk_level);
                   return (
                     <div className="space-y-4">
-                      <div className="p-5 bg-white/[0.02] border border-white/5 rounded-xl">
+                      <div className="p-5 bg-muted/50 border border-border/50 rounded-xl">
                         <div className="flex items-center justify-between mb-4">
-                          <p className="text-sm font-semibold text-white">Status Enkripsi Traffic</p>
+                          <p className="text-sm font-semibold text-card-foreground">Status Enkripsi Traffic</p>
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${badge}`}>
                             {enc.risk_level || "Unknown"}
                           </span>
@@ -465,32 +473,32 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                               />
                             </svg>
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-xl font-bold text-white">{pct}%</span>
+                              <span className="text-xl font-bold text-card-foreground">{pct}%</span>
                             </div>
                           </div>
                           <div className="flex-1 space-y-2">
                             <div>
                               <div className="flex justify-between text-xs mb-1">
-                                <span className="text-slate-400">Terenkripsi</span>
+                                <span className="text-muted-foreground">Terenkripsi</span>
                                 <span className="text-green-400">{fmtBytes(enc.encrypted_bytes ?? 0)}</span>
                               </div>
-                              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                              <div className="h-2 bg-secondary rounded-full overflow-hidden">
                                 <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
                               </div>
                             </div>
                             <div>
                               <div className="flex justify-between text-xs mb-1">
-                                <span className="text-slate-400">Tidak Terenkripsi</span>
+                                <span className="text-muted-foreground">Tidak Terenkripsi</span>
                                 <span className="text-red-400">{fmtBytes(enc.unencrypted_bytes ?? 0)}</span>
                               </div>
-                              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                              <div className="h-2 bg-secondary rounded-full overflow-hidden">
                                 <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${100 - pct}%` }} />
                               </div>
                             </div>
                           </div>
                         </div>
 
-                        <div className="text-xs text-slate-500 text-right">
+                        <div className="text-xs text-muted-foreground text-right">
                           Total: {fmtBytes(enc.total_bytes ?? 0)}
                         </div>
                       </div>
@@ -525,9 +533,9 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                             </span>
                           </td>
                           <td className="px-3 py-2 text-xs text-slate-300 font-mono truncate max-w-[140px]">{s.hostname || "—"}</td>
-                          <td className="px-3 py-2 text-xs text-slate-400">{s.port ?? "—"}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">{s.port ?? "—"}</td>
                           <td className="px-3 py-2 text-xs text-purple-300">{s.protocol || "—"}</td>
-                          <td className="px-3 py-2 text-xs text-slate-500">{s.os_label || "—"}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">{s.os_label || "—"}</td>
                           <td className="px-3 py-2 text-right text-xs text-cyan-400">{fmtBytes(s.download)}</td>
                           <td className="px-3 py-2 text-right text-xs text-green-400">{fmtBytes(s.upload)}</td>
                         </tr>
@@ -541,7 +549,7 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                   data.unencrypted_passwords.length === 0
                     ? <div className="text-center py-10">
                         <p className="text-green-400 text-2xl mb-2">✅</p>
-                        <p className="text-slate-400 text-sm">Tidak ada password cleartext yang terdeteksi.</p>
+                        <p className="text-muted-foreground text-sm">Tidak ada password cleartext yang terdeteksi.</p>
                       </div>
                     : (
                       <div className="space-y-3">
@@ -558,7 +566,7 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                                   {p.dst_ip && <IpDetails ip={p.dst_ip} />}
                                 </div>
                               </td>
-                              <td className="px-3 py-2 text-xs text-slate-400">{p.dst_port ?? "—"}</td>
+                              <td className="px-3 py-2 text-xs text-muted-foreground">{p.dst_port ?? "—"}</td>
                               <td className="px-3 py-2 text-xs text-slate-300">{p.protocol || "—"}</td>
                               <td className="px-3 py-2 text-xs text-yellow-300 font-mono">{p.username || "—"}</td>
                               <td className="px-3 py-2">
@@ -588,7 +596,7 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                           </td>
                           <td className="px-3 py-2 text-xs text-slate-300">{r.reputation || "—"}</td>
                           <td className="px-3 py-2 text-xs text-yellow-400">{r.score ?? "—"}</td>
-                          <td className="px-3 py-2 text-xs text-slate-400">{r.country || "—"}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">{r.country || "—"}</td>
                           <td className="px-3 py-2 text-xs text-purple-300 truncate max-w-[80px]">{r.app_label || "—"}</td>
                           <td className="px-3 py-2 text-xs">
                             {r.blacklisted
@@ -607,27 +615,27 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
                   <div className="space-y-6">
                     {/* VPN */}
                     <section>
-                      <h4 className="flex items-center gap-2 text-sm font-semibold text-white mb-3">
+                      <h4 className="flex items-center gap-2 text-sm font-semibold text-card-foreground mb-3">
                         <Shield className="w-4 h-4 text-blue-400" /> Deteksi VPN
-                        <span className="ml-auto text-xs text-slate-500">{data.vpn_detections.length} records</span>
+                        <span className="ml-auto text-xs text-muted-foreground">{data.vpn_detections.length} records</span>
                       </h4>
                       {data.vpn_detections.length === 0 ? (
-                        <p className="text-slate-500 text-xs">Tidak ada penggunaan VPN yang terdeteksi.</p>
+                        <p className="text-muted-foreground text-xs">Tidak ada penggunaan VPN yang terdeteksi.</p>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {data.vpn_detections.map((v, i) => (
                             <div key={i} className="p-3 bg-blue-500/5 border border-blue-500/15 rounded-xl text-xs space-y-1">
                               <div className="flex justify-between">
                                 <span className="text-blue-400 font-medium">{v.vpn_type || "Unknown VPN"}</span>
-                                <span className="text-slate-500">{v.country || "—"}</span>
+                                <span className="text-muted-foreground">{v.country || "—"}</span>
                               </div>
                               {v.remote_ip && (
-                                <div className="text-slate-400 font-mono flex flex-col gap-0.5 mt-0.5">
+                                <div className="text-muted-foreground font-mono flex flex-col gap-0.5 mt-0.5">
                                   <span>→ {v.remote_ip}</span>
                                   <IpDetails ip={v.remote_ip} />
                                 </div>
                               )}
-                              <div className="flex gap-2 text-slate-500">
+                              <div className="flex gap-2 text-muted-foreground">
                                 <span>{v.protocol || "—"}</span>
                                 {v.confidence !== null && v.confidence !== undefined && (
                                   <span className="ml-auto text-purple-400">
@@ -643,27 +651,27 @@ export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Prop
 
                     {/* Events */}
                     <section>
-                      <h4 className="flex items-center gap-2 text-sm font-semibold text-white mb-3">
+                      <h4 className="flex items-center gap-2 text-sm font-semibold text-card-foreground mb-3">
                         <Bell className="w-4 h-4 text-yellow-400" /> Security Events
-                        <span className="ml-auto text-xs text-slate-500">{data.events.length} records</span>
+                        <span className="ml-auto text-xs text-muted-foreground">{data.events.length} records</span>
                       </h4>
                       {data.events.length === 0 ? (
-                        <p className="text-slate-500 text-xs">Tidak ada security events untuk device ini.</p>
+                        <p className="text-muted-foreground text-xs">Tidak ada security events untuk device ini.</p>
                       ) : (
                         <div className="space-y-2">
                           {data.events.map((ev, i) => (
                             <div key={i} className={`p-3 rounded-xl border text-xs ${
                               (ev.severity || "").toLowerCase() === "critical" ? "bg-red-500/5 border-red-500/20" :
                               (ev.severity || "").toLowerCase() === "high" ? "bg-orange-500/5 border-orange-500/15" :
-                              "bg-white/[0.02] border-white/5"
+                              "bg-muted/50 border-border/50"
                             }`}>
                               <div className="flex items-start gap-2">
                                 <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold ${sevStyle(ev.severity)}`}>
                                   {ev.severity || "Info"}
                                 </span>
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-white">{ev.event_type || "Unknown"}</p>
-                                  {ev.description && <p className="text-slate-400 mt-0.5 leading-relaxed">{ev.description}</p>}
+                                  <p className="font-medium text-card-foreground">{ev.event_type || "Unknown"}</p>
+                                  {ev.description && <p className="text-muted-foreground mt-0.5 leading-relaxed">{ev.description}</p>}
                                 </div>
                                 <span className="text-slate-600 flex-shrink-0">{ev.event_at?.slice(0, 16) || "—"}</span>
                               </div>

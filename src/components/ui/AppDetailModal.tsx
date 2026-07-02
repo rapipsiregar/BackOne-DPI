@@ -16,6 +16,14 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
   const [data, setData] = useState<AppDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 480);
+  };
 
   useEffect(() => {
     setIsLoading(true);
@@ -27,14 +35,14 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
   }, [appLabel]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleClose}>
+      <div className={`absolute inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`} />
       <div
-        className="relative bg-[#0d1117] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl shadow-black/60 animate-slide-up"
+        className={`relative bg-card border border-border rounded-2xl w-full max-w-2xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-gradient-to-r from-green-900/30 to-emerald-900/20 rounded-t-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-green-900/30 to-emerald-900/20 rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-500/20 rounded-lg ring-1 ring-green-500/30">
               {favicon ? (
@@ -44,24 +52,24 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
               )}
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">{appLabel}</h3>
-              {category && <p className="text-xs text-slate-400">{category}</p>}
+              <h3 className="text-lg font-bold text-card-foreground">{appLabel}</h3>
+              {category && <p className="text-xs text-muted-foreground">{category}</p>}
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+            onClick={handleClose}
+            className="p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-lg transition-all flex-shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Loader2 className="w-8 h-8 animate-spin text-green-400" />
-              <p className="text-slate-400 text-sm">Loading application data...</p>
+              <p className="text-muted-foreground text-sm">Loading application data...</p>
             </div>
           ) : error ? (
             <div className="p-6 text-center text-red-400 text-sm">{error}</div>
@@ -69,13 +77,13 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
             <div className="p-6 space-y-6">
 
               {/* Total Summary */}
-              <div className="grid grid-cols-2 gap-3 p-4 bg-white/[0.03] border border-white/5 rounded-xl">
+              <div className="grid grid-cols-2 gap-3 p-4 bg-white/[0.03] border border-border/50 rounded-xl">
                 <div className="text-center">
-                  <p className="text-xs text-slate-500">Total Download</p>
+                  <p className="text-xs text-muted-foreground">Total Download</p>
                   <p className="text-xl font-bold text-cyan-400">{fmtBytes(data.total_download ?? 0)}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-slate-500">Total Upload</p>
+                  <p className="text-xs text-muted-foreground">Total Upload</p>
                   <p className="text-xl font-bold text-green-400">{fmtBytes(data.total_upload ?? 0)}</p>
                 </div>
               </div>
@@ -87,20 +95,20 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
                   Usage per Agent
                 </h4>
                 {data.agent_scorecard.length === 0 ? (
-                  <p className="text-slate-500 text-sm text-center py-4">No traffic from known agents for this app yet.</p>
+                  <p className="text-muted-foreground text-sm text-center py-4">No traffic from known agents for this app yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {data.agent_scorecard.map((a, i) => {
                       const maxDl = Math.max(...data.agent_scorecard.map(x => x.download), 1);
                       const pct = (a.download / maxDl) * 100;
                       return (
-                        <div key={i} className="p-3 bg-white/[0.03] border border-white/5 rounded-lg">
+                        <div key={i} className="p-3 bg-white/[0.03] border border-border/50 rounded-lg">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-blue-400" />
-                              <span className="text-sm font-medium text-white">{a.agent_label}</span>
+                              <span className="text-sm font-medium text-card-foreground">{a.agent_label}</span>
                               {a.agent_uuid && (
-                                <span className="text-xs font-mono text-slate-500">{a.agent_uuid}</span>
+                                <span className="text-xs font-mono text-muted-foreground">{a.agent_uuid}</span>
                               )}
                             </div>
                             <div className="flex items-center gap-3 text-xs font-mono">
@@ -108,7 +116,7 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
                               <span className="text-green-400">↑ {fmtBytes(a.upload ?? 0)}</span>
                             </div>
                           </div>
-                          <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                             <div
                               className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all"
                               style={{ width: `${pct}%` }}
@@ -133,17 +141,17 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
                   )}
                 </h4>
                 {data.top_ips.length === 0 ? (
-                  <p className="text-slate-500 text-sm text-center py-4">No device data available.</p>
+                  <p className="text-muted-foreground text-sm text-center py-4">No device data available.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="text-left border-b border-white/10">
-                          <th className="pb-2 text-xs font-medium text-slate-400">#</th>
-                          <th className="pb-2 text-xs font-medium text-slate-400">IP Address</th>
-                          <th className="pb-2 text-xs font-medium text-slate-400 text-right">Download</th>
-                          <th className="pb-2 text-xs font-medium text-slate-400 text-right">Upload</th>
-                          <th className="pb-2 text-xs font-medium text-slate-400">Usage</th>
+                        <tr className="text-left border-b border-border">
+                          <th className="pb-2 text-xs font-medium text-muted-foreground">#</th>
+                          <th className="pb-2 text-xs font-medium text-muted-foreground">IP Address</th>
+                          <th className="pb-2 text-xs font-medium text-muted-foreground text-right">Download</th>
+                          <th className="pb-2 text-xs font-medium text-muted-foreground text-right">Upload</th>
+                          <th className="pb-2 text-xs font-medium text-muted-foreground">Usage</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
@@ -152,7 +160,7 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
                           const pct = (ip.download / maxDl) * 100;
                           return (
                             <tr key={i} className="hover:bg-white/[0.03] transition-colors">
-                              <td className="py-2 pr-4 text-xs text-slate-500">{i + 1}</td>
+                              <td className="py-2 pr-4 text-xs text-muted-foreground">{i + 1}</td>
                               <td className="py-2 pr-4 font-mono text-xs">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className={ip.blacklisted ? "text-red-400" : "text-blue-400"}>{ip.ip_address || "-"}</span>
@@ -160,14 +168,14 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
                                     <span className="text-xs text-red-300 bg-red-500/10 px-1.5 py-0.5 rounded-full ring-1 ring-red-500/30">🚫</span>
                                   )}
                                   {!ip.blacklisted && ip.reputation && ip.reputation !== "Unknown" && (
-                                    <span className="text-xs text-slate-400 bg-white/5 px-1.5 py-0.5 rounded">{ip.reputation}</span>
+                                    <span className="text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">{ip.reputation}</span>
                                   )}
                                 </div>
                               </td>
                               <td className="py-2 pr-4 text-right text-xs text-cyan-400">{fmtBytes(ip.download)}</td>
                               <td className="py-2 pr-4 text-right text-xs text-green-400">{fmtBytes(ip.upload ?? 0)}</td>
                               <td className="py-2 w-32">
-                                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                                   <div
                                     className={`h-full rounded-full ${ip.blacklisted ? "bg-red-500" : "bg-gradient-to-r from-cyan-500 to-green-500"}`}
                                     style={{ width: `${pct}%` }}

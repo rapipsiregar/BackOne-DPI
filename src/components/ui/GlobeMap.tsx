@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { fmtBytes } from '@/lib/utils';
 import { useTheme } from "next-themes";
+import * as THREE from 'three';
+import { fmtBytes } from "@/lib/utils";
 
 // Dynamically import Globe to avoid SSR issues
 const Globe = dynamic(() => import('react-globe.gl'), { ssr: false });
@@ -49,6 +50,8 @@ interface GlobeMapProps {
   data: {
     countryCode: string;
     value: number;
+    upload?: number;
+    download?: number;
     label: string;
   }[];
 }
@@ -57,48 +60,12 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
   const globeRef = useRef<any>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
   const [countries, setCountries] = useState<any>(null);
+  const [userInteracting, setUserInteracting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
   const isLight = theme === 'light';
 
-  // Generate a beautiful, ultra-fresh gradient blue texture for the Light Mode ocean
-  const lightGlobeTexture = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      const gradient = ctx.createLinearGradient(0, 0, 0, 512);
-      gradient.addColorStop(0, '#bae6fd'); // sky-200 (light bright blue at the top)
-      gradient.addColorStop(0.5, '#38bdf8'); // sky-400 (vibrant blue equator)
-      gradient.addColorStop(1, '#0284c7'); // sky-600 (deeper rich blue at the bottom)
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 1024, 512);
-    }
-    return canvas.toDataURL('image/png');
-  }, []);
-
-  // Generate a sleek, deep gradient dark texture for the Dark Mode ocean
-  const darkGlobeTexture = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      const gradient = ctx.createLinearGradient(0, 0, 0, 512);
-      gradient.addColorStop(0, '#0f172a'); // slate-900 
-      gradient.addColorStop(0.5, '#020617'); // slate-950 (deepest dark blue/black)
-      gradient.addColorStop(1, '#000000'); // black
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 1024, 512);
-    }
-    return canvas.toDataURL('image/png');
-  }, []);
-
   useEffect(() => {
-    // Handle resizing
     const updateDimensions = () => {
       if (containerRef.current) {
         setDimensions({
@@ -111,7 +78,6 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     
-    // Fetch high-res vector polygons for both themes' continents
     fetch('https://unpkg.com/globe.gl/example/datasets/ne_110m_admin_0_countries.geojson')
       .then(res => res.json())
       .then(setCountries)
@@ -120,27 +86,24 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
+  // Setup Initial Controls & Position
   useEffect(() => {
-    // Auto-rotate and controls configuration
-    // Since Globe is dynamically imported, we must wait until the ref is actually populated.
     let checkInterval = setInterval(() => {
       if (globeRef.current && globeRef.current.controls) {
         clearInterval(checkInterval);
 
         const controls = globeRef.current.controls();
-        controls.autoRotate = true;
-        controls.autoRotateSpeed = 1.2; // Adjusted auto-rotate speed to 1.5
-
-        // Enable inertia/damping for smooth deceleration after dragging
         controls.enableDamping = true;
-        controls.dampingFactor = 0.035;
-
-        // Adjust the manual rotation sensitivity
+        controls.dampingFactor = 0.05;
         controls.rotateSpeed = 0.8;
+        controls.minPolarAngle = Math.PI / 4; 
+        controls.maxPolarAngle = Math.PI * 3/4;
+        controls.minDistance = 140; // Zoom in limit
+        controls.maxDistance = 350; // Zoom out limit
 
-        // Remove boundaries to allow 360 degree rotation in all directions (as much as OrbitControls allows)
-        controls.minPolarAngle = 0; // The top pole (North)
-        controls.maxPolarAngle = Math.PI; // The bottom pole (South)
+        // Listen for interactions to pause auto-rotate smoothly
+        controls.addEventListener('start', () => setUserInteracting(true));
+        controls.addEventListener('end', () => setUserInteracting(false));
 
         // Focus on Southeast Asia initially
         globeRef.current.pointOfView({ lat: ORIGIN_LAT, lng: ORIGIN_LNG, altitude: 1.8 }, 2000);
@@ -150,6 +113,47 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
     return () => clearInterval(checkInterval);
   }, []);
 
+  // Manage Auto Rotate based on Interaction
+  useEffect(() => {
+    if (globeRef.current && globeRef.current.controls) {
+      const controls = globeRef.current.controls();
+      controls.autoRotate = !userInteracting;
+      controls.autoRotateSpeed = 1.0;
+    }
+  }, [userInteracting]);
+
+  // Create a custom material that we can mutate safely
+  const customGlobeMaterial = useMemo(() => {
+    const mat = new THREE.MeshPhongMaterial();
+    mat.color.set('#020617'); // Default to dark mode
+    return mat;
+  }, []);
+
+  // Smooth Material Color Interpolation for Theme Switching
+  useEffect(() => {
+    // Target ocean colors
+    const targetColor = new THREE.Color(isLight ? '#e0f2fe' : '#020617');
+    
+    let frameId: number;
+    const lerpColor = () => {
+      customGlobeMaterial.color.lerp(targetColor, 0.08); // Smooth interpolation step
+      
+      const rDiff = Math.abs(customGlobeMaterial.color.r - targetColor.r);
+      const gDiff = Math.abs(customGlobeMaterial.color.g - targetColor.g);
+      const bDiff = Math.abs(customGlobeMaterial.color.b - targetColor.b);
+      
+      if (rDiff + gDiff + bDiff > 0.01) {
+        frameId = requestAnimationFrame(lerpColor);
+      } else {
+        customGlobeMaterial.color.copy(targetColor);
+      }
+    };
+    lerpColor();
+    
+    return () => cancelAnimationFrame(frameId);
+  }, [isLight, customGlobeMaterial]);
+
+  // Prepare Data Memos
   const arcsData = useMemo(() => {
     return data
       .filter(d => d.countryCode !== "ID" && COUNTRY_COORDS[d.countryCode])
@@ -160,59 +164,87 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
           startLng: ORIGIN_LNG,
           endLat: lat,
           endLng: lng,
-          color: ['#0ea5e9', '#38bdf8'],
+          color: isLight ? ['#38bdf8', '#0284c7'] : ['#0ea5e9', '#38bdf8'],
           name: d.label,
-          value: d.value
+          value: d.value,
+          upload: d.upload || 0,
+          download: d.download || 0
         };
       });
-  }, [data]);
+  }, [data, isLight]);
 
   const pointsData = useMemo(() => {
     const points = arcsData.map(arc => ({
       lat: arc.endLat,
       lng: arc.endLng,
       size: 0.1,
-      color: '#38bdf8',
+      color: isLight ? '#0284c7' : '#38bdf8',
       name: arc.name,
-      value: arc.value
+      value: arc.value,
+      upload: arc.upload,
+      download: arc.download,
+      isOrigin: false
     }));
 
-    // Add origin point
     points.push({
       lat: ORIGIN_LAT,
       lng: ORIGIN_LNG,
       size: 0.2,
       color: '#f43f5e',
       name: 'Indonesia (Origin)',
-      value: 0
+      value: 0,
+      upload: 0,
+      download: 0,
+      isOrigin: true
     });
 
     return points;
+  }, [arcsData, isLight]);
+
+  // Extract All Labels + Origin to display statically
+  const labelsData = useMemo(() => {
+    const staticLabels = arcsData.map(arc => ({
+      lat: arc.endLat,
+      lng: arc.endLng,
+      name: arc.name,
+      color: isLight ? '#0f172a' : '#f8fafc'
+    }));
+    
+    // Add origin
+    staticLabels.push({
+      lat: ORIGIN_LAT,
+      lng: ORIGIN_LNG,
+      name: 'Indonesia',
+      color: isLight ? '#e11d48' : '#fda4af'
+    });
+    
+    return staticLabels;
   }, [arcsData, isLight]);
 
   return (
     <div
       ref={containerRef}
       className="relative w-full h-[500px] rounded-xl overflow-visible bg-transparent cursor-move flex items-center justify-center transition-all duration-500"
+      onMouseEnter={() => setUserInteracting(true)}
+      onMouseLeave={() => setUserInteracting(false)}
     >
-
       <Globe
         ref={globeRef}
         width={dimensions.width}
         height={dimensions.height}
+        globeMaterial={customGlobeMaterial}
         backgroundColor="rgba(0,0,0,0)"
         showGraticules={true}
-        globeImageUrl={isLight ? lightGlobeTexture : darkGlobeTexture}
         showAtmosphere={true}
-        atmosphereColor={isLight ? "#0ea5e9" : "#1e40af"}
+        atmosphereColor={isLight ? "#38bdf8" : "#1e40af"}
         atmosphereAltitude={isLight ? 0.15 : 0.25}
         
-        // Polygons Configuration for Unified Vector Designs
+        // Polygons Configuration
         polygonsData={countries ? countries.features : []}
         polygonAltitude={0.015}
-        polygonCapColor={() => isLight ? '#4ade80' : '#0f172a'} // Fresh green for light, dark slate for dark
-        polygonSideColor={() => isLight ? '#22c55e' : '#020617'} // Depth colors
-        polygonStrokeColor={() => isLight ? '#bbf7d0' : '#0284c7'} // Crisp bright borders for light, neon blue for dark
+        polygonCapColor={() => isLight ? '#4ade80' : '#0f172a'} 
+        polygonSideColor={() => isLight ? '#22c55e' : '#020617'} 
+        polygonStrokeColor={() => isLight ? '#ffffff' : '#0ea5e9'} 
 
         // Arcs configuration
         arcsData={arcsData}
@@ -225,7 +257,21 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         arcDashGap={0.2}
         arcDashAnimateTime={2000}
         arcAltitude={0.3}
-        arcStroke={0.7}
+        arcStroke={isLight ? 0.8 : 0.6}
+        arcLabel={(d: any) => `
+          <div style="background: rgba(0,0,0,0.85); color: white; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; min-width: 180px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+            <div style="font-weight: 600; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px; margin-bottom: 6px;">Flow to ${d.name}</div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: #9ca3af;">Total Traffic:</span> <span>${fmtBytes(d.value)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: #38bdf8;">Download:</span> <span>${fmtBytes(d.download)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: #4ade80;">Upload:</span> <span>${fmtBytes(d.upload)}</span>
+            </div>
+          </div>
+        `}
 
         // Points configuration
         pointsData={pointsData}
@@ -235,37 +281,42 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         pointAltitude={0.01}
         pointRadius="size"
         pointsMerge={true}
+        pointLabel={(d: any) => `
+          <div style="background: rgba(0,0,0,0.85); color: white; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; min-width: ${d.value > 0 ? '180px' : 'auto'}; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+            <div style="font-weight: 600; font-size: 14px; ${d.value > 0 ? 'border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px; margin-bottom: 6px;' : ''}">${d.name}</div>
+            ${d.value > 0 ? `
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span style="color: #9ca3af;">Total Traffic:</span> <span>${fmtBytes(d.value)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span style="color: #38bdf8;">Download:</span> <span>${fmtBytes(d.download)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #4ade80;">Upload:</span> <span>${fmtBytes(d.upload)}</span>
+              </div>
+            ` : ''}
+          </div>
+        `}
 
         // Rings configuration (Ping effect for points)
         ringsData={pointsData}
         ringLat="lat"
         ringLng="lng"
         ringColor="color"
-        ringMaxRadius={(d: any) => d.name === 'Indonesia (Origin)' ? 3 : 1.5}
+        ringMaxRadius={(d: any) => d.isOrigin ? 3 : 1.5}
         ringPropagationSpeed={3}
         ringRepeatPeriod={1000}
 
-        // HTML Labels configuration for better readability with text-shadow
-        htmlElementsData={pointsData}
-        htmlLat="lat"
-        htmlLng="lng"
-        htmlAltitude={0.03}
-        htmlElement={(d: any) => {
-          const el = document.createElement('div');
-          el.innerHTML = d.name;
-          el.style.color = isLight ? '#0f172a' : '#f8fafc';
-          el.style.fontSize = '12px';
-          el.style.fontWeight = '700';
-          el.style.fontFamily = 'Inter, sans-serif';
-          // Creates a thick outline effect so text doesn't blend into arcs/continents
-          el.style.textShadow = isLight 
-            ? '0 0 4px #ffffff, 0 0 6px #ffffff, 0 0 8px #ffffff' 
-            : '0 0 4px #000000, 0 0 6px #000000, 0 0 8px #000000';
-          el.style.pointerEvents = 'none';
-          el.style.whiteSpace = 'nowrap';
-          el.style.transform = 'translate(-50%, -100%)'; // shift slightly up
-          return el;
-        }}
+        // Labels Configuration (All Destinations + Origin)
+        labelsData={labelsData}
+        labelLat="lat"
+        labelLng="lng"
+        labelText="name"
+        labelSize={1.4}
+        labelDotRadius={0.2}
+        labelColor="color"
+        labelResolution={5}
+        labelAltitude={0.03}
       />
     </div>
   );

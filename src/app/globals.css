@@ -451,26 +451,26 @@ body::after {
   opacity: 1;
 }
 
-/* Ambient Gradients for Cards & Sidebars */
+/* Ambient Colors for Cards & Sidebars */
 :root {
-  --ambient-card-bg: linear-gradient(135deg, rgba(30, 58, 138, 0.1) 0%, rgba(15, 23, 42, 0.5) 100%);
-  --ambient-sidebar-bg: linear-gradient(180deg, rgba(15, 23, 42, 0.85) 0%, rgba(2, 6, 23, 0.95) 100%);
+  --ambient-card-bg: rgba(24, 24, 27, 0.7);
+  --ambient-sidebar-bg: rgba(9, 9, 11, 0.95);
 }
 
 .light {
-  --ambient-card-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.65) 100%);
-  --ambient-sidebar-bg: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(241, 245, 249, 0.9) 100%);
+  --ambient-card-bg: rgba(255, 255, 255, 0.9);
+  --ambient-sidebar-bg: rgba(255, 255, 255, 1);
 }
 
 .bg-card {
-  background-image: var(--ambient-card-bg) !important;
-  background-color: transparent !important;
+  background-color: var(--ambient-card-bg) !important;
+  background-image: none !important;
   backdrop-filter: blur(12px);
 }
 
 .bg-sidebar {
-  background-image: var(--ambient-sidebar-bg) !important;
-  background-color: transparent !important;
+  background-color: var(--ambient-sidebar-bg) !important;
+  background-image: none !important;
   backdrop-filter: blur(16px);
 }
 
@@ -478,14 +478,86 @@ body::after {
 *,
 *::before,
 *::after {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, background-image;
-  transition-timing-function: ease-in-out;
-  transition-duration: 150ms;
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow, opacity, transform !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-duration: 300ms !important;
+}
+
+canvas {
+  transition: none !important;
 }
 
 /* View Transitions API (For perfect whole-screen crossfade including WebGL/Canvas) */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 150ms;
+  animation-duration: 300ms;
   animation-timing-function: ease-in-out;
+}
+
+/* ── Custom Scrollbar for Fixed Modals ── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--muted);
+  border-radius: 10px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.light .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* ── Modal Animations (0.5s) ── */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalFadeOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes overlayFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.animate-modal-in {
+  animation: modalFadeIn 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-out {
+  animation: modalFadeOut 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-overlay-in {
+  animation: overlayFadeIn 500ms ease-out forwards;
+}
+
+.animate-overlay-out {
+  animation: overlayFadeOut 500ms ease-in forwards;
 }
