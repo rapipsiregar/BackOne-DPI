@@ -260,7 +260,8 @@ router.post('/upload-profile-picture', upload.single('profile_picture'), (req, r
 
     res.json({ ok: true, message: 'Foto profil berhasil diperbarui', profile_picture: req.file.filename });
   } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
+    console.error('[Upload Error]', err);
+    res.status(401).json({ error: 'Invalid token', details: err.message });
   }
 });
 

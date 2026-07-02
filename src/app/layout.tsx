@@ -10,6 +10,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "BackOne - Deep Package Inspection",
   description: "BackOne by PT. Data Bisnis Solusi - Network Intelligence Dashboard",
+  icons: {
+    icon: "/backone-logo.png",
+  },
 };
 
 export default function RootLayout({
