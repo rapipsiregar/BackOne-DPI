@@ -188,33 +188,42 @@ export function Header({
   };
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-background px-6">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
-          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-          Site: {process.env.NEXT_PUBLIC_SITE_ID || "Unknown Site"}
+    <header className="flex min-h-[4rem] h-auto py-3 lg:py-0 lg:h-16 shrink-0 flex-col lg:flex-row items-center justify-between border-b border-border bg-background px-4 lg:px-6 gap-3">
+      <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 lg:gap-4">
+        <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground whitespace-nowrap shadow-sm">
+          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+          <span className="truncate max-w-[100px] sm:max-w-[150px] md:max-w-none">
+            Site: {process.env.NEXT_PUBLIC_SITE_ID || "Unknown Site"}
+          </span>
         </div>
         {intervalText && (
-          <div className="flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 px-3 py-1 text-xs text-blue-400 font-medium">
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Rentang Data: {intervalText}</span>
+          <div className="flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 px-3 py-1 text-xs text-blue-400 font-medium whitespace-nowrap">
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate max-w-[140px] sm:max-w-[250px] md:max-w-none">
+              <span className="hidden lg:inline">Rentang Data: </span>
+              {intervalText}
+            </span>
           </div>
         )}
         <RealtimeClock />
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between lg:justify-end gap-2 lg:gap-4 w-full lg:w-auto">
         {user?.role === 'AGENT_VIEWER' && (
-          <div className="flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-950/40 px-3 py-1 text-xs text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
-            <span className="font-semibold">Agent:</span> {AGENT_LABELS[user.agent_uuid || ''] || user.agent_uuid} ({user.agent_uuid})
+          <div className="flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-950/40 px-3 py-1 text-xs text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.1)] whitespace-nowrap">
+            <span className="font-semibold hidden sm:inline">Agent:</span>
+            <span className="truncate max-w-[120px] md:max-w-none">
+              {AGENT_LABELS[user.agent_uuid || ''] || user.agent_uuid}
+            </span>
+            <span className="text-[10px] opacity-60 hidden md:inline">({user.agent_uuid})</span>
           </div>
         )}
         {user?.role === 'SUPER_ADMIN' && (
-          <div className="flex items-center gap-2 rounded-full border border-red-500/30 bg-red-950/40 px-3 py-1 text-xs text-red-300 shadow-[0_0_10px_rgba(239,68,68,0.1)]">
+          <div className="flex items-center gap-2 rounded-full border border-red-500/30 bg-red-950/40 px-3 py-1 text-xs text-red-300 shadow-[0_0_10px_rgba(239,68,68,0.1)] whitespace-nowrap">
             <span className="font-semibold">Admin:</span> All Agents
           </div>
         )}
-        <div className="text-xs text-muted-foreground">
+        <div className="text-xs text-muted-foreground whitespace-nowrap">
           Update: {lastUpdate}
         </div>
         <button
