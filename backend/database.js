@@ -9,15 +9,21 @@ let db;
 // Agent UUID mappings to MAC addresses and numeric interface IDs
 const AGENT_MAC_MAP = {
   '2F-TF-1D-GK': ['60:be:b4:1f:05:96'],
-  '8A-V3-PB-85': ['04:f4:1c:ce:c2:e6'],
+  '8A-V3-PB-85': [
+    'bc:45:5b:ca:d5:be', 'de:ed:cc:57:58:34', 'aa:b2:5e:30:51:30',
+    '76:32:c3:dd:b2:bb', '5c:ba:ef:d5:80:a1', '5a:e8:2f:f4:99:3d',
+    '8e:91:0f:6e:24:63', '12:46:2e:63:2c:b7', '92:df:61:3e:ff:5e',
+    '14:ea:63:96:40:78', '44:e5:17:b9:0d:07', '78:93:c3:08:41:ea',
+    '0e:15:c3:8e:29:a8', '58:a0:23:ae:f2:72', 'f2:69:9d:a1:5e:11',
+    '60:be:b4:2a:39:b0', 'ae:5d:99:33:67:2c'
+  ],
   'F6-2V-DT-8A': [
-    '2c:7b:a0:d8:86:91', '16:11:ac:73:34:1d', 'bc:45:5b:ca:d5:be',
-    'de:ed:cc:57:58:34', 'f4:6d:3f:ef:01:a0', '60:be:b4:29:d3:36',
-    '60:be:b4:29:d3:33', '60:be:b4:26:4c:d6', '60:be:b4:29:d3:32'
+    '2c:7b:a0:d8:86:91', '16:11:ac:73:34:1d', 'f4:6d:3f:ef:01:a0',
+    '60:be:b4:29:d3:36', '60:be:b4:29:d3:33', '60:be:b4:26:4c:d6',
+    '60:be:b4:29:d3:32', '04:f4:1c:ce:c2:e6'
   ],
   '1R-79-J9-YE': [
-    '70:85:6c:6d:f7:17', '70:85:6c:81:50:d4', 'a2:cc:8e:7d:39:51',
-    'f2:69:9d:a1:5e:11', '8e:91:0f:6e:24:63'
+    '70:85:6c:6d:f7:17', '70:85:6c:81:50:d4', 'a2:cc:8e:7d:39:51'
   ],
 };
 
@@ -961,10 +967,13 @@ function deviceMatchesAgent(ip, mac, agentUuid) {
   // 2. Subnet checks for client IPs
   if (ip) {
     if (agentUuid === '8A-V3-PB-85') {
-      return ip.startsWith('10.6.');
+      return ip.startsWith('10.250.0.');
     }
     if (agentUuid === 'F6-2V-DT-8A') {
-      return ip.startsWith('10.250.') || ip.startsWith('192.168.') || ip.startsWith('10.121.');
+      return (ip.startsWith('10.250.') && !ip.startsWith('10.250.0.')) || 
+             ip.startsWith('192.168.') || 
+             ip.startsWith('10.121.') || 
+             ip.startsWith('10.6.');
     }
     if (agentUuid === '2F-TF-1D-GK') {
       return ip.startsWith('10.0.') || ip.startsWith('10.1.') || ip.startsWith('10.26.') ||
@@ -972,6 +981,9 @@ function deviceMatchesAgent(ip, mac, agentUuid) {
         ip.startsWith('10.7.') || ip.startsWith('10.182.') || ip.startsWith('10.109.') ||
         ip.startsWith('10.181.') || ip.startsWith('10.75.') || ip.startsWith('10.202.') ||
         ip.startsWith('10.93.');
+    }
+    if (agentUuid === '1R-79-J9-YE') {
+      return ip.startsWith('192.168.201.');
     }
   }
 
@@ -1369,9 +1381,9 @@ function correlateFlows(flows) {
       if (isIntranet) {
         let friendlyName = devMap.get(dstIp);
         if (!friendlyName) {
-          if (dstIp.startsWith("10.6.")) {
+          if (dstIp.startsWith("10.250.0.")) {
             friendlyName = "IFG Client";
-          } else if (dstIp.startsWith("10.250.") || dstIp.startsWith("192.168.") || dstIp.startsWith("10.121.")) {
+          } else if (dstIp.startsWith("10.6.") || (dstIp.startsWith("10.250.") && !dstIp.startsWith("10.250.0.")) || dstIp.startsWith("192.168.") || dstIp.startsWith("10.121.")) {
             friendlyName = "CPI Client";
           } else if (
             dstIp.startsWith("10.0.") || dstIp.startsWith("10.1.") || dstIp.startsWith("10.26.") ||

@@ -48,8 +48,8 @@ function runTest() {
   // Verify at least some intranet flows are correlated since JRP and IFG cross-talk or communicate
   console.log('\nAsserting JRP/IFG intranet destination correlation...');
   
-  // Find a specific flow where dst_ip starts with 10.6.
-  const ifgDstFlow = flows.find(f => f.dst_ip && f.dst_ip.startsWith('10.6.') && f.app_label.includes('IFG'));
+  // Find a specific flow where dst_ip starts with 10.250.0.
+  const ifgDstFlow = flows.find(f => f.dst_ip && f.dst_ip.startsWith('10.250.0.') && f.app_label.includes('IFG'));
   if (ifgDstFlow) {
     console.log(`- Found correlated IFG destination flow:`);
     console.log(`  - Dst IP:     ${ifgDstFlow.dst_ip}`);
