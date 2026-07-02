@@ -6,6 +6,7 @@ const axios = require('axios');
 const BASE_URL  = 'https://informatics.netify.ai/api/v1';
 const JWT_TOKEN = process.env.NETIFY_JWT_TOKEN;
 const SITE_UUID = process.env.NETIFY_SITE_UUID;
+const agentMap = {};
 
 function headersSite(useApiKey = false) {
   const token = process.env.NETIFY_API_KEY || JWT_TOKEN;
@@ -354,7 +355,14 @@ function getMockDataForPath(path, params = {}) {
 }
 
 async function netifyFetch(path, params = {}, useApiKey = false, agentUuid = null) {
-  if (agentUuid) params.settings_agent = agentUuid;
+  if (agentUuid) {
+    const agentId = agentMap[agentUuid];
+    if (agentId) {
+      params.filter_agents = `[${agentId}]`;
+    } else {
+      params.settings_agent = agentUuid;
+    }
+  }
   if (!JWT_TOKEN || !SITE_UUID || JWT_TOKEN === 'YOUR_JWT_TOKEN' || SITE_UUID === 'YOUR_SITE_UUID' || JWT_TOKEN.startsWith('change_me') || JWT_TOKEN.startsWith('YOUR_')) {
     return getMockDataForPath(path, params);
   }
@@ -718,7 +726,7 @@ async function fetchDiscoveredDevices(interval = 1440, limit = 500, agentUuid = 
     }
   }
 
-  return intelRaw.map(r => {
+  const resolvedList = intelRaw.map(r => {
     const ip = r.ip?.address ?? null;
     const mac = r.mac_address ?? r.discovery_mac?.address ?? null;
     const oui = mac ? mac.substring(0, 8).toUpperCase() : null;
@@ -751,7 +759,34 @@ async function fetchDiscoveredDevices(interval = 1440, limit = 500, agentUuid = 
       upload       : ul,
       last_seen    : r.last_seen_at?.date || r.discovery_mac?.last_seen_at?.date || null,
     };
-  }).sort((a, b) => (b.download + b.upload) - (a.download + a.upload));
+  });
+
+  const seenIps = new Set(resolvedList.map(d => d.ip_address).filter(Boolean));
+  const allActiveIps = new Set([
+    ...Object.keys(dlMap),
+    ...Object.keys(ulMap)
+  ]);
+
+  for (const ip of allActiveIps) {
+    if (!seenIps.has(ip)) {
+      seenIps.add(ip);
+      const dl = dlMap[ip] ?? 0;
+      const ul = ulMap[ip] ?? 0;
+      resolvedList.push({
+        ip_address   : ip,
+        mac_address  : null,
+        device_label : ip,
+        device_type  : 'LAN Client',
+        os_label     : 'Windows/Linux',
+        manufacturer : 'Unknown',
+        download     : dl,
+        upload       : ul,
+        last_seen    : new Date().toISOString()
+      });
+    }
+  }
+
+  return resolvedList.sort((a, b) => (b.download + b.upload) - (a.download + a.upload));
 }
 
 // OUI lookup — manufacturer dari 3 oktet pertama MAC
@@ -2852,9 +2887,15 @@ async function fetchVPNDetection(limit = 50, agentUuid = null) {
 async function fetchAgents() {
   const data = await netifyFetch('/data/stats/top/agent/download', { filter_interval: 43200, settings_limit: 100 }, false, null);
   if (!data || !Array.isArray(data)) return [];
-  return data.map(r => ({
+  const list = data.map(r => ({
     id: r.agent?.id,
     uuid: r.agent?.uuid,
     label: r.agent?.label,
   }));
+  for (const a of list) {
+    if (a.uuid && a.id) {
+      agentMap[a.uuid] = a.id;
+    }
+  }
+  return list;
 }
