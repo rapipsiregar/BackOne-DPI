@@ -4,6 +4,8 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
+  --font-backone: var(--font-backone);
+
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
 
@@ -480,7 +482,7 @@ body::after {
 *::after {
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow, opacity, transform !important;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
-  transition-duration: 300ms !important;
+  transition-duration: 500ms !important;
 }
 
 canvas {
@@ -490,7 +492,7 @@ canvas {
 /* View Transitions API (For perfect whole-screen crossfade including WebGL/Canvas) */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 300ms;
+  animation-duration: 500ms;
   animation-timing-function: ease-in-out;
 }
 

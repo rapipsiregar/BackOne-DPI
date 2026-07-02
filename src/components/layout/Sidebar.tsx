@@ -288,10 +288,10 @@ export function Sidebar() {
       <div className="flex h-[72px] shrink-0 items-center px-6 border-b border-border/50 relative z-10">
         <img src="/backone-logo.png" alt="BackOne Logo" className="w-8 h-8 mr-3 rounded-full drop-shadow-[0_0_10px_rgba(255,0,0,0.3)]" />
         <div className="flex flex-col">
-          <span className="text-lg font-bold text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70 leading-tight">
+          <span className="text-lg font-bold font-backone text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70 leading-tight">
             BackOne
           </span>
-          <span className="text-[10px] font-medium text-muted-foreground tracking-wide mt-0.5">
+          <span className="text-[10px] font-medium font-backone text-muted-foreground tracking-wide mt-0.5">
             Deep Package Inspection
           </span>
         </div>
