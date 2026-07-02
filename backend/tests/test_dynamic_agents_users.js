@@ -37,8 +37,8 @@ for (const u of expectedUsernames) {
   }
   console.log(`✅ User verified: '${u}' (Role: ${user.role}, Agent UUID: ${user.agent_uuid})`);
 
-  // Verify password matches agent123
-  const pwOk = bcrypt.compareSync('agent123', user.password_hash);
+  // Verify password matches 123
+  const pwOk = bcrypt.compareSync('123', user.password_hash);
   if (!pwOk) {
     throw new Error(`❌ TEST FAILED: Password for user '${u}' is incorrect!`);
   }

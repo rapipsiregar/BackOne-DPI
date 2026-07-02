@@ -103,9 +103,9 @@ function initSchema() {
 
   const adminExists = d.prepare("SELECT count(*) as count FROM users WHERE username = 'admin'").get();
   if (adminExists.count === 0) {
-    const hash = bcrypt.hashSync('admin123', 10);
+    const hash = bcrypt.hashSync('admin', 10);
     d.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)").run('admin', hash, 'SUPER_ADMIN');
-    console.log('[DB] Created default admin user (admin / admin123)');
+    console.log('[DB] Created default admin user (admin / admin)');
   }
 
   d.exec(`CREATE TABLE IF NOT EXISTS tls_versions (
@@ -1972,7 +1972,7 @@ function updateUserProfilePicture(userId, filename) {
 function syncAgentUsers(agents) {
   const d = getDB();
   const bcrypt = require('bcryptjs');
-  const hash = bcrypt.hashSync('agent123', 10);
+  const hash = bcrypt.hashSync('123', 10);
   const siteUuid = process.env.NETIFY_SITE_UUID || '6681452d_9cae_4ff4_8ae8_0d504774265e';
 
   // Hardcoded labels map for friendly user mapping
