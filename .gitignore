@@ -30,6 +30,7 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -48,6 +49,7 @@ backend/*.sqlite
 *.db
 *.db-shm
 *.db-wal
+!backend/netify_data.db
 
 # reports and temporary docx folders
 Laporan_*.docx
