@@ -84,72 +84,70 @@ export async function getAgents(): Promise<Agent[]> {
         console.error("Failed to fetch dynamic agents from Netify API:", err);
       }
 
-      // If API query fails or is empty, use the hardcoded agent list as fallback
-      if (apiAgents.length === 0) {
-        apiAgents = [
-          { agent: { id: 4897042839, uuid: "2F-TF-1D-GK", label: "2F-TF-1D-GK" } },
-          { agent: { id: 4895530456, uuid: "8A-V3-PB-85", label: "8A-V3-PB-85" } },
-          { agent: { id: 4894730147, uuid: "F6-2V-DT-8A", label: "F6-2V-DT-8A" } },
-          { agent: { id: 4895853843, uuid: "1R-79-J9-YE", label: "1R-79-J9-YE" } }
-        ];
-      }
-
-      const AGENT_MAC_MAP: Record<string, string[]> = {
-        '2F-TF-1D-GK': ['60:be:b4:1f:05:96'],
-        '8A-V3-PB-85': ['04:f4:1c:ce:c2:e6'],
-        'F6-2V-DT-8A': [
-          '2c:7b:a0:d8:86:91', '16:11:ac:73:34:1d', 'bc:45:5b:ca:d5:be',
-          'de:ed:cc:57:58:34', 'f4:6d:3f:ef:01:a0', '60:be:b4:29:d3:36',
-          '60:be:b4:29:d3:33', '60:be:b4:26:4c:d6', '60:be:b4:29:d3:32'
-        ],
-        '1R-79-J9-YE': [
-          '70:85:6c:6d:f7:17', '70:85:6c:81:50:d4', 'a2:cc:8e:7d:39:51',
-          'f2:69:9d:a1:5e:11', '8e:91:0f:6e:24:63'
-        ],
-      };
-
-      const AGENT_LABELS: Record<string, string> = {
-        "2F-TF-1D-GK": "JRP Cibubur",
-        "8A-V3-PB-85": "IFG LT.18",
-        "F6-2V-DT-8A": "CPI Balaraja",
-        "1R-79-J9-YE": "CPI Balaraja WAN"
-      };
-
-      const latestBwTime = db.prepare("SELECT MAX(fetched_at) as t FROM mac_bandwidth").get()?.t;
-
-      const agents: Agent[] = apiAgents.map((item: any, idx: number) => {
-        const uuid = item.agent?.uuid || "";
-        const id = item.agent?.id || idx;
-        const macs = AGENT_MAC_MAP[uuid] || [];
-        
-        let dl = 0;
-        let ul = 0;
-        if (macs.length > 0 && latestBwTime) {
-          const placeholders = macs.map(() => '?').join(',');
-          const bw = db.prepare(`
-            SELECT SUM(download) as dl, SUM(upload) as ul 
-            FROM mac_bandwidth 
-            WHERE mac_address IN (${placeholders}) AND fetched_at = ?
-          `).get(...macs, latestBwTime);
-          dl = bw?.dl ?? 0;
-          ul = bw?.ul ?? 0;
+      // If API query fails, apiAgents will be empty. We still process from knownAgents.
+      const knownAgents = db.prepare('SELECT DISTINCT agent_uuid FROM users WHERE agent_uuid IS NOT NULL').all().map((r: any) => r.agent_uuid);
+      
+      const agentMap = new Map<string, any>();
+      
+      // 1. Add agents that have traffic from the API (Active in last 12 hours = Online)
+      apiAgents.forEach((item: any, idx: number) => {
+        const uuid = item.agent?.uuid;
+        if (uuid) {
+          agentMap.set(uuid, {
+            id: item.agent.id,
+            uuid: uuid,
+            label: item.agent.label,
+            isOnline: true
+          });
         }
+      });
 
-        const totalMB = ((dl + ul) / (1024 * 1024)).toFixed(2);
+      // 2. Add any other configured agents from DB (These might be Last Seen or Offline)
+      knownAgents.forEach((uuid: string) => {
+        if (!agentMap.has(uuid)) {
+          agentMap.set(uuid, {
+            id: parseInt(uuid.replace(/[^0-9]/g, '')) || Math.floor(Math.random() * 100000), // Fallback ID
+            uuid: uuid,
+            label: uuid, // Label diselesaikan oleh frontend via resolveAgentLabel
+            isOnline: false
+          });
+        }
+      });
+
+      const agents: Agent[] = Array.from(agentMap.values()).map((item, idx) => {
+        let statusHuman = "Offline";
+        
+        if (item.isOnline) {
+          statusHuman = "Online";
+        } else {
+          // Cari data terakhir dari DB
+          const f = db.prepare('SELECT MAX(fetched_at) as t FROM flows WHERE agent_uuid = ?').get(item.uuid)?.t;
+          const a = db.prepare('SELECT MAX(fetched_at) as t FROM bandwidth_apps WHERE agent_uuid = ?').get(item.uuid)?.t;
+          const e = db.prepare('SELECT MAX(fetched_at) as t FROM events WHERE agent_uuid = ?').get(item.uuid)?.t;
+          
+          const times = [f, a, e].filter(Boolean);
+          if (times.length > 0) {
+            times.sort();
+            const latest = times[times.length - 1];
+            const d = new Date(latest);
+            const formatted = d.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            statusHuman = `Last Seen ${formatted} WIB`;
+          }
+        }
         
         return {
-          id: id,
-          uuid: uuid,
-          serial: uuid,
+          id: item.id || idx,
+          uuid: item.uuid,
+          serial: item.uuid,
           site_uuid: SITE_UUID || "",
           organization_uuid: "",
           provisioned: true,
           activated: true,
-          label: AGENT_LABELS[uuid] || item.agent?.label || uuid,
+          label: item.label,
           created_at: { human: "N/A", date: "", unix_time: 0 },
           updated_at: { human: "N/A", date: "", unix_time: 0 },
           last_seen_at: { 
-            human: `Active (Traffic: ${totalMB} MB)`, 
+            human: statusHuman, 
             date: new Date().toISOString(), 
             unix_time: Date.now() / 1000 
           }

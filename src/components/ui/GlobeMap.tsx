@@ -78,10 +78,18 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     
-    fetch('https://unpkg.com/globe.gl/example/datasets/ne_110m_admin_0_countries.geojson')
-      .then(res => res.json())
-      .then(setCountries)
-      .catch(err => console.error('Failed to load countries', err));
+    const loadCountries = async () => {
+      try {
+        const res = await fetch('/ne_110m_admin_0_countries.geojson');
+        if (!res.ok) throw new Error('Network response was not ok');
+        const data = await res.json();
+        setCountries(data);
+      } catch (err) {
+        console.error('Failed to load countries', err);
+      }
+    };
+    
+    loadCountries();
 
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);

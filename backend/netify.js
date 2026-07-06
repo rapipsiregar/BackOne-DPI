@@ -1886,13 +1886,15 @@ async function fetchAppDetails(appLabel, agentUuid = null) {
 
   // ── Totals: from flows (protocol-level) OR bandwidth_apps (brand-level) ──
   // IMPORTANT: use MAX(download) from latest snapshot — NOT SUM() of all history!
-  const flowTotalRow = d.prepare(`
+  let flowQuery = `
     SELECT SUM(bytes_download) AS download,
            SUM(bytes_upload)   AS upload,
            COUNT(*) AS flow_count
     FROM   flows
-    WHERE  app_label = ?
-  `).get(appLabel);
+    WHERE  app_label = @appLabel
+  `;
+  if (agentUuid) flowQuery += ` AND agent_uuid = @agentUuid`;
+  const flowTotalRow = d.prepare(flowQuery).get({ appLabel, agentUuid });
 
   let total_download = flowTotalRow?.download ?? 0;
   let total_upload   = flowTotalRow?.upload   ?? 0;
@@ -1900,14 +1902,20 @@ async function fetchAppDetails(appLabel, agentUuid = null) {
 
   // If no flows data (brand-name app like YouTube), use LATEST bandwidth_apps snapshot
   if (total_download === 0 && total_upload === 0) {
-    const latestSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM bandwidth_apps WHERE app_label = ?`).get(appLabel)?.t;
+    let snapQuery = `SELECT MAX(fetched_at) AS t FROM bandwidth_apps WHERE app_label = @appLabel`;
+    snapQuery += agentUuid ? ` AND agent_uuid = @agentUuid` : ` AND agent_uuid IS NULL`;
+    const latestSnap = d.prepare(snapQuery).get({ appLabel, agentUuid })?.t;
+    
     if (latestSnap) {
-      const bwRow = d.prepare(`
+      let bwQuery = `
         SELECT download, upload
         FROM   bandwidth_apps
-        WHERE  app_label = ? AND fetched_at = ?
-        LIMIT  1
-      `).get(appLabel, latestSnap);
+        WHERE  app_label = @appLabel AND fetched_at = @latestSnap
+      `;
+      bwQuery += agentUuid ? ` AND agent_uuid = @agentUuid` : ` AND agent_uuid IS NULL`;
+      bwQuery += ` LIMIT 1`;
+      
+      const bwRow = d.prepare(bwQuery).get({ appLabel, latestSnap, agentUuid });
       if (bwRow) {
         total_download = bwRow.download ?? 0;
         total_upload   = bwRow.upload   ?? 0;
@@ -1916,18 +1924,20 @@ async function fetchAppDetails(appLabel, agentUuid = null) {
     }
   }
 
-  // ── Top IPs accessing this app (from flows — protocol-level labels) ──
-  const ipRows = d.prepare(`
+  // ── Top 5 Flow Records accessing this app (Raw Flows) ──
+  let ipQuery = `
     SELECT src_ip AS ip_address,
-           SUM(bytes_download) AS download,
-           SUM(bytes_upload)   AS upload,
-           COUNT(*) AS flow_count
+           dst_ip,
+           domain,
+           last_seen,
+           bytes_download AS download,
+           bytes_upload   AS upload
     FROM   flows
-    WHERE  app_label = ?
-    GROUP  BY src_ip
-    ORDER  BY download DESC
-    LIMIT  20
-  `).all(appLabel);
+    WHERE  app_label = @appLabel
+  `;
+  if (agentUuid) ipQuery += ` AND agent_uuid = @agentUuid`;
+  ipQuery += ` ORDER BY download DESC LIMIT 5`;
+  const ipRows = d.prepare(ipQuery).all({ appLabel, agentUuid });
 
   // ── Domain-based per-IP breakdown (bridges HTTPS/TLS → brand name) ──
   // Build keyword map for common brand names
@@ -1950,22 +1960,31 @@ async function fetchAppDetails(appLabel, agentUuid = null) {
     // Build WHERE clause for domain keywords
     const likeClause = kws.map(() => `LOWER(domain) LIKE ?`).join(' OR ');
     const likeParams = kws.map(k => `%${k}%`);
-    const domRows = d.prepare(`
+    let domQuery = `
       SELECT src_ip AS ip_address,
-             SUM(bytes_download) AS download,
-             SUM(bytes_upload)   AS upload,
-             COUNT(*) AS flow_count
+             dst_ip,
+             domain,
+             last_seen,
+             bytes_download AS download,
+             bytes_upload   AS upload
       FROM   flows
       WHERE  domain IS NOT NULL AND (${likeClause})
-      GROUP  BY src_ip
-      ORDER  BY download DESC
-      LIMIT  20
-    `).all(...likeParams);
+    `;
+    const domParams = [...likeParams];
+    if (agentUuid) {
+      domQuery += ` AND agent_uuid = ?`;
+      domParams.push(agentUuid);
+    }
+    domQuery += ` ORDER BY download DESC LIMIT 5`;
+    const domRows = d.prepare(domQuery).all(...domParams);
+    
     domain_breakdown = domRows.map(r => ({
       ip_address : r.ip_address,
+      dst_ip     : r.dst_ip,
+      domain     : r.domain,
+      last_seen  : r.last_seen,
       download   : r.download ?? 0,
       upload     : r.upload   ?? 0,
-      flow_count : r.flow_count ?? 0,
     }));
   }
 
@@ -1987,48 +2006,62 @@ async function fetchAppDetails(appLabel, agentUuid = null) {
   const allIpRows = domain_breakdown.length > 0 ? domain_breakdown : ipRows;
   const top_ips = allIpRows.map(r => ({
     ip_address  : r.ip_address,
+    dst_ip      : r.dst_ip,
+    domain      : r.domain,
+    last_seen   : r.last_seen,
     download    : r.download ?? 0,
     upload      : r.upload   ?? 0,
-    flow_count  : r.flow_count ?? 0,
     reputation  : threatMap[r.ip_address]?.reputation  ?? null,
     blacklisted : threatMap[r.ip_address]?.blacklisted ?? false,
   }));
 
-  // ── Per-agent breakdown using MAC-based grouping in flows ──
-  const agent_scorecard = Object.entries(AGENT_MAC_MAP).map(([uuid, macs]) => {
-    const ph = inClause(macs);
-    const likeParams2 = kws ? kws.map(k => `%${k}%`) : [];
-    let row;
-    if (likeParams2.length > 0) {
-      // For brand-name apps: query by domain keywords filtered by agent MAC
-      const likeClause2 = likeParams2.map(() => `LOWER(domain) LIKE ?`).join(' OR ');
-      row = d.prepare(`
-        SELECT SUM(bytes_download) AS download,
-               SUM(bytes_upload)   AS upload,
-               COUNT(*) AS flow_count
-        FROM   flows
-        WHERE  src_mac IN (${ph})
-          AND  domain IS NOT NULL
-          AND  (${likeClause2})
-      `).get(...macs, ...likeParams2);
-    } else {
-      row = d.prepare(`
-        SELECT SUM(bytes_download) AS download,
-               SUM(bytes_upload)   AS upload,
-               COUNT(*) AS flow_count
-        FROM   flows
-        WHERE  app_label = ?
-          AND  src_mac IN (${ph})
-      `).get(appLabel, ...macs);
+  // ── Per-agent breakdown using agent_uuid grouping in flows ──
+  let agent_scorecard_rows = [];
+  if (kws && kws.length > 0) {
+    const likeClause2 = kws.map(() => `LOWER(domain) LIKE ?`).join(' OR ');
+    const likeParams2 = kws.map(k => `%${k}%`);
+    let scoreQuery = `
+      SELECT agent_uuid,
+             SUM(bytes_download) AS download,
+             SUM(bytes_upload)   AS upload,
+             COUNT(*) AS flow_count
+      FROM   flows
+      WHERE  domain IS NOT NULL AND (${likeClause2})
+             AND agent_uuid IS NOT NULL
+    `;
+    const scoreParams = [...likeParams2];
+    if (agentUuid) {
+      scoreQuery += ` AND agent_uuid = ?`;
+      scoreParams.push(agentUuid);
     }
-    return {
-      agent_uuid  : uuid,
-      agent_label : AGENT_LABELS[uuid] || uuid,
-      download    : row?.download    ?? 0,
-      upload      : row?.upload      ?? 0,
-      flow_count  : row?.flow_count  ?? 0,
-    };
-  }).filter(a => a.download > 0 || a.upload > 0);
+    scoreQuery += ` GROUP BY agent_uuid`;
+    agent_scorecard_rows = d.prepare(scoreQuery).all(...scoreParams);
+  } else {
+    let scoreQuery = `
+      SELECT agent_uuid,
+             SUM(bytes_download) AS download,
+             SUM(bytes_upload)   AS upload,
+             COUNT(*) AS flow_count
+      FROM   flows
+      WHERE  app_label = ?
+             AND agent_uuid IS NOT NULL
+    `;
+    const scoreParams = [appLabel];
+    if (agentUuid) {
+      scoreQuery += ` AND agent_uuid = ?`;
+      scoreParams.push(agentUuid);
+    }
+    scoreQuery += ` GROUP BY agent_uuid`;
+    agent_scorecard_rows = d.prepare(scoreQuery).all(...scoreParams);
+  }
+
+  const agent_scorecard = agent_scorecard_rows.map(row => ({
+    agent_uuid  : row.agent_uuid,
+    agent_label : AGENT_LABELS[row.agent_uuid] || row.agent_uuid,
+    download    : row.download    ?? 0,
+    upload      : row.upload      ?? 0,
+    flow_count  : row.flow_count  ?? 0,
+  })).filter(a => a.download > 0 || a.upload > 0);
 
   return {
     app_label      : appLabel,

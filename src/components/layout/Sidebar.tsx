@@ -1,847 +1,407 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
-  Server,
-  Activity,
-  Globe,
-  Radio,
-  Zap,
-  ShieldAlert,
-  Shield,
-  LogOut,
-  Lock,
-  Eye,
-  EyeOff,
-  AppWindow,
-  Search,
-  User,
-  Image as ImageIcon,
-  Upload,
-  Trash2,
-  Sun,
-  Moon
+  LayoutDashboard, Server, Activity, Globe, Radio, Zap,
+  ShieldAlert, Shield, Lock, AppWindow, Search,
+  Bell, Check, Clock, User, LogOut, Sun, Moon, AlertTriangle, Info, Calendar, Router
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Modal } from "@/components/ui/Modal";
+import { useThreats, useEvents } from "@/lib/api";
+import { AccountSettingsModal } from "./AccountSettingsModal";
 
-const navigation = [
-  { name: "Summary", href: "/", icon: LayoutDashboard },
-  { name: "Agents", href: "/agents", icon: Server },
-  { name: "Devices", href: "/devices", icon: Server },
-  { name: "Flows", href: "/flows", icon: Activity },
-  { name: "Apps", href: "/apps", icon: AppWindow },
-  { name: "App Database", href: "/lookup", icon: Search },
-  { name: "Threats", href: "/threats", icon: ShieldAlert },
-  { name: "Geography", href: "/geography", icon: Globe },
-  { name: "DNS", href: "/dns", icon: Radio },
-  { name: "Events", href: "/events", icon: Zap },
-  { name: "Network Intelligence", href: "/network-intelligence", icon: Activity },
-  { name: "Security Audit", href: "/security-audit", icon: Lock },
-  { name: "Intelligence", href: "/intelligence", icon: Shield },
-  { name: "Network Infra", href: "/network-infrastructure", icon: Server },
-  { name: "DPI Analytics", href: "/dpi-analytics", icon: Activity },
+interface AppNotification {
+  id: string;
+  dbId: number;
+  title: string;
+  message: string;
+  severity: string;
+  timestamp: string;
+  type: 'threat' | 'event';
+}
+
+const navigationGroups = [
+  {
+    title: "OVERVIEW",
+    items: [
+      { name: "Dashboard", href: "/", icon: LayoutDashboard },
+    ]
+  },
+  {
+    title: "INFRASTRUCTURE",
+    items: [
+      { name: "Devices", href: "/devices", icon: Router },
+      { name: "Agents", href: "/agents", icon: Server },
+      { name: "Topology", href: "/network-infrastructure", icon: Globe },
+    ]
+  },
+  {
+    title: "MONITORING",
+    items: [
+      { name: "Flows", href: "/flows", icon: Activity },
+      { name: "Apps", href: "/apps", icon: AppWindow },
+      { name: "DNS", href: "/dns", icon: Radio },
+      { name: "Events", href: "/events", icon: Zap },
+    ]
+  },
+  {
+    title: "MANAGEMENT",
+    items: [
+      { name: "Lookup", href: "/lookup", icon: Search },
+      { name: "Threats", href: "/threats", icon: ShieldAlert },
+    ]
+  },
+  {
+    title: "SYSTEM",
+    items: [
+      { name: "Geography", href: "/geography", icon: Globe },
+      { name: "Network Intelligence", href: "/network-intelligence", icon: Activity },
+      { name: "Security Audit", href: "/security-audit", icon: Lock },
+      { name: "Intelligence", href: "/intelligence", icon: Shield },
+      { name: "DPI Analytics", href: "/dpi-analytics", icon: Activity },
+    ]
+  }
 ];
 
-export function Sidebar({ isCollapsed = false }: { isCollapsed?: boolean }) {
+export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
+  // State
   const [user, setUser] = useState<{ username?: string; account_name?: string; profile_picture?: string; role?: string; agent_uuid?: string } | null>(null);
-
   const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'account_name' | 'username' | 'password' | 'profile_picture'>('account_name');
+  const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false); // Notifications
+  const [readIds, setReadIds] = useState<string[]>([]);
+  const [intervalText, setIntervalText] = useState<string>("");
 
-  // Password state
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const accountDropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Username state
-  const [newUsername, setNewUsername] = useState("");
-  const [usernameErrorMsg, setUsernameErrorMsg] = useState("");
-  const [usernameSuccessMsg, setUsernameSuccessMsg] = useState("");
-  const [isSubmittingUsername, setIsSubmittingUsername] = useState(false);
-
-  // Account Name state
-  const [newAccountName, setNewAccountName] = useState("");
-  const [accountNameErrorMsg, setAccountNameErrorMsg] = useState("");
-  const [accountNameSuccessMsg, setAccountNameSuccessMsg] = useState("");
-  const [isSubmittingAccountName, setIsSubmittingAccountName] = useState(false);
-
-  // Profile Picture state
-  const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
-  const [profilePicErrorMsg, setProfilePicErrorMsg] = useState("");
-  const [profilePicSuccessMsg, setProfilePicSuccessMsg] = useState("");
-  const [isUploadingPic, setIsUploadingPic] = useState(false);
-
-  // Change Password visibility state
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-
-  // Real-time checks for password strength validation
-  const isMinLength = newPassword.length >= 6;
-  const hasUppercase = /[A-Z]/.test(newPassword);
-  const hasLowercase = /[a-z]/.test(newPassword);
-  const hasNumber = /[0-9]/.test(newPassword);
-  const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
-  const isPasswordValid = isMinLength && hasUppercase && hasLowercase && hasNumber && passwordsMatch;
+  // Fetching
+  const { data: threats } = useThreats(30);
+  const { data: events } = useEvents(30);
 
   useEffect(() => {
     fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
-        if (data.user) {
-          setUser(data.user);
+        if (data.user) setUser(data.user);
+      })
+      .catch(console.error);
+
+    const stored = localStorage.getItem('read_notifications');
+    if (stored) {
+      try { setReadIds(JSON.parse(stored)); } catch {}
+    }
+
+    // Fetch interval
+    fetch('/api/dashboard/data-interval')
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.ok && res.data) {
+          const { start, end } = res.data;
+          if (start && end) {
+            const sDate = new Date(start);
+            const eDate = new Date(end);
+            const options: Intl.DateTimeFormatOptions = {
+              day: 'numeric', month: 'short', year: 'numeric',
+              hour: '2-digit', minute: '2-digit', hour12: false
+            };
+            setIntervalText(`${sDate.toLocaleString('id-ID', options)} - ${eDate.toLocaleString('id-ID', options)}`);
+          }
         }
       })
-      .catch(err => console.error(err));
+      .catch(() => {});
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      router.push('/login');
-      router.refresh();
-    } catch (e) {
-      console.error(e);
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsOpen(false);
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(event.target as Node)) setIsAccountDropdownOpen(false);
     }
-  };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isPasswordValid) return;
-
-    setIsSubmitting(true);
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    try {
-      const res = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setSuccessMsg("Password berhasil diubah!");
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-      } else {
-        setErrorMsg(data.error || "Gagal mengubah password.");
+  const notifications = useMemo<AppNotification[]>(() => {
+    const list: AppNotification[] = [];
+    if (threats) {
+      for (const t of threats) {
+        list.push({
+          id: `threat-${t.id || t.detected_at}`,
+          dbId: t.id,
+          title: "Ancaman Terdeteksi!",
+          message: `${t.threat_type || "Malicious traffic"} dari IP ${t.ip_address || "unknown"}`,
+          severity: t.severity || "high",
+          timestamp: t.detected_at || "",
+          type: "threat"
+        });
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Terjadi kesalahan sistem.");
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+    if (events) {
+      for (const e of events) {
+        const severity = (e.severity || "info").toLowerCase();
+        if (["critical", "high", "medium", "warning"].includes(severity)) {
+          const eventTypeLabel = (e.event_type || 'Sistem')
+            .replace('new.device', 'New Device Discovered')
+            .replace('update.device', 'Device Updated')
+            .replace('server.discovery', 'Server Discovered')
+            .replace('encryption.audit', 'Encryption Alert')
+            .replace(/\./g, ' ');
 
-  const handleChangeUsername = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmittingUsername(true);
-    setUsernameErrorMsg("");
-    setUsernameSuccessMsg("");
-
-    try {
-      const res = await fetch('/api/auth/change-username', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword, newUsername }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setUsernameSuccessMsg("Username berhasil diubah!");
-        setCurrentPassword("");
-        if (user) {
-          setUser({ ...user, username: data.newUsername });
+          list.push({
+            id: `event-${e.id || e.timestamp}`,
+            dbId: e.id,
+            title: `Event: ${eventTypeLabel}`,
+            message: e.message || "",
+            severity: e.severity || "warning",
+            timestamp: e.timestamp || "",
+            type: "event"
+          });
         }
-      } else {
-        setUsernameErrorMsg(data.error || "Gagal mengubah username.");
       }
-    } catch (err: any) {
-      setUsernameErrorMsg(err.message || "Terjadi kesalahan sistem.");
-    } finally {
-      setIsSubmittingUsername(false);
     }
+    list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return list;
+  }, [threats, events]);
+
+  const unreadCount = useMemo(() => notifications.filter(n => !readIds.includes(n.id)).length, [notifications, readIds]);
+
+  const markAllAsRead = () => {
+    const allIds = notifications.map(n => n.id);
+    setReadIds(allIds);
+    localStorage.setItem('read_notifications', JSON.stringify(allIds));
   };
 
-  const handleChangeAccountName = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmittingAccountName(true);
-    setAccountNameErrorMsg("");
-    setAccountNameSuccessMsg("");
-
-    try {
-      const res = await fetch('/api/auth/change-account-name', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword, newAccountName }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setAccountNameSuccessMsg("Nama akun berhasil diubah!");
-        setCurrentPassword("");
-        if (user) {
-          setUser({ ...user, account_name: data.newAccountName });
-        }
-      } else {
-        setAccountNameErrorMsg(data.error || "Gagal mengubah nama akun.");
-      }
-    } catch (err: any) {
-      setAccountNameErrorMsg(err.message || "Terjadi kesalahan sistem.");
-    } finally {
-      setIsSubmittingAccountName(false);
+  const handleNotificationClick = (n: AppNotification) => {
+    if (!readIds.includes(n.id)) {
+      const updated = [...readIds, n.id];
+      setReadIds(updated);
+      localStorage.setItem('read_notifications', JSON.stringify(updated));
     }
+    setIsOpen(false);
+    router.push(n.type === 'threat' ? `/threats?highlight=${n.dbId}` : `/events?highlight=${n.dbId}`);
   };
 
-  const handleUploadProfilePicture = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!profilePicFile) return;
-
-    setIsUploadingPic(true);
-    setProfilePicErrorMsg("");
-    setProfilePicSuccessMsg("");
-
-    const formData = new FormData();
-    formData.append('profile_picture', profilePicFile);
-
-    try {
-      const res = await fetch('/api/auth/upload-profile-picture', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setProfilePicSuccessMsg("Foto profil berhasil diperbarui!");
-        setProfilePicFile(null);
-        if (user) {
-          setUser({ ...user, profile_picture: data.profile_picture });
-        }
-      } else {
-        setProfilePicErrorMsg(data.error || "Gagal mengunggah foto profil.");
-      }
-    } catch (err: any) {
-      setProfilePicErrorMsg(err.message || "Terjadi kesalahan sistem.");
-    } finally {
-      setIsUploadingPic(false);
+  const getSeverityStyles = (severity: string) => {
+    const s = severity.toLowerCase();
+    if (s.includes('critical') || s.includes('high')) {
+      return { bg: 'bg-red-500/10 hover:bg-red-500/15', border: 'border-red-500/20', text: 'text-red-400', icon: <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" /> };
     }
+    if (s.includes('med') || s.includes('warning')) {
+      return { bg: 'bg-yellow-500/10 hover:bg-yellow-500/15', border: 'border-yellow-500/20', text: 'text-yellow-400', icon: <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" /> };
+    }
+    return { bg: 'bg-blue-500/10 hover:bg-blue-500/15', border: 'border-blue-500/20', text: 'text-blue-400', icon: <Info className="w-4 h-4 text-blue-500 shrink-0" /> };
   };
-
-  const handleRemoveProfilePicture = async () => {
-    setIsUploadingPic(true);
-    setProfilePicErrorMsg("");
-    setProfilePicSuccessMsg("");
-
-    try {
-      const res = await fetch('/api/auth/remove-profile-picture', {
-        method: 'POST',
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setProfilePicSuccessMsg("Foto profil berhasil dihapus!");
-        if (user) {
-          setUser({ ...user, profile_picture: undefined });
-        }
-      } else {
-        setProfilePicErrorMsg(data.error || "Gagal menghapus foto profil.");
-      }
-    } catch (err: any) {
-      setProfilePicErrorMsg(err.message || "Terjadi kesalahan sistem.");
-    } finally {
-      setIsUploadingPic(false);
-    }
-  };
-
-  const filteredNavigation = navigation.filter((item) => {
-    if (user?.role === 'AGENT_VIEWER' && item.name === 'Agents') {
-      return false;
-    }
-    return true;
-  });
 
   return (
-    <div className={cn(
-      "flex h-full flex-col border-r border-border/50 bg-sidebar/80 backdrop-blur-2xl transition-all duration-500 ease-in-out relative z-30 overflow-x-hidden",
-      isCollapsed ? "w-[72px]" : "w-64"
-    )}>
-      {/* Subtle glow effect behind sidebar */}
-      <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
-      
-      <div className="flex h-[72px] shrink-0 items-center border-b border-border/50 relative z-10 w-full overflow-hidden">
-        <div className="w-[72px] shrink-0 flex justify-center items-center">
+    <div className="flex h-full max-h-screen flex-col border-r border-white/5 bg-black/20 backdrop-blur-3xl transition-all w-64 shrink-0 relative z-40 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)]">
+      {/* Brand & Site Info */}
+      <div className="flex flex-col p-4 shrink-0 gap-4 border-b border-white/5">
+        <div className="flex items-center gap-3">
           <img src="/backone-logo.png" alt="BackOne Logo" className="w-8 h-8 rounded-full drop-shadow-[0_0_10px_rgba(255,0,0,0.3)]" />
+          <div className="flex flex-col min-w-0 justify-center">
+            <span className="text-lg font-bold font-backone text-foreground tracking-tight leading-none">
+              BackOne
+            </span>
+            <span className="text-[10px] text-muted-foreground mt-0.5 leading-tight tracking-wide whitespace-nowrap">
+              Deep Package Inspection
+            </span>
+          </div>
         </div>
-        <div className={cn(
-          "flex flex-col whitespace-nowrap transition-opacity duration-500",
-          isCollapsed ? "opacity-0" : "opacity-100"
-        )}>
-          <span className="text-lg font-bold font-backone text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70 leading-tight">
-            BackOne
-          </span>
-          <span className="text-[10px] font-medium font-backone text-muted-foreground mt-0.5 truncate w-[160px]">
-            Deep Package Inspection
-          </span>
+        
+        {/* Site Badge */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 rounded bg-secondary/30 px-2 py-1.5 text-xs text-muted-foreground">
+            <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+            <span className="truncate flex-1">
+              {process.env.NEXT_PUBLIC_SITE_ID || "Unknown Site"} - {user?.role === 'SUPER_ADMIN' ? 'Admin' : (user?.account_name || user?.agent_uuid || 'User')}
+            </span>
+          </div>
+          {intervalText && (
+            <div className="flex items-center gap-2 rounded bg-blue-500/10 border border-blue-500/20 px-2 py-1.5 text-[10px] text-blue-400 whitespace-nowrap">
+              <Calendar className="w-3 h-3 shrink-0" />
+              <span className="truncate">{intervalText}</span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="py-6 flex flex-col items-center border-b border-border/50 relative z-10 overflow-hidden w-full">
-        <div className="relative">
-          <div className={cn(
-            "rounded-full bg-gradient-to-tr from-primary to-blue-400 p-0.5 shadow-lg shadow-primary/20 overflow-hidden transition-all duration-500 ease-in-out shrink-0 mx-auto",
-            isCollapsed ? "h-10 w-10" : "h-16 w-16"
-          )}>
-            <div className="flex h-full w-full items-center justify-center rounded-full bg-background overflow-hidden relative">
-              {user?.profile_picture ? (
-                <img src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <span className={cn("font-bold text-white uppercase transition-all duration-500", isCollapsed ? "text-base" : "text-xl")}>
-                  {user?.account_name ? user.account_name.charAt(0) : (user?.username ? user.username.charAt(0) : (user?.role === 'SUPER_ADMIN' ? 'A' : 'V'))}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className={cn(
-            "absolute rounded-full border-2 border-background bg-green-500 shadow-sm transition-all duration-500",
-            isCollapsed ? "-bottom-0.5 -right-0.5 h-3 w-3" : "-bottom-1 -right-1 h-4 w-4"
-          )} />
-        </div>
-        
-        <div className={cn(
-          "flex flex-col items-center transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap",
-          isCollapsed ? "opacity-0 max-h-0 mt-0 max-w-0" : "opacity-100 max-h-[100px] mt-4 w-[256px]"
-        )}>
-          <span className="font-semibold text-white tracking-wide text-center leading-snug truncate w-full px-4">
-            {user?.account_name || user?.username || 'Loading...'}
-          </span>
-          <span className="mt-1.5 rounded-full bg-primary/20 px-2.5 py-0.5 text-[10px] font-medium text-primary border border-primary/30 shrink-0">
-            {user?.role === 'SUPER_ADMIN' ? 'PRO' : 'STD'}
-          </span>
-        </div>
-      </div>
-      <div className="flex flex-1 flex-col overflow-y-auto relative z-10 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20 transition-colors">
-        <nav className="flex-1 py-6 flex flex-col items-center overflow-hidden w-full space-y-1.5">
-          {filteredNavigation.map((item) => {
-            const isActive = pathname === item.href;
+      {/* Navigation */}
+      <div className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar min-h-0">
+        <nav className="flex flex-col space-y-6">
+          {navigationGroups.map((group, groupIdx) => {
+            // Filter items based on role
+            const filteredItems = group.items.filter(item => !(user?.role === 'AGENT_VIEWER' && item.name === 'Agents'));
+            if (filteredItems.length === 0) return null;
+
             return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "group relative flex items-center rounded-lg py-2.5 text-sm font-medium transition-all duration-500 overflow-hidden shrink-0",
-                  isCollapsed ? "w-[48px]" : "w-[232px]",
-                  isActive
-                    ? "bg-primary/10 text-white shadow-[0_0_10px_rgba(59,130,246,0.1)]"
-                    : "text-muted-foreground hover:bg-secondary/50 hover:text-white"
-                )}
-                title={isCollapsed ? item.name : undefined}
-              >
-                {/* Active indicator bar */}
-                {isActive && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
-                )}
-                
-                <div className="w-[48px] shrink-0 flex justify-center items-center">
-                  <item.icon
-                    className={cn(
-                      "h-5 w-5 transition-all duration-300",
-                      isActive 
-                        ? "text-primary drop-shadow-[0_0_8px_rgba(59,130,246,0.5)] scale-110" 
-                        : "text-muted-foreground group-hover:text-white group-hover:scale-110"
-                    )}
-                    aria-hidden="true"
-                  />
-                </div>
-                <span className={cn(
-                  "relative z-10 transition-opacity duration-500 whitespace-nowrap",
-                  isCollapsed ? "opacity-0" : "opacity-100"
-                )}>{item.name}</span>
-                
-                {/* Hover background effect */}
-                {!isActive && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none translate-x-[-100%] group-hover:translate-x-[100%]" />
-                )}
-              </Link>
+              <div key={groupIdx} className="flex flex-col space-y-1">
+                <h3 className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  {group.title}
+                </h3>
+                {filteredItems.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        "group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        isActive
+                          ? "bg-primary/15 text-primary shadow-[inset_2px_0_0_0_hsl(var(--primary))]"
+                          : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
+                      )}
+                    >
+                      <item.icon
+                        className={cn(
+                          "mr-3 h-4 w-4 shrink-0 transition-transform",
+                          isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground group-hover:scale-110"
+                        )}
+                        aria-hidden="true"
+                      />
+                      <span className="truncate">{item.name}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             );
           })}
         </nav>
       </div>
 
-      <div className="py-4 border-t border-border/50 relative z-10 shrink-0 space-y-1.5 flex flex-col items-center w-full">
-        <button
-          onClick={() => {
-            setErrorMsg("");
-            setSuccessMsg("");
-            setUsernameErrorMsg("");
-            setUsernameSuccessMsg("");
-            setAccountNameErrorMsg("");
-            setAccountNameSuccessMsg("");
-            setCurrentPassword("");
-            setNewPassword("");
-            setConfirmPassword("");
-            setNewUsername("");
-            setNewAccountName("");
-            setProfilePicFile(null);
-            setActiveTab("account_name");
-            setIsAccountOpen(true);
-          }}
-          className={cn(
-            "relative flex items-center rounded-lg py-2.5 text-sm font-medium text-slate-400 hover:bg-secondary/50 hover:text-white transition-all duration-500 overflow-hidden shrink-0",
-            isCollapsed ? "w-[48px]" : "w-[232px]"
-          )}
-          title={isCollapsed ? "Account Settings" : undefined}
-        >
-          <div className="w-[48px] shrink-0 flex justify-center items-center">
-            <User className="h-5 w-5 transition-all duration-500" />
-          </div>
-          <span className={cn(
-            "transition-opacity duration-500 whitespace-nowrap",
-            isCollapsed ? "opacity-0" : "opacity-100"
-          )}>Account Settings</span>
-        </button>
-        <div className={cn("flex transition-all duration-500", isCollapsed ? "w-[48px] flex-col space-y-1.5" : "w-[232px] space-x-1.5")}>
-          <button
-            onClick={handleLogout}
-            className={cn(
-              "relative flex items-center rounded-lg py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all duration-500 overflow-hidden shrink-0",
-              isCollapsed ? "w-[48px]" : "flex-1"
-            )}
-            title={isCollapsed ? "Logout" : undefined}
-          >
-            <div className="w-[48px] shrink-0 flex justify-center items-center">
-              <LogOut className="h-5 w-5 transition-all duration-500" />
-            </div>
-            <span className={cn(
-              "transition-opacity duration-500 whitespace-nowrap",
-              isCollapsed ? "opacity-0" : "opacity-100"
-            )}>Logout</span>
-          </button>
-          
-          {mounted && !isCollapsed && (
+      {/* Footer (Account & Notifications) */}
+      <div className="mt-auto p-4 border-t border-white/5 bg-white/5 backdrop-blur-sm">
+        <div className="flex items-center gap-3">
+          {/* Account Settings Dropdown */}
+          <div className="relative flex-1 min-w-0" ref={accountDropdownRef}>
             <button
-              onClick={() => {
-                const nextTheme = theme === 'dark' ? 'light' : 'dark';
-                if (!document.startViewTransition) {
-                  setTheme(nextTheme);
-                  return;
-                }
-                document.startViewTransition(() => {
-                  setTheme(nextTheme);
-                });
-              }}
-              className="flex items-center justify-center rounded-lg px-3 py-2.5 text-slate-400 hover:bg-secondary/50 hover:text-white transition-all duration-200 shrink-0"
-              title="Toggle Theme"
+              onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
+              className="flex w-full items-center gap-3 rounded-xl p-2 hover:bg-secondary/50 transition-colors"
             >
-              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-primary to-blue-400 overflow-hidden">
+                {user?.profile_picture ? (
+                  <img src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="font-bold text-white uppercase text-xs">
+                    {user?.account_name ? user.account_name.charAt(0) : (user?.username ? user.username.charAt(0) : (user?.role === 'SUPER_ADMIN' ? 'A' : 'V'))}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col items-start overflow-hidden text-left min-w-0 flex-1">
+                <span className="text-sm font-semibold text-foreground truncate w-full">{user?.account_name || user?.username || 'Loading...'}</span>
+                <span className="text-[10px] text-primary truncate w-full">{user?.role === 'SUPER_ADMIN' ? 'Admin' : 'Standard User'}</span>
+              </div>
             </button>
-          )}
-        </div>
-      </div>
 
-      <Modal isOpen={isAccountOpen} onClose={() => setIsAccountOpen(false)} title="Account Settings">
-        <div className="flex mb-6 border-b border-border/50">
-          <button
-            onClick={() => setActiveTab('account_name')}
-            className={cn(
-              "flex-1 pb-3 text-sm font-medium transition-colors relative",
-              activeTab === 'account_name' ? "text-primary" : "text-slate-400 hover:text-slate-200"
-            )}
-          >
-            Ubah Nama
-            {activeTab === 'account_name' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full shadow-[0_-2px_10px_rgba(59,130,246,0.5)]" />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('profile_picture')}
-            className={cn(
-              "flex-1 pb-3 text-sm font-medium transition-colors relative",
-              activeTab === 'profile_picture' ? "text-primary" : "text-slate-400 hover:text-slate-200"
-            )}
-          >
-            Foto Profil
-            {activeTab === 'profile_picture' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full shadow-[0_-2px_10px_rgba(59,130,246,0.5)]" />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('username')}
-            className={cn(
-              "flex-1 pb-3 text-sm font-medium transition-colors relative",
-              activeTab === 'username' ? "text-primary" : "text-slate-400 hover:text-slate-200"
-            )}
-          >
-            Ubah Username
-            {activeTab === 'username' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full shadow-[0_-2px_10px_rgba(59,130,246,0.5)]" />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('password')}
-            className={cn(
-              "flex-1 pb-3 text-sm font-medium transition-colors relative",
-              activeTab === 'password' ? "text-primary" : "text-slate-400 hover:text-slate-200"
-            )}
-          >
-            Ubah Password
-            {activeTab === 'password' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full shadow-[0_-2px_10px_rgba(59,130,246,0.5)]" />
-            )}
-          </button>
-        </div>
-
-        {activeTab === 'profile_picture' ? (
-          <div className="space-y-4">
-            {profilePicErrorMsg && (
-              <div className="rounded-lg bg-red-500/10 p-3 text-xs text-red-400 border border-red-500/20">
-                {profilePicErrorMsg}
+            {isAccountDropdownOpen && (
+              <div className="absolute bottom-0 left-full ml-4 w-56 rounded-xl border border-border bg-card/95 backdrop-blur-xl p-2 shadow-2xl z-50 animate-fade-in">
+                <div className="flex flex-col items-center justify-center p-3 mb-2 border-b border-border/50">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-primary to-blue-400 overflow-hidden mb-2">
+                    {user?.profile_picture ? (
+                      <img src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="font-bold text-white uppercase text-lg">
+                        {user?.account_name ? user.account_name.charAt(0) : (user?.username ? user.username.charAt(0) : (user?.role === 'SUPER_ADMIN' ? 'A' : 'V'))}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm font-bold text-foreground text-center break-words w-full leading-tight">{user?.account_name || user?.username || 'Loading...'}</span>
+                  <span className="text-xs text-primary mt-1 text-center font-medium">{user?.role === 'SUPER_ADMIN' ? 'Admin' : 'Standard User'}</span>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    setIsAccountDropdownOpen(false);
+                    setIsAccountOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                >
+                  <User className="h-4 w-4" /> Pengaturan Akun
+                </button>
+                <button
+                  onClick={() => {
+                    setTheme(theme === 'dark' ? 'light' : 'dark');
+                    setIsAccountDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                >
+                  {theme === 'dark' ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />} 
+                  <span className="truncate">{theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}</span>
+                </button>
+                <div className="h-px bg-border/50 my-1 mx-2" />
+                <button
+                  onClick={async () => {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                    router.push('/login');
+                    router.refresh();
+                  }}
+                  className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" /> Keluar
+                </button>
               </div>
             )}
-            {profilePicSuccessMsg && (
-              <div className="rounded-lg bg-green-500/10 p-3 text-xs text-green-400 border border-green-500/20">
-                {profilePicSuccessMsg}
-              </div>
-            )}
+          </div>
 
-            <div className="flex flex-col items-center justify-center py-4">
-              <div className="h-24 w-24 rounded-full bg-gradient-to-tr from-primary to-blue-400 p-0.5 shadow-lg shadow-primary/20 mb-4 overflow-hidden relative group">
-                <div className="flex h-full w-full items-center justify-center rounded-full bg-background overflow-hidden relative">
-                  {user?.profile_picture ? (
-                    <img src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
+          {/* Notifications */}
+          <div className="relative shrink-0" ref={dropdownRef}>
+            <button 
+              onClick={() => setIsOpen(!isOpen)}
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute right-2 top-2 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-[#ffffff] shadow-lg ring-2 ring-transparent">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {isOpen && (
+              <div className="absolute bottom-0 left-full ml-4 w-96 rounded-2xl border border-border bg-card/95 backdrop-blur-xl p-3 shadow-2xl z-50 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-border/50 pb-2 mb-2">
+                  <span className="text-sm font-semibold text-foreground">Notifikasi</span>
+                  {unreadCount > 0 && (
+                    <button onClick={markAllAsRead} className="text-xs text-primary hover:text-primary/80">Tandai dibaca</button>
+                  )}
+                </div>
+                <div className="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {notifications.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-muted-foreground">Tidak ada notifikasi</div>
                   ) : (
-                    <span className="text-3xl font-bold text-white uppercase">
-                      {user?.account_name ? user.account_name.charAt(0) : (user?.username ? user.username.charAt(0) : (user?.role === 'SUPER_ADMIN' ? 'A' : 'V'))}
-                    </span>
+                    notifications.map((n) => {
+                      const isRead = readIds.includes(n.id);
+                      const styles = getSeverityStyles(n.severity);
+                      return (
+                        <div
+                          key={n.id}
+                          onClick={() => handleNotificationClick(n)}
+                          className={`flex gap-2 p-2 rounded-lg border transition-all cursor-pointer ${styles.bg} ${styles.border} ${!isRead ? 'ring-1 ring-primary/25 opacity-100' : 'opacity-60'}`}
+                        >
+                          {styles.icon}
+                          <div className="flex-1 space-y-0.5">
+                            <div className="flex justify-between items-start">
+                              <span className={`text-xs font-semibold ${styles.text} line-clamp-1`}>{n.title}</span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground line-clamp-2">{n.message}</p>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
-              
-              <div className="flex space-x-3 w-full">
-                <form onSubmit={handleUploadProfilePicture} className="flex-1 flex flex-col space-y-3">
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => setProfilePicFile(e.target.files ? e.target.files[0] : null)}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <div className="flex items-center justify-center w-full px-4 py-2 border border-dashed border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
-                      <Upload className="w-4 h-4 mr-2 text-slate-400" />
-                      <span className="text-sm text-slate-300 truncate">
-                        {profilePicFile ? profilePicFile.name : "Pilih File Gambar"}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <button
-                    type="submit"
-                    disabled={!profilePicFile || isUploadingPic}
-                    className="w-full rounded-lg px-4 py-2 text-sm font-medium text-[#fff] shadow-lg bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 disabled:from-slate-700 disabled:to-slate-800 disabled:text-slate-500 disabled:shadow-none transition-all duration-300 flex items-center justify-center"
-                  >
-                    {isUploadingPic ? (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                    ) : (
-                      <ImageIcon className="w-4 h-4 mr-2" />
-                    )}
-                    {isUploadingPic ? "Mengunggah..." : "Unggah Foto"}
-                  </button>
-                </form>
-
-                {user?.profile_picture && (
-                  <button
-                    onClick={handleRemoveProfilePicture}
-                    disabled={isUploadingPic}
-                    className="flex flex-col items-center justify-center px-4 py-2 border border-red-500/30 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors shrink-0 disabled:opacity-50"
-                  >
-                    <Trash2 className="w-5 h-5 mb-1" />
-                    <span className="text-[10px] font-medium">Hapus</span>
-                  </button>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex justify-end pt-2 border-t border-border/50">
-              <button
-                type="button"
-                onClick={() => setIsAccountOpen(false)}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 hover:bg-secondary hover:text-white transition-colors"
-              >
-                Tutup
-              </button>
-            </div>
+            )}
           </div>
-        ) : activeTab === 'account_name' ? (
-          <form onSubmit={handleChangeAccountName} className="space-y-4">
-            {accountNameErrorMsg && (
-              <div className="rounded-lg bg-red-500/10 p-3 text-xs text-red-400 border border-red-500/20">
-                {accountNameErrorMsg}
-              </div>
-            )}
-            {accountNameSuccessMsg && (
-              <div className="rounded-lg bg-green-500/10 p-3 text-xs text-green-400 border border-green-500/20">
-                {accountNameSuccessMsg}
-              </div>
-            )}
+        </div>
+      </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Nama Tampilan Baru</label>
-              <input
-                type="text"
-                value={newAccountName}
-                onChange={(e) => setNewAccountName(e.target.value)}
-                required
-                className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none"
-                placeholder="Misal: Super Admin Budi"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Password Saat Ini (Otorisasi)</label>
-              <div className="relative">
-                <input
-                  type={showCurrent ? "text" : "password"}
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none pr-10"
-                  placeholder="Ketik password untuk melanjutkan"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCurrent(!showCurrent)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition-colors"
-                >
-                  {showCurrent ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => setIsAccountOpen(false)}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 hover:bg-secondary hover:text-white transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                disabled={!newAccountName || !currentPassword || isSubmittingAccountName}
-                className="rounded-lg px-6 py-2 text-sm font-medium text-[#fff] shadow-lg bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 disabled:from-slate-700 disabled:to-slate-800 disabled:text-slate-500 disabled:shadow-none transition-all duration-300 flex items-center"
-              >
-                {isSubmittingAccountName ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                ) : null}
-                {isSubmittingAccountName ? "Menyimpan..." : "Simpan Nama Akun"}
-              </button>
-            </div>
-          </form>
-        ) : activeTab === 'username' ? (
-          <form onSubmit={handleChangeUsername} className="space-y-4">
-            {usernameErrorMsg && (
-              <div className="rounded-lg bg-red-500/10 p-3 text-xs text-red-400 border border-red-500/20">
-                {usernameErrorMsg}
-              </div>
-            )}
-            {usernameSuccessMsg && (
-              <div className="rounded-lg bg-green-500/10 p-3 text-xs text-green-400 border border-green-500/20">
-                {usernameSuccessMsg}
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Username Baru</label>
-              <input
-                type="text"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                required
-                className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none"
-                placeholder="Masukkan username baru (min. 4 karakter)"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Password Saat Ini (Otorisasi)</label>
-              <div className="relative">
-                <input
-                  type={showCurrent ? "text" : "password"}
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none pr-10"
-                  placeholder="Ketik password untuk melanjutkan"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCurrent(!showCurrent)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition-colors"
-                >
-                  {showCurrent ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => setIsAccountOpen(false)}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 hover:bg-secondary hover:text-white transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                disabled={!newUsername || !currentPassword || isSubmittingUsername}
-                className="rounded-lg px-6 py-2 text-sm font-medium text-[#fff] shadow-lg bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 disabled:from-slate-700 disabled:to-slate-800 disabled:text-slate-500 disabled:shadow-none transition-all duration-300 flex items-center"
-              >
-                {isSubmittingUsername ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                ) : null}
-                {isSubmittingUsername ? "Menyimpan..." : "Simpan Username"}
-              </button>
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={handlePasswordChange} className="space-y-4">
-            {errorMsg && (
-              <div className="rounded-lg bg-red-500/10 p-3 text-xs text-red-400 border border-red-500/20">
-                {errorMsg}
-              </div>
-            )}
-            {successMsg && (
-              <div className="rounded-lg bg-green-500/10 p-3 text-xs text-green-400 border border-green-500/20">
-                {successMsg}
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Password Saat Ini</label>
-              <div className="relative">
-                <input
-                  type={showCurrent ? "text" : "password"}
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none pr-10"
-                  placeholder="Masukkan password saat ini"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCurrent(!showCurrent)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition-colors"
-                >
-                  {showCurrent ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Password Baru</label>
-              <div className="relative">
-                <input
-                  type={showNew ? "text" : "password"}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none pr-10"
-                  placeholder="Ketik password baru"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNew(!showNew)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition-colors"
-                >
-                  {showNew ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Konfirmasi Password Baru</label>
-              <div className="relative">
-                <input
-                  type={showConfirm ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none pr-10"
-                  placeholder="Ketik ulang password baru"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition-colors"
-                >
-                  {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Real-time Checklist */}
-            <div className="rounded-xl bg-gradient-to-br from-secondary/40 to-background p-4 border border-border/50 shadow-inner space-y-3">
-              <span className="text-xs font-semibold text-slate-200">Syarat Kekuatan Password:</span>
-              <ul className="text-xs space-y-2">
-                <li className={cn("flex items-center transition-colors duration-200", isMinLength ? "text-green-400 font-medium" : "text-slate-400")}>
-                  <span className="mr-2.5 text-sm">{isMinLength ? "✓" : "○"}</span> Minimal 6 karakter
-                </li>
-                <li className={cn("flex items-center transition-colors duration-200", hasUppercase ? "text-green-400 font-medium" : "text-slate-400")}>
-                  <span className="mr-2.5 text-sm">{hasUppercase ? "✓" : "○"}</span> Mengandung huruf besar (A-Z)
-                </li>
-                <li className={cn("flex items-center transition-colors duration-200", hasLowercase ? "text-green-400 font-medium" : "text-slate-400")}>
-                  <span className="mr-2.5 text-sm">{hasLowercase ? "✓" : "○"}</span> Mengandung huruf kecil (a-z)
-                </li>
-                <li className={cn("flex items-center transition-colors duration-200", hasNumber ? "text-green-400 font-medium" : "text-slate-400")}>
-                  <span className="mr-2.5 text-sm">{hasNumber ? "✓" : "○"}</span> Mengandung angka (0-9)
-                </li>
-                <li className={cn("flex items-center transition-colors duration-200", passwordsMatch ? "text-green-400 font-medium" : "text-slate-400")}>
-                  <span className="mr-2.5 text-sm">{passwordsMatch ? "✓" : "○"}</span> Password cocok
-                </li>
-              </ul>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => setIsAccountOpen(false)}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 hover:bg-secondary hover:text-white transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                disabled={!isPasswordValid || isSubmitting}
-                className="rounded-lg px-6 py-2 text-sm font-medium text-[#fff] shadow-lg bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 disabled:from-slate-700 disabled:to-slate-800 disabled:text-slate-500 disabled:shadow-none transition-all duration-300 flex items-center"
-              >
-                {isSubmitting ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                ) : null}
-                {isSubmitting ? "Menyimpan..." : "Simpan Password"}
-              </button>
-            </div>
-          </form>
-        )}
-      </Modal>
+      <AccountSettingsModal isOpen={isAccountOpen} onClose={() => setIsAccountOpen(false)} user={user} setUser={setUser} />
     </div>
   );
 }

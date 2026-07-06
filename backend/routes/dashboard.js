@@ -128,14 +128,43 @@ router.get('/dns', (req, res) => {
 router.get('/events', (req, res) => {
   const limit = parseInt(req.query.limit ?? 20);
   const rawData = db.getLatestEvents(limit, req.user?.site_uuid, req.user?.role === 'AGENT_VIEWER' ? req.user?.agent_uuid : null);
+
+  // Normalize timestamp: "2026-06-22 08:12:28" (Netify UTC, tanpa Z) → "2026-06-22T08:12:28Z"
+  function normalizeTimestamp(ts) {
+    if (!ts) return new Date().toISOString();
+    if (ts.includes('T') && (ts.endsWith('Z') || ts.includes('+'))) return ts; // already ISO
+    return ts.replace(' ', 'T') + 'Z';
+  }
+
+  // Inject MAC into message like Netify does:
+  // new.device   → "New device {mac} discovered"
+  // update.device → "An existing device ({mac}) has been reidentified as X"
+  // other types  → keep message as-is, MAC shown separately in column
+  function buildMessage(description, event_type, mac_address) {
+    if (!description) return '';
+    if (!mac_address) return description;
+
+    if (event_type === 'new.device') {
+      // Replace "New device X discovered" → "New device {mac} discovered"
+      return description.replace(/^New device .+ discovered$/, `New device ${mac_address} discovered`);
+    }
+    if (event_type === 'update.device') {
+      // Replace "(Unknown)" or "(X)" → "({mac})"
+      return description.replace(/\([^)]+\)/, `(${mac_address})`);
+    }
+    // For other types (server.discovery, encryption.audit, etc.), keep original
+    return description;
+  }
+
   const mappedData = rawData.map(r => ({
     id: r.id,
     event_id: r.event_id,
     event_type: r.event_type || 'unknown',
     severity: r.severity || 'info',
-    message: r.description || '',
+    message: buildMessage(r.description || '', r.event_type || '', r.mac_address || null),
     source_ip: r.ip_address || null,
-    timestamp: r.event_at || r.fetched_at || new Date().toISOString()
+    mac_address: r.mac_address || null,
+    timestamp: normalizeTimestamp(r.event_at || r.fetched_at)
   }));
   res.json({ ok: true, data: mappedData });
 });

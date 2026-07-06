@@ -974,6 +974,25 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null, search
   }
   const flowMap = new Map(flowsBandwidth.map(f => [f.src_ip, f]));
 
+  // Build historical MAC lookup from ALL flows (not just latest snapshot)
+  // This catches devices that appeared before with a MAC address
+  const historicalMacs = agentUuid
+    ? d.prepare(`
+        SELECT src_ip, src_mac
+        FROM flows
+        WHERE ${siteClause} AND agent_uuid = @agentUuid AND src_mac IS NOT NULL
+        GROUP BY src_ip
+        ORDER BY COUNT(*) DESC
+      `).all({ siteUuid, agentUuid })
+    : d.prepare(`
+        SELECT src_ip, src_mac
+        FROM flows
+        WHERE ${siteClause} AND agent_uuid IS NULL AND src_mac IS NOT NULL
+        GROUP BY src_ip
+        ORDER BY COUNT(*) DESC
+      `).all({ siteUuid });
+  const historicalMacMap = new Map(historicalMacs.map(f => [f.src_ip, f.src_mac]));
+
   // Get all devices in latest snapshot from devices table
   const devices = agentUuid
     ? d.prepare(`SELECT * FROM devices WHERE ${siteClause} AND agent_uuid = @agentUuid AND fetched_at = @fetched_at`).all({ siteUuid, agentUuid, fetched_at: latest.t })
@@ -988,8 +1007,19 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null, search
     const dbMan = dbDev ? dbDev.manufacturer : (intelInfo ? intelInfo.manufacturer : null);
     const dbType = intelInfo ? intelInfo.device_type : null;
 
-    const meta = resolveDeviceMetadata(ip, mac, dbLabel, dbMan, dbType);
-    const isRouted = mac === '04:f4:1c:ce:c2:e6' && ip !== '10.6.50.25' && ip !== '10.6.12.242';
+    // Enrich MAC — fallback chain:
+    // 1. devices.mac_address (most accurate, from API)
+    // 2. intel_device_discovery.mac_address (from device discovery intel)
+    // 3. flows.src_mac latest snapshot
+    // 4. flows.src_mac historical (all time)
+    const resolvedMac = mac
+      || (intelInfo && intelInfo.mac_address ? intelInfo.mac_address : null)
+      || (flowInfo && flowInfo.src_mac ? flowInfo.src_mac : null)
+      || historicalMacMap.get(ip)
+      || null;
+
+    const meta = resolveDeviceMetadata(ip, resolvedMac, dbLabel, dbMan, dbType);
+    const isRouted = resolvedMac === '04:f4:1c:ce:c2:e6' && ip !== '10.6.50.25' && ip !== '10.6.12.242';
 
     const download = flowInfo ? flowInfo.flow_download : (dbDev ? dbDev.download : 0);
     const upload = flowInfo ? flowInfo.flow_upload : (dbDev ? dbDev.upload : 0);
@@ -998,7 +1028,7 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null, search
       id: dbDev ? dbDev.id : null,
       site_uuid: dbDev ? dbDev.site_uuid : siteUuid,
       fetched_at: latest.t,
-      mac_address: mac,
+      mac_address: resolvedMac,
       ip_address: ip,
       device_label: meta.label,
       device_type: meta.type,
@@ -1029,11 +1059,9 @@ function getLatestDevices(limit = 100, siteUuid = null, agentUuid = null, search
 
   resolved.sort((a, b) => b.download - a.download);
   
-  // If agent is specified, only return devices that have some traffic or are active
+  // We no longer filter out devices with 0 traffic for agents.
+  // This allows the Devices page to show offline/idle devices properly.
   let filtered = resolved;
-  if (agentUuid) {
-    filtered = resolved.filter(d => d.total > 0);
-  }
   
   return filtered.slice(0, limit);
 }
@@ -1861,13 +1889,24 @@ function insertVPNDetection(rows, fetchedAt, siteUuid, agentUuid) {
 // (karena event ini tidak diposting ulang tiap menit, simpan kumulatif)
 function getIntelData(table, limit = 100, siteUuid = null, agentUuid = null) {
   const d = getDB();
-  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+
+  if (!agentUuid) {
+    // Admin mode: return latest global snapshot (agent_uuid IS NULL)
+    return d.prepare(`SELECT * FROM ${table} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND agent_uuid IS NULL ORDER BY fetched_at DESC LIMIT @limit`).all({ limit, siteUuid });
+  }
+
+  // Agent mode: try agent_uuid filter first (direct, most accurate)
+  const directResult = d.prepare(`SELECT * FROM ${table} WHERE agent_uuid = @agentUuid ORDER BY fetched_at DESC LIMIT @limit`).all({ agentUuid, limit });
+  if (directResult.length > 0) {
+    return directResult;
+  }
+
+  // Fallback: MAC-based filter for tables that may have been saved without agent_uuid
+  if (AGENT_MAC_MAP[agentUuid]) {
     const macs = AGENT_MAC_MAP[agentUuid];
     const placeholders = macs.map(() => '?').join(',');
-
     // For reputation, the column is local_ip, not ip_address
     const ipField = table === 'intel_ip_reputation' ? 'local_ip' : 'ip_address';
-
     return d.prepare(`
       SELECT * FROM ${table} 
       WHERE mac_address IN (${placeholders}) OR ${ipField} IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
@@ -1875,7 +1914,8 @@ function getIntelData(table, limit = 100, siteUuid = null, agentUuid = null) {
       LIMIT ?
     `).all(...macs, ...macs, limit);
   }
-  return d.prepare(`SELECT * FROM ${table} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid) ORDER BY fetched_at DESC LIMIT @limit`).all({ limit, siteUuid, agentUuid });
+
+  return [];
 }
 
 function getIntelStats(siteUuid = null, agentUuid = null) {
@@ -1887,19 +1927,28 @@ function getIntelStats(siteUuid = null, agentUuid = null) {
   ];
   const counts = {};
 
-  const macs = agentUuid ? AGENT_MAC_MAP[agentUuid] : null;
-  const placeholders = macs ? macs.map(() => '?').join(',') : '';
-
   for (const t of tables) {
     try {
-      if (agentUuid && macs) {
-        const ipField = t === 'intel_ip_reputation' ? 'local_ip' : 'ip_address';
-        counts[t] = d.prepare(`
-          SELECT COUNT(*) as n FROM ${t} 
-          WHERE mac_address IN (${placeholders}) OR ${ipField} IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
-        `).get(...macs, ...macs)?.n ?? 0;
+      if (!agentUuid) {
+        // Admin: count global (agent_uuid IS NULL)
+        counts[t] = d.prepare(`SELECT COUNT(*) as n FROM ${t} WHERE agent_uuid IS NULL`).get()?.n ?? 0;
       } else {
-        counts[t] = d.prepare(`SELECT COUNT(*) as n FROM ${t} WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid) AND (@agentUuid IS NULL OR agent_uuid = @agentUuid)`).get({ siteUuid, agentUuid })?.n ?? 0;
+        // Agent mode: try agent_uuid directly first
+        const directCount = d.prepare(`SELECT COUNT(*) as n FROM ${t} WHERE agent_uuid = ?`).get(agentUuid)?.n ?? 0;
+        if (directCount > 0) {
+          counts[t] = directCount;
+        } else if (AGENT_MAC_MAP[agentUuid]) {
+          // Fallback MAC-based
+          const macs = AGENT_MAC_MAP[agentUuid];
+          const placeholders = macs.map(() => '?').join(',');
+          const ipField = t === 'intel_ip_reputation' ? 'local_ip' : 'ip_address';
+          counts[t] = d.prepare(`
+            SELECT COUNT(*) as n FROM ${t} 
+            WHERE mac_address IN (${placeholders}) OR ${ipField} IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
+          `).get(...macs, ...macs)?.n ?? 0;
+        } else {
+          counts[t] = 0;
+        }
       }
     } catch { counts[t] = 0; }
   }
@@ -1917,10 +1966,17 @@ function getDataInterval() {
 
 module.exports = {
   getUserByUsername,
+  getUserByAgentUuid,
   updateUserPassword,
   updateUserUsername,
   updateUserAccountName,
   updateUserProfilePicture,
+  // Admin user management
+  getAllUsers,
+  getUserById,
+  createAgentUser,
+  adminUpdateUser,
+  deleteAgentUser,
   syncAgentUsers,
   getDB,
   getDataInterval,
@@ -1953,6 +2009,20 @@ function getUserByUsername(username) {
   return getDB().prepare('SELECT * FROM users WHERE username = ?').get(username);
 }
 
+// Returns the canonical user for an agent_uuid (prefers the one with account_name set)
+function getUserByAgentUuid(agentUuid) {
+  const d = getDB();
+  // First: find a user with account_name set for this agent
+  const withName = d.prepare(
+    "SELECT * FROM users WHERE agent_uuid = ? AND role = 'AGENT_VIEWER' AND account_name IS NOT NULL ORDER BY id ASC LIMIT 1"
+  ).get(agentUuid);
+  if (withName) return withName;
+  // Fallback: any user for this agent
+  return d.prepare(
+    "SELECT * FROM users WHERE agent_uuid = ? AND role = 'AGENT_VIEWER' ORDER BY id ASC LIMIT 1"
+  ).get(agentUuid);
+}
+
 function updateUserPassword(userId, newPasswordHash) {
   return getDB().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newPasswordHash, userId);
 }
@@ -1967,6 +2037,55 @@ function updateUserAccountName(userId, newAccountName) {
 
 function updateUserProfilePicture(userId, filename) {
   return getDB().prepare('UPDATE users SET profile_picture = ? WHERE id = ?').run(filename, userId);
+}
+
+// ─── ADMIN USER MANAGEMENT ──────────────────────────────────────────────────
+
+function getAllUsers() {
+  return getDB().prepare(
+    'SELECT id, username, role, site_uuid, agent_uuid, account_name, profile_picture, created_at FROM users ORDER BY role DESC, id ASC'
+  ).all();
+}
+
+function getUserById(userId) {
+  return getDB().prepare(
+    'SELECT id, username, role, site_uuid, agent_uuid, account_name, profile_picture, created_at FROM users WHERE id = ?'
+  ).get(userId);
+}
+
+function createAgentUser(username, passwordHash, accountName, agentUuid, siteUuid) {
+  const d = getDB();
+  // Check username unique
+  const existing = d.prepare('SELECT id FROM users WHERE username = ?').get(username);
+  if (existing) throw new Error('Username sudah digunakan');
+  return d.prepare(
+    'INSERT INTO users (username, password_hash, role, site_uuid, agent_uuid, account_name) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(username, passwordHash, 'AGENT_VIEWER', siteUuid || null, agentUuid || null, accountName || null);
+}
+
+function adminUpdateUser(userId, fields) {
+  const d = getDB();
+  const allowed = ['username', 'password_hash', 'account_name', 'agent_uuid', 'profile_picture'];
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(fields)) {
+    if (allowed.includes(k) && v !== undefined) {
+      sets.push(`${k} = ?`);
+      vals.push(v);
+    }
+  }
+  if (sets.length === 0) return { changes: 0 };
+  vals.push(userId);
+  return d.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+}
+
+function deleteAgentUser(userId) {
+  const d = getDB();
+  // Prevent deleting SUPER_ADMIN
+  const user = d.prepare('SELECT role FROM users WHERE id = ?').get(userId);
+  if (!user) throw new Error('User tidak ditemukan');
+  if (user.role === 'SUPER_ADMIN') throw new Error('Tidak bisa menghapus akun SUPER_ADMIN');
+  return d.prepare('DELETE FROM users WHERE id = ?').run(userId);
 }
 
 function syncAgentUsers(agents) {

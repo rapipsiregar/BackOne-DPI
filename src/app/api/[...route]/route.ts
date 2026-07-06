@@ -58,6 +58,11 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ rou
       if (cookie) {
         headers.set('cookie', cookie);
       }
+      // Forward X-View-As-Agent header for view-as mode data filtering
+      const viewAsHeader = req.headers.get('x-view-as-agent');
+      if (viewAsHeader) {
+        headers.set('x-view-as-agent', viewAsHeader);
+      }
     }
     
     // Some requests like GET cannot have a body
@@ -77,12 +82,30 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ rou
     // Return raw text so we don't try to parse it if it's not JSON
     const responseText = await response.text();
     
-    return new NextResponse(responseText, {
+    // Build the response
+    const nextResponse = new NextResponse(responseText, {
       status: response.status,
       headers: {
         'Content-Type': response.headers.get('content-type') || 'application/json',
       }
     });
+    
+    // Forward ALL Set-Cookie headers individually so cookies reach the browser
+    // This is critical for view_as_token and auth token cookies
+    const rawCookies = response.headers.getSetCookie ? response.headers.getSetCookie() : [];
+    if (rawCookies.length > 0) {
+      rawCookies.forEach(cookie => {
+        nextResponse.headers.append('Set-Cookie', cookie);
+      });
+    } else {
+      // Fallback: single set-cookie header
+      const setCookieHeader = response.headers.get('set-cookie');
+      if (setCookieHeader) {
+        nextResponse.headers.set('Set-Cookie', setCookieHeader);
+      }
+    }
+
+    return nextResponse;
   } catch (error: any) {
     console.error('[Proxy Error]', error);
     return NextResponse.json({ ok: false, message: error.message }, { status: 500 });

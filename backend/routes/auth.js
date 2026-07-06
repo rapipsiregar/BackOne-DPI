@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { getUserByUsername, updateUserPassword, updateUserUsername, updateUserAccountName, updateUserProfilePicture, getDB } = require('../database');
+const { getUserByUsername, getUserByAgentUuid, updateUserPassword, updateUserUsername, updateUserAccountName, updateUserProfilePicture, getAllUsers, getUserById, createAgentUser, adminUpdateUser, deleteAgentUser, getDB } = require('../database');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
@@ -66,7 +66,38 @@ router.get('/me', (req, res) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    res.json({ user: decoded });
+
+    // Query DB fresh for latest account_name/profile_picture (in case admin updated after login)
+    const freshUser = getUserByUsername(decoded.username);
+    if (!freshUser) {
+      // Fallback to JWT data if user not found (edge case)
+      return res.json({ user: decoded });
+    }
+
+    // For AGENT_VIEWER: also check if there's a canonical account for the same agent_uuid
+    // that has account_name set (handles duplicate account edge case)
+    let accountName = freshUser.account_name;
+    if (!accountName && freshUser.agent_uuid && freshUser.role === 'AGENT_VIEWER') {
+      const canonicalUser = getUserByAgentUuid(freshUser.agent_uuid);
+      if (canonicalUser?.account_name) {
+        accountName = canonicalUser.account_name;
+      }
+    }
+
+    res.json({
+      user: {
+        id: freshUser.id,
+        username: freshUser.username,
+        account_name: accountName || freshUser.account_name,
+        profile_picture: freshUser.profile_picture,
+        role: freshUser.role,
+        site_uuid: freshUser.site_uuid,
+        agent_uuid: freshUser.agent_uuid,
+        // Keep iat/exp from JWT for session validity
+        iat: decoded.iat,
+        exp: decoded.exp,
+      }
+    });
   } catch (err) {
     res.status(401).json({ error: 'Invalid token' });
   }
@@ -389,6 +420,163 @@ router.get('/geoip', async (req, res) => {
       city: 'Remote',
       as_org: 'Public Network'
     });
+  }
+});
+
+// ─── ADMIN: USER MANAGEMENT ─────────────────────────────────────────────────
+
+// Middleware: hanya SUPER_ADMIN yang boleh akses
+function requireAdmin(req, res, next) {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Hanya admin yang boleh akses' });
+    req.adminUser = decoded;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Token tidak valid' });
+  }
+}
+
+// Middleware: auth untuk semua user terlogin
+function requireAuth(req, res, next) {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: 'Token tidak valid' });
+  }
+}
+
+// GET /api/auth/admin/users — daftar semua users (hanya admin)
+router.get('/admin/users', requireAdmin, (req, res) => {
+  try {
+    const users = getAllUsers();
+    res.json({ ok: true, data: users });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/auth/admin/create-agent-user — buat akun Network Agent baru
+router.post('/admin/create-agent-user', requireAdmin, (req, res) => {
+  const { username, password, account_name, agent_uuid } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ ok: false, error: 'Username dan password wajib diisi' });
+  }
+  try {
+    const passwordHash = bcrypt.hashSync(password, 10);
+    const siteUuid = process.env.BACKONE_SITE_UUID || process.env.NETIFY_SITE_UUID || null;
+    const result = createAgentUser(username.trim(), passwordHash, account_name?.trim() || null, agent_uuid?.trim() || null, siteUuid);
+    res.json({ ok: true, message: 'Akun Network Agent berhasil dibuat', userId: result.lastInsertRowid });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/auth/admin/update-agent-user — update akun Network Agent
+router.post('/admin/update-agent-user', requireAdmin, upload.single('profile_picture'), async (req, res) => {
+  const { user_id, username, password, account_name, agent_uuid } = req.body;
+  if (!user_id) return res.status(400).json({ ok: false, error: 'user_id wajib diisi' });
+
+  try {
+    const target = getUserById(parseInt(user_id));
+    if (!target) return res.status(404).json({ ok: false, error: 'User tidak ditemukan' });
+    if (target.role === 'SUPER_ADMIN') return res.status(403).json({ ok: false, error: 'Tidak bisa mengubah akun SUPER_ADMIN dari sini' });
+
+    const fields = {};
+    if (username?.trim()) {
+      // Cek username unik
+      const existing = getAllUsers().find(u => u.username === username.trim() && u.id !== parseInt(user_id));
+      if (existing) return res.status(400).json({ ok: false, error: 'Username sudah digunakan' });
+      fields.username = username.trim();
+    }
+    if (password) fields.password_hash = bcrypt.hashSync(password, 10);
+    if (account_name !== undefined) fields.account_name = account_name?.trim() || null;
+    if (agent_uuid !== undefined) fields.agent_uuid = agent_uuid?.trim() || null;
+    if (req.file) fields.profile_picture = req.file.filename;
+
+    adminUpdateUser(parseInt(user_id), fields);
+    const updated = getUserById(parseInt(user_id));
+    res.json({ ok: true, message: 'Akun berhasil diperbarui', user: updated });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// DELETE /api/auth/admin/delete-agent-user/:id — hapus akun Network Agent
+router.delete('/admin/delete-agent-user/:id', requireAdmin, (req, res) => {
+  try {
+    deleteAgentUser(parseInt(req.params.id));
+    res.json({ ok: true, message: 'Akun berhasil dihapus' });
+  } catch (err) {
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/auth/admin/upload-agent-picture/:id — upload foto profil untuk agent oleh admin
+router.post('/admin/upload-agent-picture/:id', requireAdmin, upload.single('profile_picture'), (req, res) => {
+  const userId = parseInt(req.params.id);
+  if (!req.file) return res.status(400).json({ ok: false, error: 'File gambar wajib diupload' });
+  try {
+    const target = getUserById(userId);
+    if (!target) return res.status(404).json({ ok: false, error: 'User tidak ditemukan' });
+    adminUpdateUser(userId, { profile_picture: req.file.filename });
+    res.json({ ok: true, message: 'Foto profil berhasil diperbarui', filename: req.file.filename });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── ADMIN: VIEW-AS AGENT ────────────────────────────────────────────────────
+
+// POST /api/auth/admin/view-as — admin masuk mode "lihat sebagai agent"
+router.post('/admin/view-as', requireAdmin, (req, res) => {
+  const { agent_uuid, agent_label } = req.body;
+  if (!agent_uuid) return res.status(400).json({ ok: false, error: 'agent_uuid wajib diisi' });
+
+  const viewToken = jwt.sign(
+    {
+      adminId: req.adminUser.id,
+      adminUsername: req.adminUser.username,
+      viewAs: agent_uuid,
+      viewAsLabel: agent_label || agent_uuid,
+      type: 'view-as'
+    },
+    JWT_SECRET,
+    { expiresIn: '8h' }
+  );
+
+  // Return token dalam JSON body (frontend akan simpan di localStorage)
+  // Pendekatan ini lebih reliable daripada Set-Cookie melalui proxy
+  res.json({ 
+    ok: true, 
+    message: `Sekarang melihat sebagai ${agent_label || agent_uuid}`,
+    view_token: viewToken,
+    agent_uuid,
+    agent_label: agent_label || agent_uuid
+  });
+});
+
+// DELETE /api/auth/admin/view-as — keluar dari mode view-as
+router.delete('/admin/view-as', requireAdmin, (req, res) => {
+  res.clearCookie('view_as_token');
+  res.json({ ok: true, message: 'Kembali ke tampilan admin' });
+});
+
+// GET /api/auth/view-as — cek status view-as (untuk frontend)
+router.get('/view-as', requireAuth, (req, res) => {
+  const viewToken = req.cookies?.view_as_token;
+  if (!viewToken) return res.json({ active: false });
+  try {
+    const decoded = jwt.verify(viewToken, JWT_SECRET);
+    res.json({ active: true, agent_uuid: decoded.viewAs, agent_label: decoded.viewAsLabel });
+  } catch {
+    res.clearCookie('view_as_token');
+    res.json({ active: false });
   }
 });
 

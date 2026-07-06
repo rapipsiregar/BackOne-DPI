@@ -9,6 +9,24 @@ import { Loader2, AlertCircle, Info, AlertTriangle } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
+// Helper: format UTC ISO timestamp → Waktu WIB (UTC+7)
+function formatTimestampWIB(ts: string): string {
+  try {
+    return new Date(ts).toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return ts;
+  }
+}
+
 function EventsContent() {
   const [mounted, setMounted] = useState(false);
   const { data, isLoading } = useEvents(100); // fetch 100 events
@@ -36,18 +54,16 @@ function EventsContent() {
 
   const columns: Column<typeof data[0]>[] = [
     { header: "#", accessor: (row, i) => i + 1 },
-    { 
-      header: "Timestamp", 
-      accessor: (row) => {
-        try {
-          return new Date(row.timestamp).toLocaleString();
-        } catch {
-          return row.timestamp;
-        }
-      }
+    {
+      header: "Timestamp (WIB)",
+      accessor: (row) => (
+        <span className="font-mono text-xs text-slate-300 whitespace-nowrap">
+          {formatTimestampWIB(row.timestamp)}
+        </span>
+      )
     },
-    { 
-      header: "Severity", 
+    {
+      header: "Severity",
       accessor: (row) => (
         <div className="flex items-center gap-2">
           {getSeverityIcon(row.severity)}
@@ -56,11 +72,35 @@ function EventsContent() {
       )
     },
     { header: "Event Type", accessor: (row) => row.event_type },
-    { 
-      header: "Source IP", 
-      accessor: (row) => <span className="text-blue-400">{row.source_ip || "-"}</span> 
+    {
+      header: "MAC Address",
+      accessor: (row) => row.mac_address
+        ? <span className="font-mono text-xs text-emerald-400">{row.mac_address}</span>
+        : <span className="text-slate-500">-</span>
     },
-    { header: "Message", accessor: (row) => row.message }
+    {
+      header: "Source IP",
+      accessor: (row) => <span className="text-blue-400 font-mono text-xs">{row.source_ip || "-"}</span>
+    },
+    {
+      header: "Message",
+      accessor: (row) => {
+        const msg = row.message;
+        const mac = row.mac_address;
+        if (!mac || !msg.includes(mac)) {
+          return <span className="text-slate-200 text-sm">{msg}</span>;
+        }
+        // Highlight MAC in message with teal color (like Netify)
+        const parts = msg.split(mac);
+        return (
+          <span className="text-slate-200 text-sm">
+            {parts[0]}
+            <span className="font-mono text-emerald-400 font-medium">{mac}</span>
+            {parts[1]}
+          </span>
+        );
+      }
+    }
   ];
 
   return (
@@ -80,13 +120,14 @@ function EventsContent() {
           <DataTable
             data={data}
             columns={columns}
-            searchPlaceholder="Search by event type, severity, IP, or message..."
+            searchPlaceholder="Search by event type, severity, MAC, IP, or message..."
             searchFilter={(row, query) => {
               const q = query.toLowerCase();
               return (
                 (row.event_type || "").toLowerCase().includes(q) ||
                 (row.severity || "").toLowerCase().includes(q) ||
                 (row.source_ip || "").toLowerCase().includes(q) ||
+                (row.mac_address || "").toLowerCase().includes(q) ||
                 (row.message || "").toLowerCase().includes(q)
               );
             }}

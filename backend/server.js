@@ -40,6 +40,32 @@ function requireAuth(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
     req.user = jwt.verify(token, JWT_SECRET);
+
+    // ── VIEW-AS MODE ──────────────────────────────────────────────────────────
+    // Jika admin sedang dalam mode "View As Agent", frontend mengirim header
+    // X-View-As-Agent berisi JWT token yang berisi agent_uuid yang dipilih.
+    // Pendekatan header lebih reliable dari cookie karena melewati Next.js proxy.
+    const viewAsHeader = req.headers['x-view-as-agent'];
+    if (viewAsHeader && req.user.role === 'SUPER_ADMIN') {
+      try {
+        const viewDecoded = jwt.verify(viewAsHeader, JWT_SECRET);
+        if (viewDecoded.type === 'view-as' && viewDecoded.adminId === req.user.id && viewDecoded.viewAs) {
+          // Override: set role ke AGENT_VIEWER dan agent_uuid ke agent yang dipilih
+          req.user = {
+            ...req.user,
+            role: 'AGENT_VIEWER',
+            agent_uuid: viewDecoded.viewAs,
+            _viewAsMode: true,
+            _originalRole: 'SUPER_ADMIN',
+          };
+        }
+      } catch (viewErr) {
+        // Token view-as invalid/expired — abaikan, lanjut sebagai admin normal
+        console.warn('[ViewAs] Invalid view-as token, ignoring:', viewErr.message);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     next();
   } catch (err) {
     res.status(401).json({ error: 'Invalid token' });

@@ -10,7 +10,7 @@ import { Loader2, ChevronRight } from "lucide-react";
 
 export default function DevicesPage() {
   const [mounted, setMounted] = useState(false);
-  const devices = useDevices(100);
+  const devices = useDevices(1000);
   const [selectedDevice, setSelectedDevice] = useState<DeviceStat | null>(null);
 
   useEffect(() => {
@@ -102,7 +102,7 @@ export default function DevicesPage() {
             columns={columns}
             searchPlaceholder="Search devices by IP, MAC, OS..."
             searchFilter={(row, query) => {
-              const q = query.toLowerCase();
+              const q = query.trim().toLowerCase();
               return (
                 (row.ip_address || "").toLowerCase().includes(q) ||
                 (row.mac_address || "").toLowerCase().includes(q) ||

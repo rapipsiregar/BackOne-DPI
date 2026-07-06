@@ -133,7 +133,7 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
               <div>
                 <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
                   <Monitor className="w-4 h-4 text-cyan-400" />
-                  {data.has_domain_breakdown ? "Top Devices (via Domain Match)" : "Top Devices / IPs"}
+                  Top 5 Flow Records (Realtime)
                   {data.top_ips.filter(ip => ip.blacklisted).length > 0 && (
                     <span className="ml-auto text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full ring-1 ring-red-500/30">
                       🚫 {data.top_ips.filter(ip => ip.blacklisted).length} Blacklisted
@@ -146,12 +146,14 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="text-left border-b border-border">
-                          <th className="pb-2 text-xs font-medium text-muted-foreground">#</th>
-                          <th className="pb-2 text-xs font-medium text-muted-foreground">IP Address</th>
-                          <th className="pb-2 text-xs font-medium text-muted-foreground text-right">Download</th>
-                          <th className="pb-2 text-xs font-medium text-muted-foreground text-right">Upload</th>
-                          <th className="pb-2 text-xs font-medium text-muted-foreground">Usage</th>
+                        <tr className="text-left border-b border-white/10">
+                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground w-8">#</th>
+                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground">Source IP</th>
+                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground">Dest IP</th>
+                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground">Label / Domain</th>
+                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground">Time</th>
+                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground text-right">Download</th>
+                          <th className="pb-3 text-xs font-medium text-muted-foreground text-right">Upload</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
@@ -159,9 +161,9 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
                           const maxDl = Math.max(...data.top_ips.map(x => x.download), 1);
                           const pct = (ip.download / maxDl) * 100;
                           return (
-                            <tr key={i} className="hover:bg-white/[0.03] transition-colors">
-                              <td className="py-2 pr-4 text-xs text-muted-foreground">{i + 1}</td>
-                              <td className="py-2 pr-4 font-mono text-xs">
+                            <tr key={i} className="hover:bg-white/[0.04] transition-colors group">
+                              <td className="py-3 pr-4 text-xs text-muted-foreground group-hover:text-white transition-colors">{i + 1}</td>
+                              <td className="py-3 pr-4 font-mono text-xs">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className={ip.blacklisted ? "text-red-400" : "text-blue-400"}>{ip.ip_address || "-"}</span>
                                   {ip.blacklisted && (
@@ -172,16 +174,17 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
                                   )}
                                 </div>
                               </td>
-                              <td className="py-2 pr-4 text-right text-xs text-cyan-400">{fmtBytes(ip.download)}</td>
-                              <td className="py-2 pr-4 text-right text-xs text-green-400">{fmtBytes(ip.upload ?? 0)}</td>
-                              <td className="py-2 w-32">
-                                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full ${ip.blacklisted ? "bg-red-500" : "bg-gradient-to-r from-cyan-500 to-green-500"}`}
-                                    style={{ width: `${pct}%` }}
-                                  />
-                                </div>
+                              <td className="py-3 pr-4 font-mono text-xs text-muted-foreground truncate max-w-[120px]">
+                                {ip.dst_ip || "-"}
                               </td>
+                              <td className="py-3 pr-4 text-xs text-slate-300 truncate max-w-[150px]">
+                                {ip.domain || data.app_label || "-"}
+                              </td>
+                              <td className="py-3 pr-4 text-xs text-muted-foreground whitespace-nowrap">
+                                {ip.last_seen ? new Date(ip.last_seen).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : "-"}
+                              </td>
+                              <td className="py-3 pr-4 text-right text-xs font-medium text-cyan-400">{fmtBytes(ip.download)}</td>
+                              <td className="py-3 text-right text-xs font-medium text-green-400">{fmtBytes(ip.upload ?? 0)}</td>
                             </tr>
                           );
                         })}

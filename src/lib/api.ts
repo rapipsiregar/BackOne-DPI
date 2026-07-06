@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getViewAsHeaders } from './admin-api';
 
 // Common Response Wrapper
 export interface ApiResponse<T> {
@@ -48,6 +49,7 @@ export interface EventStat {
   severity: string;
   message: string;
   source_ip: string | null;
+  mac_address: string | null;
   timestamp: string;
 }
 
@@ -166,7 +168,9 @@ export interface ContinentStat {
 // Fetcher Function
 export async function fetcher<T>(endpoint: string): Promise<T> {
   const url = `/api/dashboard${endpoint}`;
-  const res = await fetch(url);
+  // Tambahkan X-View-As-Agent header jika admin dalam mode view-as
+  const viewAsHeaders = getViewAsHeaders();
+  const res = await fetch(url, { headers: viewAsHeaders });
   if (!res.ok) {
     throw new Error(`API error: ${res.status} ${res.statusText}`);
   }
