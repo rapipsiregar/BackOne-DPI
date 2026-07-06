@@ -218,7 +218,7 @@ export default function AgentsPage() {
                   <li>Buka dan login ke portal <a href="https://portal.netify.ai" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">BackOne Portal</a>.</li>
                   <li>Di menu sebelah kiri, navigasikan ke <strong>Settings</strong> &gt; <strong>API Keys</strong>.</li>
                   <li>Buat atau salin kunci tipe <strong>Standard API Key</strong>.</li>
-                  <li>Buka file <code className="text-slate-200">.env.local</code> di proyek Anda, lalu ganti nilai <code className="text-slate-200">NETIFY_API_KEY</code> dengan kunci baru tersebut.</li>
+                  <li>Buka file <code className="text-slate-200">.env.local</code> di proyek Anda, lalu ganti nilai <code className="text-slate-200">BACKONE_API_KEY</code> (atau <code className="text-slate-200">NETIFY_API_KEY</code>) dengan kunci baru tersebut.</li>
                 </ol>
               </div>
             </div>
