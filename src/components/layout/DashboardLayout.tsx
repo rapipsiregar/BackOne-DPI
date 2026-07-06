@@ -3,11 +3,15 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { usePathname } from "next/navigation";
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string>("—");
   const [intervalText, setIntervalText] = useState<string>("");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  
+  const pathname = usePathname();
 
   const fetchDataIntervalRange = () => {
     fetch('/api/dashboard/data-interval')
@@ -26,7 +30,6 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               minute: '2-digit',
               hour12: false
             };
-            // e.g. "1 Jul 2026 04:57 - 1 Jul 2026 08:42"
             setIntervalText(`${sDate.toLocaleString('id-ID', options)} - ${eDate.toLocaleString('id-ID', options)}`);
           }
         }
@@ -42,7 +45,6 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // Poll updates on backend
     try {
       await fetch('/api/dashboard/refresh', { method: 'POST' });
     } catch {}
@@ -53,17 +55,19 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-transparent transition-colors duration-500">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-transparent transition-colors duration-500 relative">
+      <Sidebar isCollapsed={isSidebarCollapsed} />
+      
+      <div className="flex flex-1 flex-col overflow-hidden w-full min-w-0 relative transition-all duration-500 ease-in-out">
         <Header 
           lastUpdate={lastUpdate} 
           isRefreshing={isRefreshing} 
           onRefresh={handleRefresh}
           intervalText={intervalText}
+          onMenuClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
-        <main className="flex-1 overflow-y-auto bg-transparent p-6 transition-colors duration-500">
-          <div className="mx-auto max-w-7xl space-y-6">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-transparent p-4 md:p-6 transition-all duration-500 ease-in-out w-full relative">
+          <div className="mx-auto w-full max-w-7xl space-y-6">
             {children}
           </div>
         </main>

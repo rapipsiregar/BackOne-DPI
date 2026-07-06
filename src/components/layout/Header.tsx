@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Bell, RefreshCw, Calendar, AlertTriangle, Info, Clock, Check } from "lucide-react";
+import { Bell, RefreshCw, Calendar, AlertTriangle, Info, Clock, Check, Menu } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useThreats, useEvents } from "@/lib/api";
 
@@ -49,11 +49,13 @@ export function Header({
   isRefreshing = false,
   onRefresh = () => {},
   intervalText = "",
+  onMenuClick,
 }: {
   lastUpdate?: string;
   isRefreshing?: boolean;
   onRefresh?: () => void;
   intervalText?: string;
+  onMenuClick?: () => void;
 }) {
   const [user, setUser] = useState<{ role?: string; agent_uuid?: string } | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -188,19 +190,32 @@ export function Header({
   };
 
   return (
-    <header className="flex min-h-[4rem] h-auto py-3 lg:py-0 lg:h-16 shrink-0 flex-col lg:flex-row items-center justify-between border-b border-border bg-background px-4 lg:px-6 gap-3">
-      <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 lg:gap-4">
+    <header className="flex min-h-[4rem] h-auto py-3 shrink-0 flex-row flex-wrap items-center justify-between border-b border-border bg-background px-4 lg:px-6 gap-3 z-20">
+      <div className="flex flex-wrap items-center justify-start gap-2 lg:gap-4 w-full lg:w-auto">
+        <button
+          onClick={onMenuClick}
+          className="p-2 -ml-2 mr-1 text-muted-foreground hover:text-white hover:bg-secondary/50 rounded-lg transition-colors shrink-0"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
         <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground whitespace-nowrap shadow-sm">
           <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-          <span className="truncate max-w-[100px] sm:max-w-[150px] md:max-w-none">
-            Site: {process.env.NEXT_PUBLIC_SITE_ID || "Unknown Site"}
+          <span className="truncate max-w-[200px] sm:max-w-[250px] md:max-w-none">
+            Site: {process.env.NEXT_PUBLIC_SITE_ID || "Unknown Site"} - {(() => {
+              if (user?.role === 'SUPER_ADMIN') return 'Admin';
+              if (user?.role === 'AGENT_VIEWER') {
+                const label = AGENT_LABELS[user.agent_uuid || ''];
+                return label ? `Network Agent (${label})` : 'Network Agent';
+              }
+              return 'User';
+            })()}
           </span>
         </div>
         {intervalText && (
           <div className="flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 px-3 py-1 text-xs text-blue-400 font-medium whitespace-nowrap">
             <Calendar className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate max-w-[140px] sm:max-w-[250px] md:max-w-none">
-              <span className="hidden lg:inline">Rentang Data: </span>
               {intervalText}
             </span>
           </div>
@@ -208,21 +223,8 @@ export function Header({
         <RealtimeClock />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between lg:justify-end gap-2 lg:gap-4 w-full lg:w-auto">
-        {user?.role === 'AGENT_VIEWER' && (
-          <div className="flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-950/40 px-3 py-1 text-xs text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.1)] whitespace-nowrap">
-            <span className="font-semibold hidden sm:inline">Agent:</span>
-            <span className="truncate max-w-[120px] md:max-w-none">
-              {AGENT_LABELS[user.agent_uuid || ''] || user.agent_uuid}
-            </span>
-            <span className="text-[10px] opacity-60 hidden md:inline">({user.agent_uuid})</span>
-          </div>
-        )}
-        {user?.role === 'SUPER_ADMIN' && (
-          <div className="flex items-center gap-2 rounded-full border border-red-500/30 bg-red-950/40 px-3 py-1 text-xs text-red-300 shadow-[0_0_10px_rgba(239,68,68,0.1)] whitespace-nowrap">
-            <span className="font-semibold">Admin:</span> All Agents
-          </div>
-        )}
+      <div className="flex flex-wrap items-center justify-start lg:justify-end gap-2 lg:gap-4 w-full lg:w-auto mt-2 lg:mt-0">
+
         <div className="text-xs text-muted-foreground whitespace-nowrap">
           Update: {lastUpdate}
         </div>
@@ -293,7 +295,7 @@ export function Header({
                             </span>
                             <span className="text-[9px] text-slate-500 whitespace-nowrap flex items-center gap-0.5">
                               <Clock className="w-2.5 h-2.5" />
-                              {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(n.timestamp).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                           <p className="text-[11px] text-slate-300 leading-normal line-clamp-2">

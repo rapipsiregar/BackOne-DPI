@@ -47,7 +47,7 @@ const navigation = [
   { name: "DPI Analytics", href: "/dpi-analytics", icon: Activity },
 ];
 
-export function Sidebar() {
+export function Sidebar({ isCollapsed = false }: { isCollapsed?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -281,49 +281,66 @@ export function Sidebar() {
   });
 
   return (
-    <div className="flex h-full w-64 flex-col border-r border-border/50 bg-sidebar/80 backdrop-blur-2xl relative">
+    <div className={cn(
+      "flex h-full flex-col border-r border-border/50 bg-sidebar/80 backdrop-blur-2xl transition-all duration-500 ease-in-out relative z-30 overflow-x-hidden",
+      isCollapsed ? "w-[72px]" : "w-64"
+    )}>
       {/* Subtle glow effect behind sidebar */}
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
       
-      <div className="flex h-[72px] shrink-0 items-center px-6 border-b border-border/50 relative z-10">
-        <img src="/backone-logo.png" alt="BackOne Logo" className="w-8 h-8 mr-3 rounded-full drop-shadow-[0_0_10px_rgba(255,0,0,0.3)]" />
-        <div className="flex flex-col">
+      <div className="flex h-[72px] shrink-0 items-center border-b border-border/50 relative z-10 w-full overflow-hidden">
+        <div className="w-[72px] shrink-0 flex justify-center items-center">
+          <img src="/backone-logo.png" alt="BackOne Logo" className="w-8 h-8 rounded-full drop-shadow-[0_0_10px_rgba(255,0,0,0.3)]" />
+        </div>
+        <div className={cn(
+          "flex flex-col whitespace-nowrap transition-opacity duration-500",
+          isCollapsed ? "opacity-0" : "opacity-100"
+        )}>
           <span className="text-lg font-bold font-backone text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70 leading-tight">
             BackOne
           </span>
-          <span className="text-[10px] font-medium font-backone text-muted-foreground tracking-wide mt-0.5">
+          <span className="text-[10px] font-medium font-backone text-muted-foreground mt-0.5 truncate w-[160px]">
             Deep Package Inspection
           </span>
         </div>
       </div>
 
-      <div className="py-6 flex flex-col items-center border-b border-border/50 relative z-10">
+      <div className="py-6 flex flex-col items-center border-b border-border/50 relative z-10 overflow-hidden w-full">
         <div className="relative">
-          <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-primary to-blue-400 p-0.5 shadow-lg shadow-primary/20 overflow-hidden">
+          <div className={cn(
+            "rounded-full bg-gradient-to-tr from-primary to-blue-400 p-0.5 shadow-lg shadow-primary/20 overflow-hidden transition-all duration-500 ease-in-out shrink-0 mx-auto",
+            isCollapsed ? "h-10 w-10" : "h-16 w-16"
+          )}>
             <div className="flex h-full w-full items-center justify-center rounded-full bg-background overflow-hidden relative">
               {user?.profile_picture ? (
                 <img src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <span className="text-xl font-bold text-white uppercase">
+                <span className={cn("font-bold text-white uppercase transition-all duration-500", isCollapsed ? "text-base" : "text-xl")}>
                   {user?.account_name ? user.account_name.charAt(0) : (user?.username ? user.username.charAt(0) : (user?.role === 'SUPER_ADMIN' ? 'A' : 'V'))}
                 </span>
               )}
             </div>
           </div>
-          <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-background bg-green-500 shadow-sm" />
+          <div className={cn(
+            "absolute rounded-full border-2 border-background bg-green-500 shadow-sm transition-all duration-500",
+            isCollapsed ? "-bottom-0.5 -right-0.5 h-3 w-3" : "-bottom-1 -right-1 h-4 w-4"
+          )} />
         </div>
         
-        <div className="mt-4 flex flex-col items-center w-full px-4 space-y-1.5">
-          <span className="font-semibold text-white tracking-wide text-center leading-snug break-words max-w-full">
+        <div className={cn(
+          "flex flex-col items-center transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap",
+          isCollapsed ? "opacity-0 max-h-0 mt-0 max-w-0" : "opacity-100 max-h-[100px] mt-4 w-[256px]"
+        )}>
+          <span className="font-semibold text-white tracking-wide text-center leading-snug truncate w-full px-4">
             {user?.account_name || user?.username || 'Loading...'}
           </span>
-          <span className="rounded-full bg-primary/20 px-2.5 py-0.5 text-[10px] font-medium text-primary border border-primary/30 shrink-0">
+          <span className="mt-1.5 rounded-full bg-primary/20 px-2.5 py-0.5 text-[10px] font-medium text-primary border border-primary/30 shrink-0">
             {user?.role === 'SUPER_ADMIN' ? 'PRO' : 'STD'}
           </span>
         </div>
       </div>
       <div className="flex flex-1 flex-col overflow-y-auto relative z-10 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20 transition-colors">
-        <nav className="flex-1 space-y-1.5 px-3 py-6">
+        <nav className="flex-1 py-6 flex flex-col items-center overflow-hidden w-full space-y-1.5">
           {filteredNavigation.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -331,31 +348,38 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "group relative flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 overflow-hidden",
+                  "group relative flex items-center rounded-lg py-2.5 text-sm font-medium transition-all duration-500 overflow-hidden shrink-0",
+                  isCollapsed ? "w-[48px]" : "w-[232px]",
                   isActive
                     ? "bg-primary/10 text-white shadow-[0_0_10px_rgba(59,130,246,0.1)]"
                     : "text-muted-foreground hover:bg-secondary/50 hover:text-white"
                 )}
+                title={isCollapsed ? item.name : undefined}
               >
                 {/* Active indicator bar */}
                 {isActive && (
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
                 )}
                 
-                <item.icon
-                  className={cn(
-                    "mr-3 h-5 w-5 shrink-0 transition-all duration-300",
-                    isActive 
-                      ? "text-primary drop-shadow-[0_0_8px_rgba(59,130,246,0.5)] scale-110" 
-                      : "text-muted-foreground group-hover:text-white group-hover:scale-110"
-                  )}
-                  aria-hidden="true"
-                />
-                <span className="relative z-10">{item.name}</span>
+                <div className="w-[48px] shrink-0 flex justify-center items-center">
+                  <item.icon
+                    className={cn(
+                      "h-5 w-5 transition-all duration-300",
+                      isActive 
+                        ? "text-primary drop-shadow-[0_0_8px_rgba(59,130,246,0.5)] scale-110" 
+                        : "text-muted-foreground group-hover:text-white group-hover:scale-110"
+                    )}
+                    aria-hidden="true"
+                  />
+                </div>
+                <span className={cn(
+                  "relative z-10 transition-opacity duration-500 whitespace-nowrap",
+                  isCollapsed ? "opacity-0" : "opacity-100"
+                )}>{item.name}</span>
                 
                 {/* Hover background effect */}
                 {!isActive && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none translate-x-[-100%] group-hover:translate-x-[100%] transition-transform" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none translate-x-[-100%] group-hover:translate-x-[100%]" />
                 )}
               </Link>
             );
@@ -363,7 +387,7 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className="px-3 py-4 border-t border-border/50 relative z-10 shrink-0 space-y-1.5 flex flex-col">
+      <div className="py-4 border-t border-border/50 relative z-10 shrink-0 space-y-1.5 flex flex-col items-center w-full">
         <button
           onClick={() => {
             setErrorMsg("");
@@ -381,21 +405,39 @@ export function Sidebar() {
             setActiveTab("account_name");
             setIsAccountOpen(true);
           }}
-          className="flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-secondary/50 hover:text-white transition-all duration-200"
+          className={cn(
+            "relative flex items-center rounded-lg py-2.5 text-sm font-medium text-slate-400 hover:bg-secondary/50 hover:text-white transition-all duration-500 overflow-hidden shrink-0",
+            isCollapsed ? "w-[48px]" : "w-[232px]"
+          )}
+          title={isCollapsed ? "Account Settings" : undefined}
         >
-          <User className="mr-3 h-5 w-5" />
-          Account Settings
+          <div className="w-[48px] shrink-0 flex justify-center items-center">
+            <User className="h-5 w-5 transition-all duration-500" />
+          </div>
+          <span className={cn(
+            "transition-opacity duration-500 whitespace-nowrap",
+            isCollapsed ? "opacity-0" : "opacity-100"
+          )}>Account Settings</span>
         </button>
-        <div className="flex w-full space-x-1.5">
+        <div className={cn("flex transition-all duration-500", isCollapsed ? "w-[48px] flex-col space-y-1.5" : "w-[232px] space-x-1.5")}>
           <button
             onClick={handleLogout}
-            className="flex flex-1 items-center rounded-lg px-3 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all duration-200"
+            className={cn(
+              "relative flex items-center rounded-lg py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all duration-500 overflow-hidden shrink-0",
+              isCollapsed ? "w-[48px]" : "flex-1"
+            )}
+            title={isCollapsed ? "Logout" : undefined}
           >
-            <LogOut className="mr-3 h-5 w-5" />
-            Logout
+            <div className="w-[48px] shrink-0 flex justify-center items-center">
+              <LogOut className="h-5 w-5 transition-all duration-500" />
+            </div>
+            <span className={cn(
+              "transition-opacity duration-500 whitespace-nowrap",
+              isCollapsed ? "opacity-0" : "opacity-100"
+            )}>Logout</span>
           </button>
           
-          {mounted && (
+          {mounted && !isCollapsed && (
             <button
               onClick={() => {
                 const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -407,7 +449,7 @@ export function Sidebar() {
                   setTheme(nextTheme);
                 });
               }}
-              className="flex items-center justify-center rounded-lg px-3 py-2.5 text-slate-400 hover:bg-secondary/50 hover:text-white transition-all duration-200"
+              className="flex items-center justify-center rounded-lg px-3 py-2.5 text-slate-400 hover:bg-secondary/50 hover:text-white transition-all duration-200 shrink-0"
               title="Toggle Theme"
             >
               {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
