@@ -164,8 +164,8 @@ export default function SecurityAuditPage() {
 
       {/* Security Overview Cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        {security.data.map((item) => (
-          <Card key={item.tls_security} className="bg-card/50 backdrop-blur-sm border-border/50">
+        {security.data.map((item, index) => (
+          <Card key={`${item.tls_security}-${index}`} className="bg-card/50 backdrop-blur-sm border-border/50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {item.tls_security} Connections

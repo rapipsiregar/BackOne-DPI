@@ -41,7 +41,7 @@ export default function LookupPage() {
           {isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
         </h1>
         <p className="text-slate-400 mt-2">
-          Search Netify's extensive classification database of over 2,500+ apps, protocols, and services.
+          Search BackOne's extensive classification database of over 2,500+ apps, protocols, and services.
         </p>
       </div>
 

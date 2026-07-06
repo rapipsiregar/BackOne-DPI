@@ -1,0 +1,11 @@
+fetch("https://backend.demoplace.my.id/api/auth/login", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username: "admin", password: "admin" })
+}).then(res => {
+  console.log("Status:", res.status);
+  console.log("Content-Type:", res.headers.get("content-type"));
+  return res.text();
+}).then(text => {
+  console.log("Body:", text.substring(0, 150));
+}).catch(console.error);

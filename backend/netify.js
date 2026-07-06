@@ -4,7 +4,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 const axios = require('axios');
 
 const BASE_URL  = 'https://informatics.netify.ai/api/v1';
-const JWT_TOKEN = process.env.NETIFY_JWT_TOKEN;
+const JWT_TOKEN = process.env.NETIFY_TOKEN || process.env.NETIFY_JWT_TOKEN;
 const SITE_UUID = process.env.NETIFY_SITE_UUID;
 const agentMap = {};
 

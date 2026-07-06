@@ -210,15 +210,14 @@ export default function AgentsPage() {
                 <span>Akses Agents Ditolak (403 Forbidden)</span>
               </div>
               <p className="text-sm leading-relaxed">
-                API Key yang Anda gunakan saat ini (<code className="bg-red-950/40 text-red-300 px-1.5 py-0.5 rounded font-mono text-xs">sk_db_live_...</code>) adalah <strong>Site-scoped API Key</strong>. Netify membatasi kunci ini agar hanya dapat membaca data statistik jaringan (Informatics), sehingga tidak memiliki izin untuk mengelola inventaris Agents global.
+                API Key yang Anda gunakan saat ini (<code className="bg-red-950/40 text-red-300 px-1.5 py-0.5 rounded font-mono text-xs">sk_db_live_...</code>) adalah <strong>Site-scoped API Key</strong>. BackOne membatasi kunci ini agar hanya dapat membaca data statistik jaringan (Informatics), sehingga tidak memiliki izin untuk mengelola inventaris Agents global.
               </p>
               <div className="bg-slate-900/60 rounded-lg p-4 border border-border/40 text-xs space-y-2 leading-relaxed">
                 <p className="font-semibold text-white">💡 Cara Mengatasinya:</p>
                 <ol className="list-decimal pl-4 space-y-1 text-slate-400">
-                  <li>Buka dan login ke portal <a href="https://portal.netify.ai" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Netify Portal</a>.</li>
-                  <li>Masuk ke menu <strong>Account</strong> di bagian atas.</li>
-                  <li>Pilih <strong>Profile &gt; API Access</strong> pada menu sebelah kiri.</li>
-                  <li>Buat sebuah <strong>Account-level API Key</strong> (kunci ini akan memiliki akses menyeluruh tanpa kedaluwarsa).</li>
+                  <li>Buka dan login ke portal <a href="https://portal.netify.ai" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">BackOne Portal</a>.</li>
+                  <li>Di menu sebelah kiri, navigasikan ke <strong>Settings</strong> &gt; <strong>API Keys</strong>.</li>
+                  <li>Buat atau salin kunci tipe <strong>Standard API Key</strong>.</li>
                   <li>Buka file <code className="text-slate-200">.env.local</code> di proyek Anda, lalu ganti nilai <code className="text-slate-200">NETIFY_API_KEY</code> dengan kunci baru tersebut.</li>
                 </ol>
               </div>

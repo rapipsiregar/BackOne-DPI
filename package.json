@@ -6,6 +6,7 @@
     "dev": "concurrently \"next dev\" \"node backend/server.js\"",
     "build": "next build",
     "start": "next start",
+    "start:prod": "concurrently \"next start\" \"node backend/server.js\"",
     "lint": "eslint",
     "backend": "node backend/server.js"
   },
@@ -32,6 +33,7 @@
     "react-globe.gl": "^2.38.0",
     "react-simple-maps": "^3.0.0",
     "recharts": "^3.9.0",
+    "ssh2": "^1.17.0",
     "swr": "^2.4.2",
     "tailwind-merge": "^3.6.0",
     "three": "^0.185.0"

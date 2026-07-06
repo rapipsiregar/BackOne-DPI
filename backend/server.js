@@ -51,7 +51,7 @@ app.use('/api/dashboard', requireAuth, dashboardRoutes);
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, message: 'Netify Dashboard Backend berjalan!', time: new Date().toISOString() });
+  res.json({ ok: true, message: 'BackOne Dashboard Backend berjalan!', time: new Date().toISOString() });
 });
 
 
