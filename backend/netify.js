@@ -18,6 +18,7 @@ function headersSite(useApiKey = false) {
 }
 
 function getMockDataForPath(path, params = {}) {
+  return null;
   if (path.includes('/data/stats/summary')) {
     return {
       download: 218648938113,
@@ -364,6 +365,7 @@ async function netifyFetch(path, params = {}, useApiKey = false, agentUuid = nul
     }
   }
   if (!JWT_TOKEN || !SITE_UUID || JWT_TOKEN === 'YOUR_JWT_TOKEN' || SITE_UUID === 'YOUR_SITE_UUID' || JWT_TOKEN.startsWith('change_me') || JWT_TOKEN.startsWith('YOUR_')) {
+    console.log('[DEBUG] FALLBACK due to invalid config', {hasToken: !!JWT_TOKEN, SITE_UUID});
     return getMockDataForPath(path, params);
   }
   try {
@@ -373,6 +375,7 @@ async function netifyFetch(path, params = {}, useApiKey = false, agentUuid = nul
     const json = res.data;
     if (json?.status_code !== 0) {
       console.error(`[Netify] API Error ${json?.status_code} pada ${path}: ${json?.status_message}`);
+      console.log('[DEBUG] FALLBACK due to API error', json);
       return getMockDataForPath(path, params);
     }
     return json?.data ?? null;
@@ -380,6 +383,7 @@ async function netifyFetch(path, params = {}, useApiKey = false, agentUuid = nul
     const s = err.response?.status;
     const msg = JSON.stringify(err.response?.data ?? err.message);
     console.error(`[Netify] ${s ?? 'ERR'} ${path}: ${msg}. Falling back to mock data.`);
+    console.log('[DEBUG] FALLBACK due to catch error');
     return getMockDataForPath(path, params);
   }
 }

@@ -160,8 +160,12 @@ async function runPoll() {
     // 9. Bandwidth Timeline
     const summary  = await netify.fetchBandwidthSummary(1440, agentUuid);
     const devCount = devices?.length ?? 0;
-    db.insertBandwidthTimeline({ ...summary, devices: devCount }, fetchedAt, SITE_UUID, agentUuid);
-    console.log(`[Scheduler] OK Timeline   : saved`);
+    if (summary) {
+      db.insertBandwidthTimeline({ ...summary, devices: devCount }, fetchedAt, SITE_UUID, agentUuid);
+      console.log(`[Scheduler] OK Timeline   : saved`);
+    } else {
+      console.log(`[Scheduler] -- Timeline   : gagal ambil data`);
+    }
 
     // 21. TLS Versions
     const tlsVer = await netify.fetchTLSVersions(1440, 10, agentUuid);
