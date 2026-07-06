@@ -3,13 +3,13 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 const axios = require('axios');
 
-const BASE_URL  = 'https://informatics.netify.ai/api/v1';
-const JWT_TOKEN = process.env.NETIFY_TOKEN || process.env.NETIFY_JWT_TOKEN;
-const SITE_UUID = process.env.NETIFY_SITE_UUID;
+const BASE_URL  = process.env.BACKONE_INFORMATICS_BASE_URL || process.env.NETIFY_INFORMATICS_BASE_URL || 'https://informatics.netify.ai/api/v1';
+const JWT_TOKEN = process.env.BACKONE_JWT_TOKEN || process.env.NETIFY_TOKEN || process.env.NETIFY_JWT_TOKEN;
+const SITE_UUID = process.env.BACKONE_SITE_UUID || process.env.NETIFY_SITE_UUID;
 const agentMap = {};
 
 function headersSite(useApiKey = false) {
-  const token = process.env.NETIFY_API_KEY || JWT_TOKEN;
+  const token = process.env.BACKONE_API_KEY || process.env.NETIFY_API_KEY || JWT_TOKEN;
   const headers = { 'x-api-key': token, 'Accept': 'application/json' };
   if (SITE_UUID) {
     headers['x-net-site'] = SITE_UUID;

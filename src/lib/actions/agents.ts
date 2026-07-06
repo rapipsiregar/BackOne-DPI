@@ -2,16 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 
-const API_URL = process.env.NETIFY_BASE_URL ? `${process.env.NETIFY_BASE_URL}/assets/agents` : "https://manager.netify.ai/api/v1/assets/agents";
+const BASE_URL = process.env.BACKONE_BASE_URL || process.env.NETIFY_BASE_URL;
+const API_URL = BASE_URL ? `${BASE_URL}/assets/agents` : "https://manager.netify.ai/api/v1/assets/agents";
+
+const getApiKey = () => process.env.BACKONE_API_KEY || process.env.NETIFY_API_KEY;
+const getJwtToken = () => process.env.BACKONE_JWT_TOKEN || process.env.NETIFY_JWT_TOKEN;
+const getSiteUuid = () => process.env.BACKONE_SITE_UUID || process.env.NETIFY_SITE_UUID;
 
 // Helper function to get headers
 const getHeaders = () => {
-  const API_KEY = process.env.NETIFY_API_KEY;
-  const JWT_TOKEN = process.env.NETIFY_JWT_TOKEN;
-  const SITE_UUID = process.env.NETIFY_SITE_UUID;
+  const API_KEY = getApiKey();
+  const JWT_TOKEN = getJwtToken();
+  const SITE_UUID = getSiteUuid();
   
   if (!API_KEY && !JWT_TOKEN) {
-    throw new Error("NETIFY_API_KEY or NETIFY_JWT_TOKEN is not set in environment variables");
+    throw new Error("BACKONE_API_KEY or BACKONE_JWT_TOKEN is not set in environment variables");
   }
 
   const headers: Record<string, string> = {
@@ -49,8 +54,8 @@ export interface Agent {
 
 export async function getAgents(): Promise<Agent[]> {
   try {
-    const API_KEY = process.env.NETIFY_API_KEY;
-    const SITE_UUID = process.env.NETIFY_SITE_UUID;
+    const API_KEY = getApiKey();
+    const SITE_UUID = getSiteUuid();
 
     // Fallback to Informatics Scorecard Agent if site-scoped API key is used
     if (API_KEY && API_KEY.startsWith("sk_db_")) {
@@ -182,7 +187,7 @@ export async function getAgents(): Promise<Agent[]> {
 
 export async function getAgent(agentId: string): Promise<Agent | null> {
   try {
-    const API_KEY = process.env.NETIFY_API_KEY;
+    const API_KEY = getApiKey();
     if (API_KEY && API_KEY.startsWith("sk_db_")) {
       const agents = await getAgents();
       return agents.find(a => a.uuid === agentId || String(a.id) === agentId) || null;
@@ -208,7 +213,7 @@ export async function getAgent(agentId: string): Promise<Agent | null> {
 
 export async function createAgent(agentId: string, label: string) {
   try {
-    const API_KEY = process.env.NETIFY_API_KEY;
+    const API_KEY = getApiKey();
     if (API_KEY && API_KEY.startsWith("sk_db_")) {
       return { success: false, message: "Aksi ditolak: Site-scoped API Key tidak diperbolehkan membuat Agents." };
     }
@@ -236,7 +241,7 @@ export async function createAgent(agentId: string, label: string) {
 
 export async function updateAgent(agentId: string, label: string) {
   try {
-    const API_KEY = process.env.NETIFY_API_KEY;
+    const API_KEY = getApiKey();
     if (API_KEY && API_KEY.startsWith("sk_db_")) {
       return { success: false, message: "Aksi ditolak: Site-scoped API Key tidak diperbolehkan mengubah Agents." };
     }
@@ -260,7 +265,7 @@ export async function updateAgent(agentId: string, label: string) {
 
 export async function deleteAgent(agentId: string) {
   try {
-    const API_KEY = process.env.NETIFY_API_KEY;
+    const API_KEY = getApiKey();
     if (API_KEY && API_KEY.startsWith("sk_db_")) {
       return { success: false, message: "Aksi ditolak: Site-scoped API Key tidak diperbolehkan menghapus Agents." };
     }

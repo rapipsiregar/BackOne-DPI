@@ -83,15 +83,23 @@ export default function LookupPage() {
                     <div className="flex items-start justify-between">
                       <div className="h-10 w-10 rounded-lg bg-secondary/80 flex items-center justify-center overflow-hidden border border-border/40 group-hover:border-primary/20 transition-all">
                         {app.favicon || app.logo ? (
-                          <img 
-                            src={app.favicon || app.logo} 
-                            alt={app.label} 
-                            className="h-6 w-6 object-contain"
-                            onError={(e) => {
-                              // If image fails, replace with default icon
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                          />
+                          <>
+                            <img 
+                              src={app.favicon || app.logo} 
+                              alt={app.label} 
+                              className="h-6 w-6 object-contain"
+                              onError={(e) => {
+                                // If image fails, hide it and show the sibling icon
+                                const img = e.target as HTMLElement;
+                                img.style.display = 'none';
+                                const sibling = img.nextSibling as HTMLElement;
+                                if (sibling) {
+                                  sibling.style.display = 'block';
+                                }
+                              }}
+                            />
+                            <AppWindow className="h-5 w-5 text-slate-400" style={{ display: 'none' }} />
+                          </>
                         ) : (
                           <AppWindow className="h-5 w-5 text-slate-400" />
                         )}

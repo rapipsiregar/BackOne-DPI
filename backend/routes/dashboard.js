@@ -4,6 +4,31 @@ const router = express.Router();
 const db = require('../database');
 const { runPoll } = require('../scheduler');
 
+// Rebrand Netify values dynamically in dashboard responses using safe JSON string serialization
+router.use((req, res, next) => {
+  const originalJson = res.json;
+  res.json = function (body) {
+    if (body) {
+      try {
+        const jsonStr = JSON.stringify(body);
+        const sanitizedStr = jsonStr
+          .replace(/netify\.unclassified/gi, 'backone.unclassified')
+          .replace(/netify\.(?!ai)/gi, 'backone.')
+          .replace(/Netify's/g, "BackOne's")
+          .replace(/netify's/g, "backone's")
+          .replace(/Netify(?!(\.ai))/g, 'BackOne')
+          .replace(/netify(?!(\.ai))/g, 'backone');
+        body = JSON.parse(sanitizedStr);
+      } catch (err) {
+        console.error('Error rebranding JSON response:', err);
+      }
+    }
+    return originalJson.call(this, body);
+  };
+  next();
+});
+
+
 // GET /api/dashboard/summary — kartu ringkasan (top of page)
 router.get('/summary', (req, res) => {
   const isAgent = req.user?.role === 'AGENT_VIEWER';

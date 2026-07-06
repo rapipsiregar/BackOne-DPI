@@ -32,7 +32,7 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ rou
       const localBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
       destinationUrl = `${localBase}/api/${route}${url.search}`;
     } else {
-      const baseUrl = process.env.NETIFY_BASE_URL || 'https://manager.netify.ai/api/v1';
+      const baseUrl = process.env.BACKONE_BASE_URL || process.env.NETIFY_BASE_URL || 'https://manager.netify.ai/api/v1';
       destinationUrl = `${baseUrl}/${route}${url.search}`;
     }
     
@@ -41,11 +41,15 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ rou
     headers.set('Content-Type', 'application/json');
     
     if (routeArray[0] !== 'auth' && routeArray[0] !== 'dashboard') {
-      if (process.env.NETIFY_JWT_TOKEN && process.env.NETIFY_SITE_UUID) {
-        headers.set('x-api-key', process.env.NETIFY_JWT_TOKEN);
-        headers.set('x-net-site', process.env.NETIFY_SITE_UUID);
-      } else if (process.env.NETIFY_API_KEY) {
-        headers.set('x-api-key', process.env.NETIFY_API_KEY);
+      const jwtToken = process.env.BACKONE_JWT_TOKEN || process.env.NETIFY_JWT_TOKEN;
+      const siteUuid = process.env.BACKONE_SITE_UUID || process.env.NETIFY_SITE_UUID;
+      const apiKey = process.env.BACKONE_API_KEY || process.env.NETIFY_API_KEY;
+
+      if (jwtToken && siteUuid) {
+        headers.set('x-api-key', jwtToken);
+        headers.set('x-net-site', siteUuid);
+      } else if (apiKey) {
+        headers.set('x-api-key', apiKey);
       }
     } else {
       // For local auth/dashboard routes, pass along the cookie for authentication
