@@ -798,6 +798,9 @@ export interface AppIpItem {
   flow_count?: number;
   reputation?: string | null;
   blacklisted?: boolean;
+  dst_ip?: string | null;
+  domain?: string | null;
+  last_seen?: string | null;
 }
 
 export interface AppDetails {
