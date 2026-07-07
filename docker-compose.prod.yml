@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: backone_mongodb_prod
+    restart: always
+    # No ports exposed to the host! Completely internal.
+    volumes:
+      - mongodb_data_prod:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=backone_dpi
+
+  backend:
+    build: 
+      context: ./backend
+    container_name: backone_backend_prod
+    restart: always
+    # No ports exposed to the host! Completely internal.
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/backone_dpi
+      - BACKEND_PORT=3001
+    env_file:
+      - .env.production
+    depends_on:
+      - mongodb
+
+  frontend:
+    build:
+      context: .
+      # Optional: you can define a multi-stage production build in a separate Dockerfile if desired,
+      # but using the standard one works if it builds Next.js standalone.
+    container_name: backone_frontend_prod
+    restart: always
+    # No ports exposed to the host! Completely internal.
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:3001
+    env_file:
+      - .env.production
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    container_name: backone_nginx_prod
+    restart: always
+    ports:
+      - "80:80"
+      # If using SSL, add "443:443" later
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - frontend
+
+volumes:
+  mongodb_data_prod:
