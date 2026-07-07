@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import {
@@ -26,9 +26,9 @@ const COLORS = {
 };
 
 const RISK_CONFIG = {
-  Rawan: { color: "text-red-400", bg: "bg-red-500/20 ring-red-500/40", icon: <ShieldX className="w-3.5 h-3.5" />, dot: "bg-red-500" },
-  Sedang: { color: "text-orange-400", bg: "bg-orange-500/20 ring-orange-500/40", icon: <ShieldAlert className="w-3.5 h-3.5" />, dot: "bg-orange-500" },
-  Aman: { color: "text-green-400", bg: "bg-green-500/20 ring-green-500/40", icon: <ShieldCheck className="w-3.5 h-3.5" />, dot: "bg-green-500" },
+  Vulnerable: { color: "text-red-400", bg: "bg-red-500/20 ring-red-500/40", icon: <ShieldX className="w-3.5 h-3.5" />, dot: "bg-red-500" },
+  Moderate: { color: "text-orange-400", bg: "bg-orange-500/20 ring-orange-500/40", icon: <ShieldAlert className="w-3.5 h-3.5" />, dot: "bg-orange-500" },
+  Safe: { color: "text-green-400", bg: "bg-green-500/20 ring-green-500/40", icon: <ShieldCheck className="w-3.5 h-3.5" />, dot: "bg-green-500" },
 } as const;
 
 export default function SecurityAuditPage() {
@@ -54,9 +54,9 @@ export default function SecurityAuditPage() {
   const isLoading = versions.isLoading || ciphers.isLoading || security.isLoading;
 
   // Risk summary counts
-  const rawan = secDevices.filter((d) => d.risk_level === "Rawan").length;
-  const sedang = secDevices.filter((d) => d.risk_level === "Sedang").length;
-  const aman = secDevices.filter((d) => d.risk_level === "Aman").length;
+  const vulnerableCount = secDevices.filter((d) => d.risk_level === "Vulnerable").length;
+  const moderateCount = secDevices.filter((d) => d.risk_level === "Moderate").length;
+  const safeCount = secDevices.filter((d) => d.risk_level === "Safe").length;
 
   const versionColumns: Column<typeof versions.data[0]>[] = [
     { header: "#", accessor: (row, i) => i + 1 },
@@ -134,7 +134,7 @@ export default function SecurityAuditPage() {
     {
       header: "Risk Level",
       accessor: (row) => {
-        const cfg = RISK_CONFIG[row.risk_level] ?? RISK_CONFIG.Aman;
+        const cfg = RISK_CONFIG[row.risk_level] ?? RISK_CONFIG.Safe;
         return (
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${cfg.bg} ${cfg.color}`}>
             {cfg.icon}
@@ -152,7 +152,7 @@ export default function SecurityAuditPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+<div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
             Security Audit
@@ -161,6 +161,7 @@ export default function SecurityAuditPage() {
           <p className="text-muted-foreground mt-1 text-sm">TLS encryption analysis and device-level risk assessment.</p>
         </div>
       </div>
+      
 
       {/* Security Overview Cards */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -186,32 +187,32 @@ export default function SecurityAuditPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-red-950/20 border-red-500/20 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-red-300">Rawan (Vulnerable)</CardTitle>
+            <CardTitle className="text-sm font-medium text-red-300">Vulnerable</CardTitle>
             <ShieldX className="h-4 w-4 text-red-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-400">{rawan}</div>
-            <p className="text-xs text-red-300/60 mt-1">device{rawan !== 1 ? "s" : ""} at risk</p>
+            <div className="text-3xl font-bold text-red-400">{vulnerableCount}</div>
+            <p className="text-xs text-red-300/60 mt-1">device{vulnerableCount !== 1 ? "s" : ""} at risk</p>
           </CardContent>
         </Card>
         <Card className="bg-orange-950/20 border-orange-500/20 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-orange-300">Sedang (Moderate)</CardTitle>
+            <CardTitle className="text-sm font-medium text-orange-300">Moderate</CardTitle>
             <ShieldAlert className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-orange-400">{sedang}</div>
-            <p className="text-xs text-orange-300/60 mt-1">device{sedang !== 1 ? "s" : ""} moderate risk</p>
+            <div className="text-3xl font-bold text-orange-400">{moderateCount}</div>
+            <p className="text-xs text-orange-300/60 mt-1">device{moderateCount !== 1 ? "s" : ""} moderate risk</p>
           </CardContent>
         </Card>
         <Card className="bg-green-950/20 border-green-500/20 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-300">Aman (Secure)</CardTitle>
+            <CardTitle className="text-sm font-medium text-green-300">Safe (Secure)</CardTitle>
             <ShieldCheck className="h-4 w-4 text-green-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-400">{aman}</div>
-            <p className="text-xs text-green-300/60 mt-1">device{aman !== 1 ? "s" : ""} secure</p>
+            <div className="text-3xl font-bold text-green-400">{safeCount}</div>
+            <p className="text-xs text-green-300/60 mt-1">device{safeCount !== 1 ? "s" : ""} secure</p>
           </CardContent>
         </Card>
       </div>
@@ -377,3 +378,4 @@ export default function SecurityAuditPage() {
     </div>
   );
 }
+

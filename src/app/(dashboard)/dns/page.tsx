@@ -32,12 +32,13 @@ export default function DNSPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+<div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
           DNS Intelligence
           {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
         </h2>
       </div>
+      
 
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader>

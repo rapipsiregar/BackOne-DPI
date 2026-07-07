@@ -355,6 +355,25 @@ function getMockDataForPath(path, params = {}) {
   return [];
 }
 
+function fixDates(obj) {
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) fixDates(obj[i]);
+  } else if (obj !== null && typeof obj === 'object') {
+    for (const key in obj) {
+      if ((key === 'first_seen_at' || key === 'last_seen_at' || key.endsWith('_at')) && obj[key] && typeof obj[key].date === 'string') {
+        let d = obj[key].date;
+        if (d.includes(' ') && !d.endsWith('Z')) {
+          obj[key].date = d.replace(' ', 'T') + 'Z';
+        } else if (!d.endsWith('Z') && !d.includes('+') && d.includes('T')) {
+          obj[key].date = d + 'Z';
+        }
+      } else if (typeof obj[key] === 'object') {
+        fixDates(obj[key]);
+      }
+    }
+  }
+}
+
 async function netifyFetch(path, params = {}, useApiKey = false, agentUuid = null) {
   if (agentUuid) {
     const agentId = agentMap[agentUuid];
@@ -378,6 +397,7 @@ async function netifyFetch(path, params = {}, useApiKey = false, agentUuid = nul
       console.log('[DEBUG] FALLBACK due to API error', json);
       return getMockDataForPath(path, params);
     }
+    if (json && json.data) fixDates(json.data);
     return json?.data ?? null;
   } catch (err) {
     const s = err.response?.status;
@@ -717,22 +737,44 @@ async function fetchDiscoveredDevices(interval = 1440, limit = 500, agentUuid = 
   // Bagi device yang IP-nya tidak ada di top stats (traffic kecil)
   const dlFlowMap = {};
   const ulFlowMap = {};
+  const macFlowMap = {};
+  const lastSeenFlowMap = {};
+
   if (flowsRaw && Array.isArray(flowsRaw)) {
     for (const f of flowsRaw) {
       const ip = f.local_ip?.address;
       if (!ip) continue;
+      
       if (!dlMap[ip]) {
         dlFlowMap[ip] = (dlFlowMap[ip] ?? 0) + (f.download ?? 0);
       }
       if (!ulMap[ip]) {
         ulFlowMap[ip] = (ulFlowMap[ip] ?? 0) + (f.upload ?? 0);
       }
+
+      // Correlate MAC Address from flow
+      if (!macFlowMap[ip]) {
+          const flowMac = f.local_mac ?? f.mac?.address;
+          if (flowMac && flowMac !== '00:00:00:00:00:00') {
+              macFlowMap[ip] = flowMac;
+          }
+      }
+
+      // Correlate Timestamp from flow
+      const flowTime = f.last_seen_at?.date || f.created_at?.date;
+      if (flowTime) {
+          if (!lastSeenFlowMap[ip] || new Date(flowTime) > new Date(lastSeenFlowMap[ip])) {
+              lastSeenFlowMap[ip] = flowTime;
+          }
+      }
     }
   }
 
   const resolvedList = intelRaw.map(r => {
     const ip = r.ip?.address ?? null;
-    const mac = r.mac_address ?? r.discovery_mac?.address ?? null;
+    let mac = r.mac_address ?? r.discovery_mac?.address ?? null;
+    if (!mac && ip && macFlowMap[ip]) mac = macFlowMap[ip];
+    
     const oui = mac ? mac.substring(0, 8).toUpperCase() : null;
     const mfr = r.mac_vendor !== 'Unknown' && r.mac_vendor !== 'Local' ? r.mac_vendor : (OUI_MAP[oui] ?? r.mac_vendor ?? null);
 
@@ -752,6 +794,9 @@ async function fetchDiscoveredDevices(interval = 1440, limit = 500, agentUuid = 
     const dl = ip ? (dlMap[ip] ?? dlFlowMap[ip] ?? 0) : 0;
     const ul = ip ? (ulMap[ip] ?? ulFlowMap[ip] ?? 0) : 0;
 
+    let last_seen = r.last_seen_at?.date || r.discovery_mac?.last_seen_at?.date || null;
+    if (!last_seen && ip && lastSeenFlowMap[ip]) last_seen = lastSeenFlowMap[ip];
+
     return {
       ip_address   : ip,
       mac_address  : mac,
@@ -761,7 +806,7 @@ async function fetchDiscoveredDevices(interval = 1440, limit = 500, agentUuid = 
       manufacturer : mfr,
       download     : dl,
       upload       : ul,
-      last_seen    : r.last_seen_at?.date || r.discovery_mac?.last_seen_at?.date || null,
+      last_seen    : last_seen,
     };
   });
 
@@ -774,18 +819,18 @@ async function fetchDiscoveredDevices(interval = 1440, limit = 500, agentUuid = 
   for (const ip of allActiveIps) {
     if (!seenIps.has(ip)) {
       seenIps.add(ip);
-      const dl = dlMap[ip] ?? 0;
-      const ul = ulMap[ip] ?? 0;
+      const dl = dlMap[ip] ?? dlFlowMap[ip] ?? 0;
+      const ul = ulMap[ip] ?? ulFlowMap[ip] ?? 0;
       resolvedList.push({
         ip_address   : ip,
-        mac_address  : null,
+        mac_address  : macFlowMap[ip] || null,
         device_label : ip,
         device_type  : 'LAN Client',
         os_label     : 'Windows/Linux',
         manufacturer : 'Unknown',
         download     : dl,
         upload       : ul,
-        last_seen    : new Date().toISOString()
+        last_seen    : lastSeenFlowMap[ip] || new Date().toISOString()
       });
     }
   }
@@ -1311,7 +1356,16 @@ async function fetchAgentDetails(agentUuid) {
   }));
 
   // ── 2. Distinct devices for this agent (using aligned subnet and MAC mapping) ─
-  const resolvedDevices = db.getLatestDevices(100, null, agentUuid);
+  let resolvedDevices = db.getLatestDevices(100, null, agentUuid);
+  
+  // FALLBACK: If agent-specific API failed to return devices, extract from global using MACs
+  if (resolvedDevices.length === 0 && macs.length > 0) {
+    const latestDevGlobal = d.prepare(`SELECT MAX(fetched_at) as t FROM devices WHERE agent_uuid IS NULL`).get()?.t;
+    if (latestDevGlobal) {
+      resolvedDevices = d.prepare(`SELECT * FROM devices WHERE fetched_at = ? AND agent_uuid IS NULL AND mac_address IN (${ph})`).all(latestDevGlobal, ...macs);
+    }
+  }
+
   const agentIPs = resolvedDevices.map(d => d.ip_address).filter(Boolean);
   const phIPs    = agentIPs.length > 0 ? agentIPs.map(() => '?').join(',') : null;
 
@@ -1344,20 +1398,45 @@ async function fetchAgentDetails(agentUuid) {
   }));
 
   // ── 3. Recent flows for this agent (using aligned flows list) ───────────────
-  const flows = db.getLatestFlows(100, null, agentUuid);
+  let flows = db.getLatestFlows(100, null, agentUuid);
+  
+  // FALLBACK: Extrapolate flows from global using MACs/IPs if agent-specific fails
+  if (flows.length === 0 && (macs.length > 0 || agentIPs.length > 0)) {
+    const latestFlowGlobal = d.prepare(`SELECT MAX(fetched_at) as t FROM flows WHERE agent_uuid IS NULL`).get()?.t;
+    if (latestFlowGlobal) {
+      if (phIPs) {
+        flows = d.prepare(`SELECT * FROM flows WHERE fetched_at = ? AND agent_uuid IS NULL AND (local_mac IN (${ph}) OR local_ip IN (${phIPs})) ORDER BY download DESC LIMIT 100`).all(latestFlowGlobal, ...macs, ...agentIPs);
+      } else {
+        flows = d.prepare(`SELECT * FROM flows WHERE fetched_at = ? AND agent_uuid IS NULL AND local_mac IN (${ph}) ORDER BY download DESC LIMIT 100`).all(latestFlowGlobal, ...macs);
+      }
+    }
+  }
 
   // ── 4. Summary stats (aligned with dashboard stats query) ───────────────────
   const stats = db.getStats(null, agentUuid);
+  
+  // ACCURATE BANDWIDTH CALCULATION FROM MAC BANDWIDTH (Overrides broken Netify Summary endpoint)
+  let totalDown = 0;
+  let totalUp = 0;
+  const latestMacSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM mac_bandwidth`).get()?.t;
+  if (latestMacSnap && macs.length > 0) {
+    const macRows = d.prepare(`SELECT download, upload FROM mac_bandwidth WHERE fetched_at = ? AND mac_address IN (${ph})`).all(latestMacSnap, ...macs);
+    for (const r of macRows) {
+      totalDown += (r.download || 0);
+      totalUp += (r.upload || 0);
+    }
+  }
+
   const summary = {
-    total_devices  : stats.totalDevices,
-    active_flows   : stats.activeFlows,
-    bandwidth_down : stats.latestBw?.total_download ?? 0,
-    bandwidth_up   : stats.latestBw?.total_upload   ?? 0,
+    total_devices  : stats.totalDevices > 0 ? stats.totalDevices : devices.length,
+    active_flows   : stats.activeFlows > 0 ? stats.activeFlows : flows.length,
+    bandwidth_down : totalDown > 0 ? totalDown : (stats.latestBw?.total_download ?? 0),
+    bandwidth_up   : totalUp > 0 ? totalUp : (stats.latestBw?.total_upload   ?? 0),
   };
 
   // ── 5. Security Intel filtered by agent IPs & MACs ─────────────────────────
   const encryptionRows = (latestEncAudit && phIPs)
-    ? d.prepare(`SELECT ip_address, mac_address, device_label, encrypted_pct, unencrypted, encrypted, total, risk_level, detected_at FROM intel_encryption_audit WHERE fetched_at = ? AND ip_address IN (${phIPs}) ORDER BY CASE risk_level WHEN 'Rawan' THEN 1 WHEN 'Sedang' THEN 2 ELSE 3 END`).all(latestEncAudit, ...agentIPs)
+    ? d.prepare(`SELECT ip_address, mac_address, device_label, encrypted_pct, unencrypted, encrypted, total, risk_level, detected_at FROM intel_encryption_audit WHERE fetched_at = ? AND ip_address IN (${phIPs}) ORDER BY CASE risk_level WHEN 'Vulnerable' THEN 1 WHEN 'Moderate' THEN 2 ELSE 3 END`).all(latestEncAudit, ...agentIPs)
     : [];
 
   const insecureProtoRows = phIPs
@@ -1401,7 +1480,7 @@ async function fetchAgentDetails(agentUuid) {
   const events = db.getLatestEvents(200, null, agentUuid);
 
   // ── 7. MAC bandwidth for this agent's MACs ──────────────────────────────────
-  const latestMacSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM mac_bandwidth`).get()?.t;
+  // latestMacSnap was already declared above, reusing it.
   const mac_bandwidth = latestMacSnap
     ? d.prepare(`SELECT mac_address, manufacturer, download, upload, total FROM mac_bandwidth WHERE fetched_at = ? AND mac_address IN (${ph}) ORDER BY download DESC`).all(latestMacSnap, ...macs)
     : [];
@@ -2015,53 +2094,92 @@ async function fetchAppDetails(appLabel, agentUuid = null) {
     blacklisted : threatMap[r.ip_address]?.blacklisted ?? false,
   }));
 
-  // ── Per-agent breakdown using agent_uuid grouping in flows ──
-  let agent_scorecard_rows = [];
+  // ── Per-agent breakdown using agent_uuid grouping in flows OR local_mac mapping ──
+  let allRelevantFlows = [];
   if (kws && kws.length > 0) {
     const likeClause2 = kws.map(() => `LOWER(domain) LIKE ?`).join(' OR ');
     const likeParams2 = kws.map(k => `%${k}%`);
     let scoreQuery = `
-      SELECT agent_uuid,
-             SUM(bytes_download) AS download,
-             SUM(bytes_upload)   AS upload,
-             COUNT(*) AS flow_count
+      SELECT agent_uuid, src_mac AS local_mac,
+             bytes_download AS download,
+             bytes_upload   AS upload
       FROM   flows
       WHERE  domain IS NOT NULL AND (${likeClause2})
-             AND agent_uuid IS NOT NULL
     `;
     const scoreParams = [...likeParams2];
     if (agentUuid) {
-      scoreQuery += ` AND agent_uuid = ?`;
+      scoreQuery += ` AND (agent_uuid = ? OR agent_uuid IS NULL)`;
       scoreParams.push(agentUuid);
     }
-    scoreQuery += ` GROUP BY agent_uuid`;
-    agent_scorecard_rows = d.prepare(scoreQuery).all(...scoreParams);
+    allRelevantFlows = d.prepare(scoreQuery).all(...scoreParams);
   } else {
     let scoreQuery = `
-      SELECT agent_uuid,
-             SUM(bytes_download) AS download,
-             SUM(bytes_upload)   AS upload,
-             COUNT(*) AS flow_count
+      SELECT agent_uuid, src_mac AS local_mac,
+             bytes_download AS download,
+             bytes_upload   AS upload
       FROM   flows
       WHERE  app_label = ?
-             AND agent_uuid IS NOT NULL
     `;
     const scoreParams = [appLabel];
     if (agentUuid) {
-      scoreQuery += ` AND agent_uuid = ?`;
+      scoreQuery += ` AND (agent_uuid = ? OR agent_uuid IS NULL)`;
       scoreParams.push(agentUuid);
     }
-    scoreQuery += ` GROUP BY agent_uuid`;
-    agent_scorecard_rows = d.prepare(scoreQuery).all(...scoreParams);
+    allRelevantFlows = d.prepare(scoreQuery).all(...scoreParams);
   }
 
-  const agent_scorecard = agent_scorecard_rows.map(row => ({
-    agent_uuid  : row.agent_uuid,
-    agent_label : AGENT_LABELS[row.agent_uuid] || row.agent_uuid,
-    download    : row.download    ?? 0,
-    upload      : row.upload      ?? 0,
-    flow_count  : row.flow_count  ?? 0,
+  // Reverse map MAC to Agent UUID
+  const macToAgent = {};
+  for (const [auid, macs] of Object.entries(AGENT_MAC_MAP)) {
+    for (const m of macs) {
+      macToAgent[m] = auid;
+    }
+  }
+
+  const agentScoreMap = {};
+  for (const row of allRelevantFlows) {
+    let auid = row.agent_uuid;
+    if (!auid && row.local_mac && macToAgent[row.local_mac]) {
+      auid = macToAgent[row.local_mac]; // Fallback to MAC mapping
+    }
+    if (auid) {
+      if (agentUuid && auid !== agentUuid) continue; // skip if filtering by a specific agent
+      if (!agentScoreMap[auid]) {
+        agentScoreMap[auid] = { download: 0, upload: 0, flow_count: 0 };
+      }
+      agentScoreMap[auid].download += (row.download ?? 0);
+      agentScoreMap[auid].upload += (row.upload ?? 0);
+      agentScoreMap[auid].flow_count += 1;
+    }
+  }
+
+  let agent_scorecard = Object.keys(agentScoreMap).map(auid => ({
+    agent_uuid  : auid,
+    agent_label : AGENT_LABELS[auid] || auid,
+    download    : agentScoreMap[auid].download,
+    upload      : agentScoreMap[auid].upload,
+    flow_count  : agentScoreMap[auid].flow_count,
   })).filter(a => a.download > 0 || a.upload > 0);
+
+  // Fallback to bandwidth_apps if flow-based scorecard is empty
+  if (agent_scorecard.length === 0) {
+    const snapQuery = `SELECT MAX(fetched_at) AS t FROM bandwidth_apps WHERE app_label = @appLabel AND agent_uuid IS NOT NULL`;
+    const latestAppSnap = d.prepare(snapQuery).get({ appLabel })?.t;
+    if (latestAppSnap) {
+      let bwQuery = `SELECT agent_uuid, download, upload FROM bandwidth_apps WHERE app_label = @appLabel AND fetched_at = @latestAppSnap AND agent_uuid IS NOT NULL`;
+      if (agentUuid) bwQuery += ` AND agent_uuid = @agentUuid`;
+      const bwRows = d.prepare(bwQuery).all({ appLabel, latestAppSnap, agentUuid });
+      for (const row of bwRows) {
+        agent_scorecard.push({
+          agent_uuid: row.agent_uuid,
+          agent_label: AGENT_LABELS[row.agent_uuid] || row.agent_uuid,
+          download: row.download,
+          upload: row.upload,
+          flow_count: 0
+        });
+      }
+    }
+  }
 
   return {
     app_label      : appLabel,
@@ -2138,11 +2256,11 @@ async function fetchSecurityDevices(siteUuid = null, agentUuid = null) {
     const encPct = r.encrypted_pct ?? 100;
     let riskLevel;
     if (encPct < 50 || insecureIPs.has(ip)) {
-      riskLevel = 'Rawan';
+      riskLevel = 'Vulnerable';
     } else if (encPct < 80) {
-      riskLevel = 'Sedang';
+      riskLevel = 'Moderate';
     } else {
-      riskLevel = 'Aman';
+      riskLevel = 'Safe';
     }
     if (!deviceMap[ip] || deviceMap[ip].encrypted_pct < encPct) {
       deviceMap[ip] = {
@@ -2177,8 +2295,8 @@ async function fetchSecurityDevices(siteUuid = null, agentUuid = null) {
     manufacturer : discMap[dev.ip_address]?.manufacturer ?? null,
   }));
 
-  // Sort: Rawan first, then Sedang, then Aman
-  const ORDER = { Rawan: 0, Sedang: 1, Aman: 2 };
+  // Sort: Vulnerable first, then Moderate, then Safe
+  const ORDER = { Vulnerable: 0, Moderate: 1, Safe: 2 };
   devices.sort((a, b) => (ORDER[a.risk_level] ?? 3) - (ORDER[b.risk_level] ?? 3));
 
   return devices;

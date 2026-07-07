@@ -13,6 +13,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useDashboardSummary, useTimeline, useTopApps, useTopProtocols, useCountries } from "@/lib/api";
 import { fmtBytes } from "@/lib/utils";
 import { GlobeMap } from "@/components/ui/GlobeMap";
+import { getOriginLocation, getDestinationLocation } from "@/lib/geoUtils";
 import Link from "next/link";
 
 const COLORS = ['#58a6ff', '#3fb950', '#f0883e', '#bc8cff', '#f85149'];
@@ -21,19 +22,63 @@ export default function SummaryPage() {
   const [mounted, setMounted] = useState(false);
   const summary = useDashboardSummary();
   const timeline = useTimeline(24);
-  const topApps = useTopApps(7);
-  const topProtocols = useTopProtocols();
+  const rawTopApps = useTopApps(7);
+  const rawTopProtocols = useTopProtocols();
   const countries = useCountries(20);
+
+  const { topProtocols, topApps } = useMemo(() => {
+    const rawProtos = rawTopProtocols.data || [];
+    let appsData = rawTopApps.data || [];
+
+    const standardProtocols = [
+      'QUIC', 'HTTPS', 'HTTP', 'STUN', 'TCP', 'UDP', 'TLS', 'DNS', 'ICMP', 
+      'SSH', 'FTP', 'SMTP', 'POP3', 'IMAP', 'NTP', 'DHCP', 'BGP', 'OSPF', 'IPSEC', 'OPENVPN'
+    ];
+
+    const actualProtocols = rawProtos.filter(p => standardProtocols.includes(p.protocol_label?.toUpperCase()));
+    const appProtocols = rawProtos.filter(p => !standardProtocols.includes(p.protocol_label?.toUpperCase()));
+
+    const convertedApps = appProtocols.map(p => ({
+      app_label: p.protocol_label,
+      download: p.download || 0,
+      upload: p.upload || 0
+    }));
+
+    let mergedApps = [...appsData.filter(a => a.app_label !== 'Unknown'), ...convertedApps];
+    mergedApps.sort((a, b) => (b.download || 0) - (a.download || 0));
+    mergedApps = mergedApps.slice(0, 7);
+
+    return {
+      topProtocols: { ...rawTopProtocols, data: actualProtocols },
+      topApps: { ...rawTopApps, data: mergedApps.length > 0 ? mergedApps : appsData }
+    };
+  }, [rawTopProtocols.data, rawTopApps.data, rawTopProtocols.isLoading, rawTopApps.isLoading]);
 
   const mapData = useMemo(() => {
     if (!countries.data) return [];
-    return countries.data.map((row) => ({
-      countryCode: row.country_code,
-      value: row.download + row.upload,
-      download: row.download,
-      upload: row.upload,
-      label: row.country_name,
-    }));
+    
+    const origin = getOriginLocation(); // Falls back to default if no specific override
+
+    return countries.data.reduce((acc: any[], row) => {
+      // Skip local-to-local if origin is Indonesia and destination is Indonesia
+      if (row.country_code === "ID" && origin.label.includes("Indonesia")) return acc;
+      
+      const dest = getDestinationLocation(row.country_code, row.country_name);
+      if (dest) {
+        acc.push({
+          startLat: origin.lat,
+          startLng: origin.lng,
+          endLat: dest.lat,
+          endLng: dest.lng,
+          fromLabel: origin.label,
+          toLabel: dest.label,
+          value: row.download + row.upload,
+          download: row.download,
+          upload: row.upload,
+        });
+      }
+      return acc;
+    }, []);
   }, [countries.data]);
 
   useEffect(() => {

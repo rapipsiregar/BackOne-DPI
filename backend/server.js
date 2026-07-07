@@ -1,15 +1,23 @@
-// backend/server.js
+﻿// backend/server.js
 const path     = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 const express  = require('express');
 const cors     = require('cors');
 const cookieParser = require('cookie-parser');
 const jwt      = require('jsonwebtoken');
+const connectDB = require('./db/mongoose');
+
+// Connect to MongoDB
+connectDB();
+
+// Start Data Ingestion Scheduler
+const { startScheduler } = require('./services/ingestionService');
+startScheduler();
 
 const app       = express();
 const PORT      = process.env.BACKEND_PORT || 3001;
 
-// ── Middleware ────────────────────────────────────────────────────────────────
+// â”€â”€ Middleware â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['http://localhost:3000', 'http://127.0.0.1:3000'];
@@ -28,7 +36,7 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// ── API Routes ────────────────────────────────────────────────────────────────
+// â”€â”€ API Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -41,7 +49,7 @@ function requireAuth(req, res, next) {
   try {
     req.user = jwt.verify(token, JWT_SECRET);
 
-    // ── VIEW-AS MODE ──────────────────────────────────────────────────────────
+    // â”€â”€ VIEW-AS MODE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Jika admin sedang dalam mode "View As Agent", frontend mengirim header
     // X-View-As-Agent berisi JWT token yang berisi agent_uuid yang dipilih.
     // Pendekatan header lebih reliable dari cookie karena melewati Next.js proxy.
@@ -60,11 +68,11 @@ function requireAuth(req, res, next) {
           };
         }
       } catch (viewErr) {
-        // Token view-as invalid/expired — abaikan, lanjut sebagai admin normal
+        // Token view-as invalid/expired â€” abaikan, lanjut sebagai admin normal
         console.warn('[ViewAs] Invalid view-as token, ignoring:', viewErr.message);
       }
     }
-    // ─────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     next();
   } catch (err) {
@@ -75,18 +83,15 @@ function requireAuth(req, res, next) {
 const dashboardRoutes = require('./routes/dashboard');
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 
-// ── Health Check ──────────────────────────────────────────────────────────────
+// â”€â”€ Health Check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, message: 'BackOne Dashboard Backend berjalan!', time: new Date().toISOString() });
 });
 
 
-// ── Start Server ──────────────────────────────────────────────────────────────
+// â”€â”€ Start Server â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.listen(PORT, () => {
-  console.log(`\n🚀 API Server berjalan di http://localhost:${PORT}`);
-  console.log(`🔌 API Health : http://localhost:${PORT}/api/health\n`);
+  console.log(`\nðŸš€ API Server berjalan di http://localhost:${PORT}`);
+  console.log(`ðŸ”Œ API Health : http://localhost:${PORT}/api/health\n`);
 
-  // Mulai scheduler polling
-  const { startScheduler } = require('./scheduler');
-  startScheduler();
 });

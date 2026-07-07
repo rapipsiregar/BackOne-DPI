@@ -36,7 +36,7 @@ export default function NetworkIntelligencePage() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
+<div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Network Intelligence
@@ -49,6 +49,7 @@ export default function NetworkIntelligencePage() {
           <span>DPI Engine Active</span>
         </div>
       </div>
+      
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Left Column: App Categories List */}

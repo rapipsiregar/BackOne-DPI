@@ -1,688 +1,603 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  fetchDeviceDetails, DeviceDetails,
-} from "@/lib/api";
+import { fetchDeviceDetails, DeviceDetails, DeviceStat } from "@/lib/api";
+import { useTimeFilter } from "@/contexts/TimeFilterContext";
 import { fmtBytes } from "@/lib/utils";
-import { IpDetails } from "./IpDetails";
-import {
-  Loader2, X, Monitor, Globe, Activity, Lock, Server,
-  AlertTriangle, Eye, Shield, Bell, Wifi, Unlock, Router,
-  Link
-} from "lucide-react";
+import { Loader2, X, Monitor, Activity, Shield, Box, Server, Cpu, Clock, HardDrive, ArrowDownToLine, ArrowUpFromLine, RefreshCcw, Globe, Link2 } from "lucide-react";
 
-interface Props {
-  ip          : string;
-  deviceLabel?: string | null;
-  macAddress? : string | null;
-  onClose     : () => void;
+const PORT_ALIASES: Record<string, string> = {
+  "20": "FTP Data",
+  "21": "FTP Control",
+  "22": "SSH",
+  "23": "Telnet",
+  "25": "SMTP",
+  "53": "DNS",
+  "67": "DHCP Server",
+  "68": "DHCP Client",
+  "80": "HTTP",
+  "110": "POP3",
+  "123": "NTP",
+  "143": "IMAP",
+  "161": "SNMP",
+  "443": "HTTPS",
+  "445": "SMB",
+  "500": "IKE/IPsec",
+  "1433": "MS SQL Server",
+  "1521": "Oracle DB",
+  "3306": "MySQL",
+  "3389": "RDP",
+  "5432": "PostgreSQL",
+  "6379": "Redis",
+  "8080": "HTTP Alternate",
+  "8443": "HTTPS Alternate",
+  "5222": "XMPP/Jabber"
+};
+
+function formatProtocolLabel(label: string) {
+  if (label.startsWith("Port ")) {
+    const portNum = label.split(" ")[1];
+    
+    // Check known aliases
+    if (PORT_ALIASES[portNum]) {
+      return `Port ${portNum} (${PORT_ALIASES[portNum]})`;
+    }
+    
+    // Check ephemeral range (49152 to 65535)
+    const portInt = parseInt(portNum, 10);
+    if (!isNaN(portInt)) {
+      if (portInt >= 49152 && portInt <= 65535) {
+        return `Port ${portNum} (Ephemeral/Dynamic)`;
+      } else {
+        return `Port ${portNum} (Unassigned/Other)`;
+      }
+    }
+  }
+  return label;
 }
 
-type Tab = "info" | "flows" | "apps" | "encryption" | "servers" | "passwords" | "reputation" | "vpn_events";
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-function explainAppOrPort(appLabel: string | null, domain: string | null, port: number) {
-  const label = appLabel || domain || "";
-  const portStr = String(port);
+function formatActiveDuration(firstSeen?: string, lastSeen?: string) {
+  if (!firstSeen || !lastSeen) return null;
+  const start = new Date(firstSeen).getTime();
+  const end = new Date(lastSeen).getTime();
+  const now = Date.now();
   
-  const matches: Record<string, string> = {
-    "1433": "MSSQL Database Server",
-    "1434": "MSSQL Monitor Server",
-    "3306": "MySQL/MariaDB Database Server",
-    "5432": "PostgreSQL Database Server",
-    "1521": "Oracle Database Server",
-    "27017": "MongoDB Database Server",
-    "6379": "Redis Key-Value Cache",
-    "80": "Unencrypted Web Traffic (HTTP)",
-    "443": "Encrypted Web Traffic (HTTPS/TLS)",
-    "22": "SSH Remote Management / SFTP",
-    "21": "FTP File Upload/Download (Unencrypted)",
-    "23": "Telnet Command Shell (Insecure)",
-    "25": "SMTP Mail Delivery",
-    "587": "Secure SMTP Mail Delivery",
-    "110": "POP3 Mail Storage Retrieval",
-    "993": "Secure IMAP Mail Service",
-    "53": "DNS Server Query (Domain Lookup)",
-    "123": "NTP Network Clock Synchronizer",
-    "161": "SNMP Network Device Monitoring",
-    "3389": "RDP Remote Desktop Management",
-    "445": "SMB Windows File Sharing",
-    "137": "NetBIOS Name Service",
-    "138": "NetBIOS Datagram Service",
-    "139": "NetBIOS Session Service",
-    "1812": "RADIUS Authentication Server",
-    "1813": "RADIUS Accounting Server"
-  };
+  const dateObj = new Date(lastSeen);
+  const fullTimestamp = dateObj.toLocaleString("id-ID", {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
 
-  let mainLabel = label;
-  let subLabel = matches[portStr] || (label.toLowerCase().includes("tls") || label.toLowerCase().includes("https") ? "Encrypted Connection (SSL/TLS)" : "");
+  let diffSec = Math.floor((end - start) / 1000);
+  if (diffSec < 0) diffSec = 0;
+  
+  const h = Math.floor(diffSec / 3600);
+  const m = Math.floor((diffSec % 3600) / 60);
+  const s = diffSec % 60;
+  
+  let durationText = "Just now";
+  if (h > 0) durationText = `${h}h ${m}m ${s}s`;
+  else if (m > 0) durationText = `${m}m ${s}s`;
+  else if (s > 0) durationText = `${s}s`;
 
-  if (appLabel && appLabel.includes("(") && domain && domain.startsWith("Port ")) {
-    mainLabel = appLabel;
-    subLabel = domain;
+  // If last seen was within 5 minutes (300 seconds), consider it Active
+  const timeSinceLastSeen = Math.floor((now - end) / 1000);
+  const isActive = timeSinceLastSeen <= 300;
+  
+  let lastSeenText = "";
+  if (!isActive) {
+    const agoH = Math.floor(timeSinceLastSeen / 3600);
+    const agoM = Math.floor((timeSinceLastSeen % 3600) / 60);
+    if (agoH > 24) {
+      const agoD = Math.floor(agoH / 24);
+      lastSeenText = `${agoD}d ago`;
+    } else if (agoH > 0) {
+      lastSeenText = `${agoH}h ago`;
+    } else if (agoM > 0) {
+      lastSeenText = `${agoM}m ago`;
+    } else {
+      lastSeenText = "a few seconds ago";
+    }
   }
 
   return {
-    main: mainLabel || `Port ${port}`,
-    sub: subLabel
+    isActive,
+    durationText,
+    fullTimestamp,
+    lastSeenText
   };
 }
 
-function sevStyle(sev: string | null) {
-  switch ((sev || "").toLowerCase()) {
-    case "critical": return "bg-red-500/15 text-red-400 ring-1 ring-red-500/30";
-    case "high":     return "bg-orange-500/15 text-orange-400 ring-1 ring-orange-500/30";
-    case "warning":  return "bg-yellow-500/15 text-yellow-400 ring-1 ring-yellow-500/30";
-    case "info":     return "bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/30";
-    default:         return "bg-slate-700/40 text-muted-foreground";
-  }
-}
+function ActiveDurationDisplay({ firstSeen, lastSeen }: { firstSeen?: string, lastSeen?: string }) {
+  if (!firstSeen || !lastSeen) return null;
+  const dur = formatActiveDuration(firstSeen, lastSeen);
+  if (!dur) return null;
 
-function riskStyle(lvl: string | null) {
-  switch ((lvl || "").toLowerCase()) {
-    case "critical":
-    case "rawan":    return { bar: "bg-red-500",    badge: "bg-red-500/15 text-red-400 ring-1 ring-red-500/30" };
-    case "medium":
-    case "sedang":   return { bar: "bg-yellow-500", badge: "bg-yellow-500/15 text-yellow-400 ring-1 ring-yellow-500/30" };
-    case "low":
-    case "aman":     return { bar: "bg-green-500",  badge: "bg-green-500/15 text-green-400 ring-1 ring-green-500/30" };
-    default:         return { bar: "bg-slate-500",  badge: "bg-slate-700/40 text-muted-foreground" };
-  }
-}
-
-function TableWrap({ head, children }: { head: string[]; children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-border/50">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-border bg-muted/50">
-            {head.map((h) => <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{h}</th>)}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/5">{children}</tbody>
-      </table>
+    <div className="flex flex-col gap-1.5 bg-black/20 p-2.5 rounded-lg border border-white/5 mb-3">
+      <div className="flex justify-between text-xs items-center">
+        <span className={`flex items-center gap-1.5 ${dur.isActive ? 'text-blue-400' : 'text-slate-400'}`}>
+          <Clock className="w-3.5 h-3.5" /> {dur.isActive ? "Active" : "Last seen"}
+        </span>
+        <span className="text-slate-300 font-medium">
+          {dur.isActive ? dur.durationText : dur.lastSeenText}
+        </span>
+      </div>
+      <div className="text-[10px] text-slate-500 text-right">
+        {dur.fullTimestamp}
+      </div>
     </div>
   );
 }
 
-function Empty({ msg }: { msg: string }) {
-  return <p className="text-muted-foreground text-sm text-center py-10">{msg}</p>;
+interface Props {
+  ip: string;
+  deviceData?: DeviceStat;
+  onClose: () => void;
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-export function DeviceDetailModal({ ip, deviceLabel, macAddress, onClose }: Props) {
-  const [data,      setData]      = useState<DeviceDetails | null>(null);
+type Tab = "info" | "apps" | "protocols" | "domains" | "flows" | "threats";
+
+export function DeviceDetailModal({ ip, deviceData, onClose }: Props) {
+  const [data, setData] = useState<DeviceDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error,     setError]     = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("info");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("info");
+  const { timeRange } = useTimeFilter();
 
   const handleClose = () => {
     setIsClosing(true);
-    setTimeout(() => {
-      onClose();
-    }, 480);
+    setTimeout(() => onClose(), 480);
+  };
+
+  const loadData = async (silent = false) => {
+    if (!silent) setIsLoading(true);
+    else setIsRefreshing(true);
+    
+    setError(null);
+    try {
+      const res = await fetchDeviceDetails(ip, timeRange);
+      setData(res);
+    } catch (e: any) {
+      if (!silent) setError(e.message);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   };
 
   useEffect(() => {
-    setIsLoading(true);
-    setError(null);
-    fetchDeviceDetails(ip)
-      .then(setData)
-      .catch((e) => setError(e.message))
-      .finally(() => setIsLoading(false));
-  }, [ip]);
+    loadData();
+    // Real-time polling every 5 seconds
+    const interval = setInterval(() => {
+      loadData(true);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [ip, timeRange]);
 
-  const di = data?.device_info;
-
-  // Alert counts
-  const alertCount =
-    (data?.unencrypted_passwords.length ?? 0) +
-    (data?.vpn_detections.length ?? 0) +
-    (data?.events.filter(e => ["critical","high"].includes((e.severity||"").toLowerCase())).length ?? 0);
-
-  const tabs: { key: Tab; label: string; icon: React.ReactNode; count?: number; alert?: boolean }[] = [
-    { key: "info",       label: "Info",         icon: <Monitor className="w-3.5 h-3.5" /> },
-    { key: "flows",      label: "Flows",        icon: <Activity className="w-3.5 h-3.5" />, count: data?.flows.length },
-    { key: "apps",       label: "Apps",         icon: <Globe className="w-3.5 h-3.5" />,    count: data?.top_apps.length },
-    { key: "encryption", label: "Enkripsi",     icon: <Lock className="w-3.5 h-3.5" /> },
-    { key: "servers",    label: "Servers",      icon: <Server className="w-3.5 h-3.5" />,   count: data?.server_discovery.length },
-    { key: "passwords",  label: "Pwd Leaks",    icon: <Unlock className="w-3.5 h-3.5" />,   count: data?.unencrypted_passwords.length, alert: (data?.unencrypted_passwords.length ?? 0) > 0 },
-    { key: "reputation", label: "Reputasi IP",  icon: <Eye className="w-3.5 h-3.5" />,      count: data?.ip_reputation.length },
-    { key: "vpn_events", label: "VPN & Events", icon: <Bell className="w-3.5 h-3.5" />,     count: (data?.vpn_detections.length ?? 0) + (data?.events.length ?? 0), alert: alertCount > 0 },
+  const tabs: { id: Tab; label: string; icon: any }[] = [
+    { id: "info", label: "Overview", icon: Monitor },
+    { id: "apps", label: "Applications", icon: Box },
+    { id: "protocols", label: "Protocols", icon: Link2 },
+    { id: "domains", label: "Domains / Web", icon: Globe },
+    { id: "flows", label: "Network Flows", icon: Activity },
+    { id: "threats", label: "Threats", icon: Shield }
   ];
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={handleClose}>
-      <div className={`absolute inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleClose}>
+      <div className={`absolute inset-0 bg-black/60 backdrop-blur-md ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`} />
       <div
-        className={`relative bg-card border border-border rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl shadow-black/70 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+        className={`relative bg-slate-950/80 border border-slate-800/60 rounded-3xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-blue-900/20 overflow-hidden backdrop-blur-xl ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-cyan-900/30 to-teal-900/20 rounded-t-2xl flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-cyan-500/20 rounded-lg ring-1 ring-cyan-500/30">
-              <Monitor className="w-5 h-5 text-cyan-400" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-card-foreground leading-tight">
-                {di?.device_label || deviceLabel || ip}
-              </h3>
-              <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                <span className="text-xs text-cyan-400 font-mono">{ip}</span>
-                {(di?.mac_address || macAddress) && (
-                  <span className="text-xs text-muted-foreground font-mono">{di?.mac_address || macAddress}</span>
-                )}
-                {di?.os_label && (
-                  <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">{di.os_label}</span>
-                )}
-                {di?.device_type && (
-                  <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded">{di.device_type}</span>
-                )}
+        {/* Decorative Top Glow */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-gradient-to-br from-blue-900/10 via-slate-900/20 to-slate-950/40 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 rounded-full" />
+              <div className="p-3 bg-gradient-to-br from-blue-500/20 to-cyan-500/10 rounded-xl ring-1 ring-blue-500/30 relative">
+                <Monitor className="w-6 h-6 text-blue-400" />
               </div>
             </div>
+            <div>
+              <div className="flex items-center gap-3">
+                <h3 className="text-xl font-bold text-white tracking-tight">{ip}</h3>
+                {isRefreshing && <RefreshCcw className="w-3.5 h-3.5 text-blue-400 animate-spin" />}
+              </div>
+              <p className="text-sm text-slate-400 mt-0.5">
+                {data?.device_label || deviceData?.device_label || 'Unknown Device'} 
+                <span className="text-slate-600 mx-2">•</span> 
+                <span className="font-mono text-xs">{data?.mac_address || deviceData?.mac_address || 'No MAC'}</span>
+              </p>
+            </div>
           </div>
-          <button onClick={handleClose} className="p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-lg transition-all flex-shrink-0">
+          <button
+            onClick={handleClose}
+            className="p-2.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* ── Body ── */}
-        <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
+        {/* Body */}
+        <div className="flex flex-col flex-1 min-h-0 bg-gradient-to-b from-transparent to-slate-950/50 relative z-10">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
-              <p className="text-muted-foreground text-sm">Loading device data…</p>
+            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+              <p className="text-slate-400 font-medium">Gathering device telemetry...</p>
             </div>
           ) : error ? (
-            <div className="p-6 text-center text-red-400 text-sm">{error}</div>
+            <div className="flex-1 flex items-center justify-center p-6 text-center">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 max-w-md">
+                <X className="w-10 h-10 text-red-400 mx-auto mb-3" />
+                <h4 className="text-red-400 font-bold text-lg mb-1">Failed to Load</h4>
+                <p className="text-red-300/70 text-sm">{error}</p>
+              </div>
+            </div>
           ) : data ? (
             <>
-              {/* ── KPI bar ── */}
-              <div className="grid grid-cols-3 gap-3 px-6 py-3 border-b border-border/50 bg-muted/30 flex-shrink-0">
-                {[
-                  { label: "Download",   value: fmtBytes(data.total_download), color: "text-cyan-400" },
-                  { label: "Upload",     value: fmtBytes(data.total_upload),   color: "text-green-400" },
-                  { label: "Total Flows",value: data.flow_count,               color: "text-card-foreground" },
-                ].map(k => (
-                  <div key={k.label} className="text-center">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{k.label}</p>
-                    <p className={`text-xl font-bold ${k.color}`}>{k.value}</p>
-                  </div>
-                ))}
+              {/* Tab Navigation */}
+              <div className="flex items-center gap-2 px-6 py-3 border-b border-white/5 overflow-x-auto custom-scrollbar flex-shrink-0 bg-black/20">
+                {tabs.map((t) => {
+                  const Icon = t.icon;
+                  const isActive = activeTab === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setActiveTab(t.id)}
+                      className={`flex items-center gap-2.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                        isActive
+                          ? "bg-gradient-to-r from-blue-500/20 to-cyan-500/10 text-blue-300 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.15)]"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent"
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-blue-400' : ''}`} />
+                      {t.label}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* ── Alert strip ── */}
-              {alertCount > 0 && (
-                <div className="mx-6 mt-3 flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                  <span><strong>{alertCount}</strong> security alerts — cek tab <strong>Pwd Leaks</strong> atau <strong>VPN & Events</strong></span>
-                </div>
-              )}
-
-              {/* ── MAC bandwidth strip ── */}
-              {data.mac_bandwidth && (
-                <div className="mx-6 mt-2 flex items-center gap-3 px-3 py-2 bg-muted/50 border border-border/50 rounded-lg text-xs">
-                  <Wifi className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <span className="text-muted-foreground font-mono">{data.mac_bandwidth.mac_address}</span>
-                  <span className="text-muted-foreground">{data.mac_bandwidth.manufacturer || "Unknown"}</span>
-                  <span className="ml-auto text-cyan-400">↓ {fmtBytes(data.mac_bandwidth.download)}</span>
-                  <span className="text-green-400">↑ {fmtBytes(data.mac_bandwidth.upload)}</span>
-                  <span className="text-muted-foreground font-medium">Total: {fmtBytes(data.mac_bandwidth.total)}</span>
-                </div>
-              )}
-
-              {/* ── Tabs ── */}
-              <div className="flex gap-1 px-6 py-3 border-b border-border/50 flex-shrink-0 flex-wrap">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      activeTab === tab.key
-                        ? "bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-500/40"
-                        : "text-muted-foreground hover:text-card-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    {tab.icon}
-                    {tab.label}
-                    {tab.count !== undefined && tab.count > 0 && (
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${tab.alert ? "bg-red-500/20 text-red-300" : activeTab === tab.key ? "bg-cyan-500/30 text-cyan-200" : "bg-white/10 text-slate-300"}`}>
-                        {tab.count}
-                      </span>
-                    )}
-                    {tab.alert && tab.count === 0 && (
-                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              {/* ── Tab content ── */}
-              <div className="px-6 py-4 space-y-4">
-
-                {/* ══ INFO ══ */}
+              {/* Tab Content */}
+              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                
+                {/* Info Tab */}
                 {activeTab === "info" && (
-                  <div className="space-y-4">
-                    {/* Device identity card */}
-                    <div className="p-4 bg-muted/50 border border-border/50 rounded-xl space-y-3">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Informasi Device</p>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        {[
-                          { label: "Label",        value: di?.device_label },
-                          { label: "Tipe",         value: di?.device_type },
-                          { label: "OS",           value: di?.os_label },
-                          { label: "Manufacturer", value: di?.manufacturer },
-                          { label: "IP Address",   value: ip },
-                          { label: "MAC Address",  value: di?.mac_address || macAddress },
-                          { label: "Is New",       value: di?.is_new === 1 ? "Perangkat Baru ✨" : di?.is_new === 0 ? "Dikenal" : null },
-                        ].filter(f => f.value).map(f => (
-                          <div key={f.label} className="flex flex-col gap-0.5">
-                            <span className="text-xs text-muted-foreground">{f.label}</span>
-                            <span className="text-xs font-medium text-card-foreground font-mono">{String(f.value)}</span>
-                          </div>
-                        ))}
+                  <div className="space-y-6 animate-fade-in">
+                    {/* Traffic Summary */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-6 bg-gradient-to-br from-cyan-500/10 to-transparent border border-cyan-500/20 rounded-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                          <ArrowDownToLine className="w-16 h-16 text-cyan-400" />
+                        </div>
+                        <p className="text-sm font-medium text-cyan-400/80 mb-2 flex items-center gap-2">
+                          <ArrowDownToLine className="w-4 h-4" /> Total Download
+                        </p>
+                        <p className="text-4xl font-black text-white tracking-tight">{fmtBytes(data.total_download)}</p>
+                      </div>
+                      <div className="p-6 bg-gradient-to-br from-emerald-500/10 to-transparent border border-emerald-500/20 rounded-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                          <ArrowUpFromLine className="w-16 h-16 text-emerald-400" />
+                        </div>
+                        <p className="text-sm font-medium text-emerald-400/80 mb-2 flex items-center gap-2">
+                          <ArrowUpFromLine className="w-4 h-4" /> Total Upload
+                        </p>
+                        <p className="text-4xl font-black text-white tracking-tight">{fmtBytes(data.total_upload)}</p>
                       </div>
                     </div>
 
-                    {/* Top domains */}
-                    {data.top_domains.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Top Domains Diakses</p>
-                        <div className="space-y-1.5">
-                          {data.top_domains.map((d, i) => {
-                            const maxDl = Math.max(...data.top_domains.map(x => x.download), 1);
-                            const pct = (d.download / maxDl) * 100;
-                            return (
-                              <div key={i} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs text-slate-200 truncate font-mono">{d.domain}</p>
-                                  <div className="h-1 bg-secondary rounded-full mt-1 overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-teal-500 to-cyan-500 rounded-full" style={{ width: `${pct}%` }} />
-                                  </div>
-                                </div>
-                                <div className="flex-shrink-0 text-right">
-                                  <p className="text-xs text-cyan-400">{fmtBytes(d.download)}</p>
-                                  <p className="text-[10px] text-muted-foreground">{d.flow_count} flows</p>
-                                </div>
-                              </div>
-                            );
-                          })}
+                    {/* Device Metadata */}
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6">
+                      <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-6 flex items-center gap-2">
+                        <Server className="w-4 h-4 text-blue-400" /> Identity & Metadata
+                      </h4>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div>
+                          <p className="text-sm font-medium text-slate-500 flex items-center gap-1.5 mb-1.5">
+                            <Cpu className="w-3.5 h-3.5" /> OS
+                          </p>
+                          <p className="text-slate-200 font-medium text-sm">{data.os_label || deviceData?.os_label || 'Unknown'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-500 flex items-center gap-1.5 mb-1.5">
+                            <Monitor className="w-3.5 h-3.5" /> Type
+                          </p>
+                          <p className="text-slate-200 font-medium text-sm">{data.device_type || deviceData?.device_type || 'Unknown'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-500 flex items-center gap-1.5 mb-1.5">
+                            <HardDrive className="w-3.5 h-3.5" /> Manufacturer
+                          </p>
+                          <p className="text-slate-200 font-medium text-sm">{data.manufacturer || deviceData?.manufacturer || 'Unknown'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-500 flex items-center gap-1.5 mb-1.5">
+                            <Clock className="w-3.5 h-3.5" /> Last Seen
+                          </p>
+                          <p className="text-slate-200 font-medium text-sm">{data.last_seen || deviceData?.last_seen ? new Date(data.last_seen || deviceData?.last_seen || '').toLocaleString() : 'Never'}</p>
                         </div>
                       </div>
-                    )}
+                    </div>
+
+                    {/* Current Activity / Destinations */}
+                    <div className="bg-black/40 border border-white/5 rounded-2xl p-6">
+                      <h4 className="text-xs font-bold tracking-widest text-blue-400/80 uppercase flex items-center gap-2 mb-4">
+                        <Globe className="w-4 h-4" /> Current Activity (Top Destinations)
+                      </h4>
+                      {(!data.destinations || data.destinations.length === 0) ? (
+                        <p className="text-slate-400 text-sm italic">No active destination data available.</p>
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          {data.destinations.slice(0, 5).map((dst: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                                  <Activity className="w-4 h-4 text-blue-400" />
+                                </div>
+                                <div>
+                                  <p className="text-slate-200 font-mono text-sm">{dst.app_label}</p>
+                                  <p className="text-slate-500 text-xs">Destination IP</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-4 text-right">
+                                <div>
+                                  <p className="text-cyan-400 text-xs font-medium">{fmtBytes(dst.download)}</p>
+                                  <p className="text-slate-500 text-[10px] uppercase tracking-widest">Down</p>
+                                </div>
+                                <div>
+                                  <p className="text-emerald-400 text-xs font-medium">{fmtBytes(dst.upload)}</p>
+                                  <p className="text-slate-500 text-[10px] uppercase tracking-widest">Up</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                {/* ══ FLOWS ══ */}
-                {activeTab === "flows" && (
-                  data.flows.length === 0 ? <Empty msg="Tidak ada flows untuk device ini." /> : (
-                    <TableWrap head={["Destination IP", "Port", "Domain / App", "Proto", "↓", "↑", "Last Seen"]}>
-                      {data.flows.map((f, i) => {
-                        const exp = explainAppOrPort(f.app_label ?? null, f.domain ?? null, f.dst_port || 0);
-                        return (
-                          <tr key={i} className="hover:bg-white/[0.03] transition-colors">
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              <span className="font-mono text-xs text-blue-400 block">{f.dst_ip || "—"}</span>
-                              {f.dst_ip && <IpDetails ip={f.dst_ip} />}
-                            </td>
-                            <td className="px-3 py-2 text-xs text-muted-foreground">{f.dst_port ?? "—"}</td>
-                            <td className="px-3 py-2 max-w-[180px]">
-                              <span className="text-xs text-teal-300 font-mono truncate block" title={exp.main}>
-                                {exp.main}
-                              </span>
-                              {exp.sub && (
-                                <span className="text-[10px] text-muted-foreground block italic">{exp.sub}</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-xs text-muted-foreground">{f.protocol || "—"}</td>
-                            <td className="px-3 py-2 text-right text-xs text-cyan-400 whitespace-nowrap">{fmtBytes(f.download)}</td>
-                            <td className="px-3 py-2 text-right text-xs text-green-400 whitespace-nowrap">{fmtBytes(f.upload)}</td>
-                            <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{f.last_seen?.slice(0, 16) || "—"}</td>
-                          </tr>
-                        );
-                      })}
-                    </TableWrap>
-                  )
-                )}
-
-                {/* ══ APPS ══ */}
+                {/* Apps Tab */}
                 {activeTab === "apps" && (
-                  data.top_apps.length === 0
-                    ? <Empty msg="Tidak ada data aplikasi / domain yang terdeteksi untuk device ini." />
-                    : (
-                      <div className="space-y-2">
-                        {/* Legend */}
-                        <div className="flex items-center gap-3 pb-1 mb-1 border-b border-border/50 flex-wrap">
-                          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <Globe className="w-3 h-3 text-teal-400" /> Domain / Website
-                          </span>
-                          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <Shield className="w-3 h-3 text-blue-400" /> Protokol
-                          </span>
-                          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <Link className="w-3 h-3 text-muted-foreground" /> Port
-                          </span>
-                        </div>
-
-                        {data.top_apps.map((a, i) => {
-                          const total    = a.download + a.upload;
-                          const maxTotal = Math.max(...data.top_apps.map(x => x.download + x.upload), 1);
-                          const pct      = (total / maxTotal) * 100;
-
-                          const isDomain   = a.type === 'domain';
-                          const isProtocol = a.type === 'protocol';
-
-                          // Color scheme by type
-                          const barColor   = isDomain ? 'from-teal-500 to-cyan-500'
-                                           : isProtocol ? 'from-blue-500 to-indigo-500'
-                                           : 'from-slate-600 to-slate-500';
-                          const iconBg     = isDomain ? 'bg-teal-500/15' : isProtocol ? 'bg-blue-500/15' : 'bg-slate-700/40';
-                          const iconColor  = isDomain ? 'text-teal-400' : isProtocol ? 'text-blue-400' : 'text-muted-foreground';
-
+                  <div className="space-y-4 animate-fade-in">
+                    {(!data.apps || data.apps.length === 0) ? (
+                      <div className="text-center py-10 bg-white/[0.02] border border-white/5 rounded-2xl">
+                        <Box className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                        <h4 className="text-slate-300 font-bold text-lg mb-1">No Application Traffic</h4>
+                        <p className="text-slate-400 font-medium max-w-md mx-auto">
+                          No application-specific traffic has been classified for this IP yet, or data is currently being ingested from the network sensor.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {data.apps.map((app: any, i: number) => {
+                          const totalBytes = data.total_download + data.total_upload;
+                          const appBytes = app.download + app.upload;
+                          const pct = totalBytes > 0 ? ((appBytes / totalBytes) * 100).toFixed(1) : "0";
                           return (
-                            <div key={i} className="p-3 bg-white/[0.03] hover:bg-white/[0.06] border border-border/50 rounded-xl transition-colors">
-                              <div className="flex items-start gap-3 mb-1.5">
-                                {/* Icon */}
-                                <div className={`w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center ${iconBg}`}>
-                                  {isDomain
-                                    ? <Globe className={`w-3.5 h-3.5 ${iconColor}`} />
-                                    : isProtocol
-                                    ? <Shield className={`w-3.5 h-3.5 ${iconColor}`} />
-                                    : <Link className={`w-3.5 h-3.5 ${iconColor}`} />}
+                            <div key={i} className="bg-white/[0.03] border border-white/5 p-4 rounded-2xl hover:bg-white/[0.05] transition-colors group relative overflow-hidden">
+                              <div className="absolute top-0 left-0 h-1 bg-blue-500/30 transition-all duration-500" style={{ width: `${pct}%` }} />
+                              <h5 className="font-semibold text-white mb-3 text-lg flex justify-between items-center">
+                                {app.app_label}
+                                <span className="text-xs font-mono text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full ring-1 ring-blue-500/20">{pct}%</span>
+                              </h5>
+                              <div className="space-y-2">
+                                <ActiveDurationDisplay firstSeen={app.first_seen} lastSeen={app.last_seen} />
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-500">Download</span>
+                                  <span className="text-cyan-400 font-mono">{fmtBytes(app.download)}</span>
                                 </div>
-
-                                {/* Label block */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    {/* Main label: domain name or protocol */}
-                                    <span className={`font-medium text-sm truncate max-w-[200px] ${
-                                      isDomain ? 'text-teal-200 font-mono' : isProtocol ? 'text-blue-200' : 'text-muted-foreground'
-                                    }`}>
-                                      {a.label}
-                                    </span>
-                                    {/* Sub-label: protocol badge if domain */}
-                                    {a.sub_label && (
-                                      <span className="inline-flex text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20 flex-shrink-0">
-                                        {a.sub_label}
-                                      </span>
-                                    )}
-                                    {/* Type badge */}
-                                    {isDomain && (
-                                      <span className="inline-flex text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 flex-shrink-0">
-                                        website
-                                      </span>
-                                    )}
-                                  </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-500">Upload</span>
+                                  <span className="text-emerald-400 font-mono">{fmtBytes(app.upload)}</span>
                                 </div>
-
-                                {/* Stats */}
-                                <div className="text-right flex-shrink-0">
-                                  <p className="text-xs font-mono text-card-foreground">{fmtBytes(total)}</p>
-                                  <p className="text-[10px] text-muted-foreground">{a.flow_count} flows</p>
-                                </div>
-                              </div>
-
-                              {/* Bandwidth breakdown */}
-                              <div className="flex gap-3 text-xs mb-1.5 pl-10">
-                                <span className="text-cyan-400">↓ {fmtBytes(a.download)}</span>
-                                <span className="text-green-400">↑ {fmtBytes(a.upload)}</span>
-                              </div>
-
-                              {/* Progress bar */}
-                              <div className="h-1 bg-secondary rounded-full overflow-hidden ml-10">
-                                <div
-                                  className={`h-full bg-gradient-to-r ${barColor} rounded-full transition-all`}
-                                  style={{ width: `${pct}%` }}
-                                />
                               </div>
                             </div>
-                          );
+                          )
                         })}
                       </div>
-                    )
-                )}
-
-                {/* ══ ENCRYPTION ══ */}
-                {activeTab === "encryption" && (() => {
-                  const enc = data.encryption;
-                  if (!enc) return <Empty msg="Tidak ada data enkripsi untuk device ini." />;
-                  const pct = enc.encrypted_pct ?? 0;
-                  const { bar, badge } = riskStyle(enc.risk_level);
-                  return (
-                    <div className="space-y-4">
-                      <div className="p-5 bg-muted/50 border border-border/50 rounded-xl">
-                        <div className="flex items-center justify-between mb-4">
-                          <p className="text-sm font-semibold text-card-foreground">Status Enkripsi Traffic</p>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${badge}`}>
-                            {enc.risk_level || "Unknown"}
-                          </span>
-                        </div>
-
-                        {/* Big donut-style display */}
-                        <div className="flex items-center gap-6 mb-4">
-                          <div className="relative w-24 h-24 flex-shrink-0">
-                            <svg className="w-24 h-24 -rotate-90" viewBox="0 0 36 36">
-                              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#ffffff10" strokeWidth="3" />
-                              <circle
-                                cx="18" cy="18" r="15.9" fill="none"
-                                stroke={pct >= 80 ? "#22c55e" : pct >= 50 ? "#eab308" : "#ef4444"}
-                                strokeWidth="3" strokeDasharray={`${pct} 100`} strokeLinecap="round"
-                              />
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-xl font-bold text-card-foreground">{pct}%</span>
-                            </div>
-                          </div>
-                          <div className="flex-1 space-y-2">
-                            <div>
-                              <div className="flex justify-between text-xs mb-1">
-                                <span className="text-muted-foreground">Terenkripsi</span>
-                                <span className="text-green-400">{fmtBytes(enc.encrypted_bytes ?? 0)}</span>
-                              </div>
-                              <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                                <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                              </div>
-                            </div>
-                            <div>
-                              <div className="flex justify-between text-xs mb-1">
-                                <span className="text-muted-foreground">Tidak Terenkripsi</span>
-                                <span className="text-red-400">{fmtBytes(enc.unencrypted_bytes ?? 0)}</span>
-                              </div>
-                              <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                                <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${100 - pct}%` }} />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="text-xs text-muted-foreground text-right">
-                          Total: {fmtBytes(enc.total_bytes ?? 0)}
-                        </div>
-                      </div>
-
-                      {/* Risk interpretation */}
-                      <div className={`p-3 rounded-xl border ${
-                        (enc.risk_level || "").toLowerCase().includes("critical") || (enc.risk_level || "").toLowerCase().includes("rawan")
-                          ? "border-red-500/20 bg-red-500/5 text-red-300"
-                          : (enc.risk_level || "").toLowerCase().includes("medium") || (enc.risk_level || "").toLowerCase().includes("sedang")
-                          ? "border-yellow-500/20 bg-yellow-500/5 text-yellow-300"
-                          : "border-green-500/20 bg-green-500/5 text-green-300"
-                      } text-xs`}>
-                        {(enc.risk_level || "").toLowerCase().includes("critical") || (enc.risk_level || "").toLowerCase().includes("rawan")
-                          ? "🚨 Device ini memiliki risiko tinggi — sebagian besar traffic tidak terenkripsi!"
-                          : (enc.risk_level || "").toLowerCase().includes("medium") || (enc.risk_level || "").toLowerCase().includes("sedang")
-                          ? "⚠️ Traffic device ini sebagian tidak terenkripsi. Pertimbangkan upgrade ke HTTPS/TLS."
-                          : "✅ Device ini memiliki enkripsi yang baik."}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* ══ SERVERS ══ */}
-                {activeTab === "servers" && (
-                  data.server_discovery.length === 0 ? <Empty msg="Tidak ada server yang terdeteksi untuk device ini." /> : (
-                    <TableWrap head={["Server Type", "Hostname", "Port", "Protocol", "OS", "↓", "↑"]}>
-                      {data.server_discovery.map((s, i) => (
-                        <tr key={i} className="hover:bg-white/[0.03] transition-colors">
-                          <td className="px-3 py-2">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-teal-500/10 text-teal-400 ring-1 ring-teal-500/20">
-                              {s.server_type || "—"}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-xs text-slate-300 font-mono truncate max-w-[140px]">{s.hostname || "—"}</td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">{s.port ?? "—"}</td>
-                          <td className="px-3 py-2 text-xs text-purple-300">{s.protocol || "—"}</td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">{s.os_label || "—"}</td>
-                          <td className="px-3 py-2 text-right text-xs text-cyan-400">{fmtBytes(s.download)}</td>
-                          <td className="px-3 py-2 text-right text-xs text-green-400">{fmtBytes(s.upload)}</td>
-                        </tr>
-                      ))}
-                    </TableWrap>
-                  )
-                )}
-
-                {/* ══ PASSWORDS ══ */}
-                {activeTab === "passwords" && (
-                  data.unencrypted_passwords.length === 0
-                    ? <div className="text-center py-10">
-                        <p className="text-green-400 text-2xl mb-2">✅</p>
-                        <p className="text-muted-foreground text-sm">Tidak ada password cleartext yang terdeteksi.</p>
-                      </div>
-                    : (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">
-                          <AlertTriangle className="w-4 h-4" />
-                          <span><strong>{data.unencrypted_passwords.length}</strong> koneksi dengan password tidak terenkripsi terdeteksi!</span>
-                        </div>
-                        <TableWrap head={["Destination IP", "Port", "Protocol", "Username", "Severity", "↓"]}>
-                          {data.unencrypted_passwords.map((p, i) => (
-                            <tr key={i} className="hover:bg-white/[0.03] transition-colors">
-                              <td className="px-3 py-2 whitespace-nowrap">
-                                <div className="flex flex-col gap-0.5">
-                                  <span className="font-mono text-xs text-red-400">{p.dst_ip || "—"}</span>
-                                  {p.dst_ip && <IpDetails ip={p.dst_ip} />}
-                                </div>
-                              </td>
-                              <td className="px-3 py-2 text-xs text-muted-foreground">{p.dst_port ?? "—"}</td>
-                              <td className="px-3 py-2 text-xs text-slate-300">{p.protocol || "—"}</td>
-                              <td className="px-3 py-2 text-xs text-yellow-300 font-mono">{p.username || "—"}</td>
-                              <td className="px-3 py-2">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${sevStyle(p.severity)}`}>
-                                  {p.severity || "—"}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-right text-xs text-cyan-400">{fmtBytes(p.download)}</td>
-                            </tr>
-                          ))}
-                        </TableWrap>
-                      </div>
-                    )
-                )}
-
-                {/* ══ REPUTATION ══ */}
-                {activeTab === "reputation" && (
-                  data.ip_reputation.length === 0 ? <Empty msg="Tidak ada data reputasi IP untuk device ini." /> : (
-                    <TableWrap head={["Remote IP", "Reputation", "Score", "Country", "App", "Blacklisted", "↓"]}>
-                      {data.ip_reputation.map((r, i) => (
-                        <tr key={i} className="hover:bg-white/[0.03] transition-colors">
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-mono text-xs text-red-400">{r.remote_ip || "—"}</span>
-                              {r.remote_ip && <IpDetails ip={r.remote_ip} />}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-xs text-slate-300">{r.reputation || "—"}</td>
-                          <td className="px-3 py-2 text-xs text-yellow-400">{r.score ?? "—"}</td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">{r.country || "—"}</td>
-                          <td className="px-3 py-2 text-xs text-purple-300 truncate max-w-[80px]">{r.app_label || "—"}</td>
-                          <td className="px-3 py-2 text-xs">
-                            {r.blacklisted
-                              ? <span className="text-red-400 font-semibold">⛔ Yes</span>
-                              : <span className="text-green-400">✓ No</span>}
-                          </td>
-                          <td className="px-3 py-2 text-right text-xs text-cyan-400">{fmtBytes(r.download)}</td>
-                        </tr>
-                      ))}
-                    </TableWrap>
-                  )
-                )}
-
-                {/* ══ VPN & EVENTS ══ */}
-                {activeTab === "vpn_events" && (
-                  <div className="space-y-6">
-                    {/* VPN */}
-                    <section>
-                      <h4 className="flex items-center gap-2 text-sm font-semibold text-card-foreground mb-3">
-                        <Shield className="w-4 h-4 text-blue-400" /> Deteksi VPN
-                        <span className="ml-auto text-xs text-muted-foreground">{data.vpn_detections.length} records</span>
-                      </h4>
-                      {data.vpn_detections.length === 0 ? (
-                        <p className="text-muted-foreground text-xs">Tidak ada penggunaan VPN yang terdeteksi.</p>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {data.vpn_detections.map((v, i) => (
-                            <div key={i} className="p-3 bg-blue-500/5 border border-blue-500/15 rounded-xl text-xs space-y-1">
-                              <div className="flex justify-between">
-                                <span className="text-blue-400 font-medium">{v.vpn_type || "Unknown VPN"}</span>
-                                <span className="text-muted-foreground">{v.country || "—"}</span>
-                              </div>
-                              {v.remote_ip && (
-                                <div className="text-muted-foreground font-mono flex flex-col gap-0.5 mt-0.5">
-                                  <span>→ {v.remote_ip}</span>
-                                  <IpDetails ip={v.remote_ip} />
-                                </div>
-                              )}
-                              <div className="flex gap-2 text-muted-foreground">
-                                <span>{v.protocol || "—"}</span>
-                                {v.confidence !== null && v.confidence !== undefined && (
-                                  <span className="ml-auto text-purple-400">
-                                    Conf: {((v.confidence) * 100).toFixed(0)}%
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </section>
-
-                    {/* Events */}
-                    <section>
-                      <h4 className="flex items-center gap-2 text-sm font-semibold text-card-foreground mb-3">
-                        <Bell className="w-4 h-4 text-yellow-400" /> Security Events
-                        <span className="ml-auto text-xs text-muted-foreground">{data.events.length} records</span>
-                      </h4>
-                      {data.events.length === 0 ? (
-                        <p className="text-muted-foreground text-xs">Tidak ada security events untuk device ini.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {data.events.map((ev, i) => (
-                            <div key={i} className={`p-3 rounded-xl border text-xs ${
-                              (ev.severity || "").toLowerCase() === "critical" ? "bg-red-500/5 border-red-500/20" :
-                              (ev.severity || "").toLowerCase() === "high" ? "bg-orange-500/5 border-orange-500/15" :
-                              "bg-muted/50 border-border/50"
-                            }`}>
-                              <div className="flex items-start gap-2">
-                                <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold ${sevStyle(ev.severity)}`}>
-                                  {ev.severity || "Info"}
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-card-foreground">{ev.event_type || "Unknown"}</p>
-                                  {ev.description && <p className="text-muted-foreground mt-0.5 leading-relaxed">{ev.description}</p>}
-                                </div>
-                                <span className="text-slate-600 flex-shrink-0">{ev.event_at?.slice(0, 16) || "—"}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </section>
+                    )}
                   </div>
                 )}
 
+                {/* Protocols Tab */}
+                {activeTab === "protocols" && (
+                  <div className="space-y-4 animate-fade-in">
+                    {(!data.protocols || data.protocols.length === 0) ? (
+                      <div className="text-center py-10 bg-white/[0.02] border border-white/5 rounded-2xl">
+                        <Link2 className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                        <h4 className="text-slate-300 font-bold text-lg mb-1">No Protocol Data</h4>
+                        <p className="text-slate-400 font-medium max-w-md mx-auto">
+                          No distinct protocols or ports have been classified for this IP yet.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {data.protocols.map((proto: any, i: number) => {
+                          const totalBytes = data.total_download + data.total_upload;
+                          const appBytes = proto.download + proto.upload;
+                          const pct = totalBytes > 0 ? ((appBytes / totalBytes) * 100).toFixed(1) : "0";
+                          return (
+                            <div key={i} className="bg-white/[0.03] border border-white/5 p-4 rounded-2xl hover:bg-white/[0.05] transition-colors group relative overflow-hidden">
+                              <div className="absolute top-0 left-0 h-1 bg-amber-500/30 transition-all duration-500" style={{ width: `${pct}%` }} />
+                              <h5 className="font-semibold text-white mb-3 text-lg flex justify-between items-center">
+                                {formatProtocolLabel(proto.app_label)}
+                                <span className="text-xs font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full ring-1 ring-amber-500/20">{pct}%</span>
+                              </h5>
+                              <div className="space-y-2">
+                                <ActiveDurationDisplay firstSeen={proto.first_seen} lastSeen={proto.last_seen} />
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-500">Download</span>
+                                  <span className="text-cyan-400 font-mono">{fmtBytes(proto.download)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-500">Upload</span>
+                                  <span className="text-emerald-400 font-mono">{fmtBytes(proto.upload)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Domains Tab */}
+                {activeTab === "domains" && (
+                  <div className="space-y-4 animate-fade-in">
+                    {(!data.domains || data.domains.length === 0) ? (
+                      <div className="text-center py-10 bg-white/[0.02] border border-white/5 rounded-2xl">
+                        <Globe className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                        <h4 className="text-slate-300 font-bold text-lg mb-1">No Web/Domain Traffic</h4>
+                        <p className="text-slate-400 font-medium max-w-md mx-auto">
+                          No distinct domain names have been extracted from SNI or DNS data for this IP yet.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {data.domains.map((dom: any, i: number) => {
+                          const totalBytes = data.total_download + data.total_upload;
+                          const appBytes = dom.download + dom.upload;
+                          const pct = totalBytes > 0 ? ((appBytes / totalBytes) * 100).toFixed(1) : "0";
+                          return (
+                            <div key={i} className="bg-white/[0.03] border border-white/5 p-4 rounded-2xl hover:bg-white/[0.05] transition-colors group relative overflow-hidden">
+                              <div className="absolute top-0 left-0 h-1 bg-purple-500/30 transition-all duration-500" style={{ width: `${pct}%` }} />
+                              <h5 className="font-semibold text-white mb-3 text-lg flex justify-between items-center truncate gap-2" title={dom.app_label}>
+                                <span className="truncate">{dom.app_label}</span>
+                                <span className="text-xs font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full ring-1 ring-purple-500/20 shrink-0">{pct}%</span>
+                              </h5>
+                              <div className="space-y-2">
+                                <ActiveDurationDisplay firstSeen={dom.first_seen} lastSeen={dom.last_seen} />
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-500">Download</span>
+                                  <span className="text-cyan-400 font-mono">{fmtBytes(dom.download)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-500">Upload</span>
+                                  <span className="text-emerald-400 font-mono">{fmtBytes(dom.upload)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Flows Tab */}
+                {activeTab === "flows" && (
+                  <div className="space-y-4 animate-fade-in">
+                    {(!data.flows || data.flows.length === 0) ? (
+                      <div className="text-center py-10 bg-white/[0.02] border border-white/5 rounded-2xl">
+                        <Activity className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                        <h4 className="text-slate-300 font-bold text-lg mb-1">No Flow Data Yet</h4>
+                        <p className="text-slate-400 font-medium max-w-md mx-auto">
+                          Network flows for this IP haven't been captured or are currently being ingested. If you just started the system, please wait a few moments as data is actively being synchronized.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto custom-scrollbar max-h-[60vh]">
+                          <table className="w-full text-sm text-left whitespace-nowrap">
+                            <thead className="bg-slate-900/80 text-slate-300 sticky top-0 backdrop-blur-md border-b border-white/10 z-10">
+                              <tr>
+                                <th className="px-5 py-4 font-semibold">Time</th>
+                                <th className="px-5 py-4 font-semibold">Source</th>
+                                <th className="px-5 py-4 font-semibold">Destination</th>
+                                <th className="px-5 py-4 font-semibold">Port</th>
+                                <th className="px-5 py-4 font-semibold">App / Protocol</th>
+                                <th className="px-5 py-4 font-semibold text-right">Download</th>
+                                <th className="px-5 py-4 font-semibold text-right">Upload</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                              {data.flows.map((f: any, i: number) => {
+                                const isOutbound = f.src_ip === ip;
+                                return (
+                                  <tr key={i} className="hover:bg-blue-500/5 transition-colors">
+                                    <td className="px-5 py-3 text-slate-400 text-xs">{new Date(f.timestamp).toLocaleString()}</td>
+                                    <td className="px-5 py-3">
+                                      <span className={`font-mono ${isOutbound ? 'text-blue-300 font-semibold' : 'text-slate-400'}`}>{f.src_ip}</span>
+                                    </td>
+                                    <td className="px-5 py-3">
+                                      <span className={`font-mono ${!isOutbound ? 'text-blue-300 font-semibold' : 'text-slate-400'}`}>{f.dst_ip}</span>
+                                    </td>
+                                    <td className="px-5 py-3 text-amber-200/80 font-mono text-xs">{f.dst_port || '-'}</td>
+                                    <td className="px-5 py-3">
+                                      <span className="bg-white/10 text-slate-200 px-2.5 py-1 rounded-md text-xs font-medium border border-white/5">
+                                        {f.app_label || f.protocol || "-"}
+                                      </span>
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-cyan-400 font-mono text-xs">{fmtBytes(f.download)}</td>
+                                    <td className="px-5 py-3 text-right text-emerald-400 font-mono text-xs">{fmtBytes(f.upload)}</td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Threats Tab */}
+                {activeTab === "threats" && (
+                  <div className="space-y-4 animate-fade-in">
+                    {(!data.threats || data.threats.length === 0) ? (
+                      <div className="text-center py-12 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl">
+                        <Shield className="w-14 h-14 text-emerald-400 mx-auto mb-4" />
+                        <h4 className="text-emerald-400 font-bold text-lg mb-1">No Threats Detected</h4>
+                        <p className="text-emerald-300/70 text-sm max-w-md mx-auto">
+                          This device's traffic appears secure. Keep in mind that new threat intelligence data may take a few moments to sync after a system restart.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden">
+                        <table className="w-full text-sm text-left whitespace-nowrap">
+                          <thead className="bg-slate-900/80 text-slate-300 sticky top-0 backdrop-blur-md border-b border-white/10 z-10">
+                            <tr>
+                              <th className="px-5 py-4 font-semibold">Time</th>
+                              <th className="px-5 py-4 font-semibold">Type</th>
+                              <th className="px-5 py-4 font-semibold">Severity</th>
+                              <th className="px-5 py-4 font-semibold">Target IP</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5">
+                            {data.threats.map((t: any, i: number) => {
+                              const sev = (t.severity || '').toLowerCase();
+                              let badgeCls = "bg-slate-500/20 text-slate-300 ring-slate-500/30";
+                              if (sev === 'high' || sev === 'critical') badgeCls = "bg-red-500/20 text-red-400 ring-red-500/30";
+                              else if (sev === 'medium') badgeCls = "bg-amber-500/20 text-amber-400 ring-amber-500/30";
+                              else if (sev === 'low') badgeCls = "bg-blue-500/20 text-blue-400 ring-blue-500/30";
+
+                              return (
+                                <tr key={i} className="hover:bg-red-500/5 transition-colors">
+                                  <td className="px-5 py-3 text-slate-400 text-xs">{new Date(t.timestamp).toLocaleString()}</td>
+                                  <td className="px-5 py-3 font-semibold text-slate-200">{t.threat_type || "-"}</td>
+                                  <td className="px-5 py-3">
+                                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ring-1 ${badgeCls}`}>
+                                      {t.severity || "-"}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-3 font-mono text-slate-300">{t.dst_ip || "-"}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           ) : null}

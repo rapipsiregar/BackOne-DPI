@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { fetchAppDetails, AppDetails } from "@/lib/api";
+import { useTimeFilter } from "@/contexts/TimeFilterContext";
 import { fmtBytes } from "@/lib/utils";
 import { Loader2, X, Globe, Server, Monitor } from "lucide-react";
 
@@ -17,6 +18,7 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const { timeRange } = useTimeFilter();
 
   const handleClose = () => {
     setIsClosing(true);
@@ -28,11 +30,11 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-    fetchAppDetails(appLabel)
+    fetchAppDetails(appLabel, timeRange)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setIsLoading(false));
-  }, [appLabel]);
+  }, [appLabel, timeRange]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleClose}>
@@ -88,112 +90,47 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
                 </div>
               </div>
 
-              {/* Per-Agent Breakdown */}
+              {/* Devices accessing this app */}
               <div>
                 <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <Server className="w-4 h-4 text-blue-400" />
-                  Usage per Agent
+                  <Monitor className="w-4 h-4 text-blue-400" />
+                  Devices Accessing {appLabel}
                 </h4>
-                {data.agent_scorecard.length === 0 ? (
-                  <p className="text-muted-foreground text-sm text-center py-4">No traffic from known agents for this app yet.</p>
+                {(!data.devices || data.devices.length === 0) ? (
+                  <p className="text-muted-foreground text-sm text-center py-4">No active devices found for this app in the selected time range.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {data.agent_scorecard.map((a, i) => {
-                      const maxDl = Math.max(...data.agent_scorecard.map(x => x.download), 1);
-                      const pct = (a.download / maxDl) * 100;
-                      return (
-                        <div key={i} className="p-3 bg-white/[0.03] border border-border/50 rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-blue-400" />
-                              <span className="text-sm font-medium text-card-foreground">{a.agent_label}</span>
-                              {a.agent_uuid && (
-                                <span className="text-xs font-mono text-muted-foreground">{a.agent_uuid}</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 text-xs font-mono">
-                              <span className="text-cyan-400">↓ {fmtBytes(a.download)}</span>
-                              <span className="text-green-400">↑ {fmtBytes(a.upload ?? 0)}</span>
-                            </div>
-                          </div>
-                          <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Top IPs */}
-              <div>
-                <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <Monitor className="w-4 h-4 text-cyan-400" />
-                  Top 5 Flow Records (Realtime)
-                  {data.top_ips.filter(ip => ip.blacklisted).length > 0 && (
-                    <span className="ml-auto text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full ring-1 ring-red-500/30">
-                      🚫 {data.top_ips.filter(ip => ip.blacklisted).length} Blacklisted
-                    </span>
-                  )}
-                </h4>
-                {data.top_ips.length === 0 ? (
-                  <p className="text-muted-foreground text-sm text-center py-4">No device data available.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left border-b border-white/10">
-                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground w-8">#</th>
-                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground">Source IP</th>
-                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground">Dest IP</th>
-                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground">Label / Domain</th>
-                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground">Time</th>
-                          <th className="pb-3 pr-4 text-xs font-medium text-muted-foreground text-right">Download</th>
-                          <th className="pb-3 text-xs font-medium text-muted-foreground text-right">Upload</th>
+                  <div className="overflow-x-auto rounded-lg border border-border/50 bg-white/[0.02]">
+                    <table className="w-full text-sm text-left whitespace-nowrap">
+                      <thead className="bg-secondary/40 text-muted-foreground">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">Timestamp</th>
+                          <th className="px-4 py-3 font-medium">Agent</th>
+                          <th className="px-4 py-3 font-medium">IP Address</th>
+                          <th className="px-4 py-3 font-medium">Hostname</th>
+                          <th className="px-4 py-3 font-medium">OS</th>
+                          <th className="px-4 py-3 font-medium">MAC Address</th>
+                          <th className="px-4 py-3 font-medium">Download</th>
+                          <th className="px-4 py-3 font-medium">Upload</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {data.top_ips.map((ip, i) => {
-                          const maxDl = Math.max(...data.top_ips.map(x => x.download), 1);
-                          const pct = (ip.download / maxDl) * 100;
-                          return (
-                            <tr key={i} className="hover:bg-white/[0.04] transition-colors group">
-                              <td className="py-3 pr-4 text-xs text-muted-foreground group-hover:text-white transition-colors">{i + 1}</td>
-                              <td className="py-3 pr-4 font-mono text-xs">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className={ip.blacklisted ? "text-red-400" : "text-blue-400"}>{ip.ip_address || "-"}</span>
-                                  {ip.blacklisted && (
-                                    <span className="text-xs text-red-300 bg-red-500/10 px-1.5 py-0.5 rounded-full ring-1 ring-red-500/30">🚫</span>
-                                  )}
-                                  {!ip.blacklisted && ip.reputation && ip.reputation !== "Unknown" && (
-                                    <span className="text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">{ip.reputation}</span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="py-3 pr-4 font-mono text-xs text-muted-foreground truncate max-w-[120px]">
-                                {ip.dst_ip || "-"}
-                              </td>
-                              <td className="py-3 pr-4 text-xs text-slate-300 truncate max-w-[150px]">
-                                {ip.domain || data.app_label || "-"}
-                              </td>
-                              <td className="py-3 pr-4 text-xs text-muted-foreground whitespace-nowrap">
-                                {ip.last_seen ? new Date(ip.last_seen).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : "-"}
-                              </td>
-                              <td className="py-3 pr-4 text-right text-xs font-medium text-cyan-400">{fmtBytes(ip.download)}</td>
-                              <td className="py-3 text-right text-xs font-medium text-green-400">{fmtBytes(ip.upload ?? 0)}</td>
-                            </tr>
-                          );
-                        })}
+                      <tbody className="divide-y divide-border/50">
+                        {data.devices.map((dev: any, i: number) => (
+                          <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="px-4 py-3 text-muted-foreground">{new Date(dev.timestamp).toLocaleString()}</td>
+                            <td className="px-4 py-3">{dev.agent_uuid || 'Global'}</td>
+                            <td className="px-4 py-3 font-mono text-blue-300">{dev.ip || '-'}</td>
+                            <td className="px-4 py-3">{dev.hostname || '-'}</td>
+                            <td className="px-4 py-3">{dev.os || '-'}</td>
+                            <td className="px-4 py-3 font-mono text-muted-foreground">{dev.mac || '-'}</td>
+                            <td className="px-4 py-3 text-cyan-400">{fmtBytes(dev.download)}</td>
+                            <td className="px-4 py-3 text-green-400">{fmtBytes(dev.upload)}</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
                 )}
               </div>
-
             </div>
           ) : null}
         </div>
@@ -201,3 +138,5 @@ export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) 
     </div>
   );
 }
+
+

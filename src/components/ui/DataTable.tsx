@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 
 export interface Column<T> {
-  header: string;
+  header: React.ReactNode;
   accessor: (row: T, index: number) => React.ReactNode;
   className?: string;
 }
@@ -58,11 +58,11 @@ export function DataTable<T>({
       )}
       <div className="rounded-xl border border-border overflow-hidden bg-card/50 backdrop-blur-xl shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-sm text-left table-fixed">
             <thead className="bg-secondary/30 text-muted-foreground border-b border-border/50">
               <tr>
                 {columns.map((col, i) => (
-                  <th key={i} className={`px-4 py-3.5 font-medium tracking-wide ${col.className || ""}`}>
+                  <th key={i} className={`px-2 py-3.5 font-medium tracking-wide text-center ${col.className || ""}`}>
                     {col.header}
                   </th>
                 ))}
@@ -98,10 +98,10 @@ export function DataTable<T>({
                 paginatedData.map((row, i) => (
                   <tr
                     key={i}
-                    className={`hover:bg-primary/5 transition-colors duration-200 group ${getRowClassName ? getRowClassName(row) : ""}`}
+                    className={`h-[64px] hover:bg-primary/5 transition-colors duration-200 group ${getRowClassName ? getRowClassName(row) : ""}`}
                   >
                     {columns.map((col, j) => (
-                      <td key={j} className={`px-4 py-3 text-foreground group-hover:text-white transition-colors ${col.className || ""}`}>
+                      <td key={j} className={`px-2 py-3 text-center text-foreground group-hover:text-white transition-colors ${col.className || ""}`}>
                         {col.accessor(row, i)}
                       </td>
                     ))}

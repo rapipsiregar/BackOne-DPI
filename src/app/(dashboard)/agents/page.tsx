@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -66,7 +66,7 @@ export default function AgentsPage() {
       router.refresh();
       window.location.reload();
     } catch (err: any) {
-      alert('Gagal masuk mode View As: ' + err.message);
+      alert('Failed to enter View As mode: ' + err.message);
     } finally {
       setViewAsLoading(null);
     }
@@ -210,7 +210,7 @@ export default function AgentsPage() {
                 >
                   {isViewAsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); openDelete(row); }} className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded transition-colors" title="Hapus">
+                <button onClick={(e) => { e.stopPropagation(); openDelete(row); }} className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded transition-colors" title="Delete">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </>
@@ -223,12 +223,13 @@ export default function AgentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
+<h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
           <Server className="w-6 h-6 text-primary" />
           Agents Inventory
           {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
         </h2>
+      <div className="flex items-center justify-between">
+        
         <button 
           onClick={openCreate}
           className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md text-sm font-medium transition-colors"
@@ -253,7 +254,7 @@ export default function AgentsPage() {
                 API Key yang Anda gunakan saat ini (<code className="bg-red-950/40 text-red-300 px-1.5 py-0.5 rounded font-mono text-xs">sk_db_live_...</code>) adalah <strong>Site-scoped API Key</strong>. BackOne membatasi kunci ini agar hanya dapat membaca data statistik jaringan (Informatics), sehingga tidak memiliki izin untuk mengelola inventaris Agents global.
               </p>
               <div className="bg-slate-900/60 rounded-lg p-4 border border-border/40 text-xs space-y-2 leading-relaxed">
-                <p className="font-semibold text-white">💡 Cara Mengatasinya:</p>
+                <p className="font-semibold text-white">ðŸ’¡ Cara Mengatasinya:</p>
                 <ol className="list-decimal pl-4 space-y-1 text-slate-400">
                   <li>Buka dan login ke portal <a href="https://portal.netify.ai" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">BackOne Portal</a>.</li>
                   <li>Di menu sebelah kiri, navigasikan ke <strong>Settings</strong> &gt; <strong>API Keys</strong>.</li>
@@ -354,3 +355,4 @@ export default function AgentsPage() {
     </div>
   );
 }
+

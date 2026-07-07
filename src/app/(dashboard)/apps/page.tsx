@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useTopApps, AppStat } from "@/lib/api";
@@ -11,7 +11,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 
 export default function AppsPage() {
   const [mounted, setMounted] = useState(false);
-  const { data, isLoading } = useTopApps(50); // fetch 50 apps
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
+  const { data, isLoading } = useTopApps(pageSize, page * pageSize);
   const [selectedApp, setSelectedApp] = useState<AppStat | null>(null);
 
   useEffect(() => {
@@ -23,6 +25,7 @@ export default function AppsPage() {
   const top5 = data.slice(0, 5);
 
   const columns: Column<AppStat>[] = [
+    { header: "Last Seen", accessor: (row) => row.timestamp ? new Date(row.timestamp).toLocaleString() : '-' },
     { header: "#", accessor: (row, i) => i + 1 },
     {
       header: "Application",
@@ -57,7 +60,7 @@ export default function AppsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+<div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
             Applications
@@ -68,6 +71,7 @@ export default function AppsPage() {
           </p>
         </div>
       </div>
+      
 
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader>
@@ -134,3 +138,6 @@ export default function AppsPage() {
     </div>
   );
 }
+
+
+

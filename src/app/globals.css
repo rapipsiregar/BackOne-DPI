@@ -563,3 +563,28 @@ canvas {
 .animate-overlay-out {
   animation: overlayFadeOut 500ms ease-in forwards;
 }
+
+/* Hide native Edge/IE password reveal icon (the second eye) */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
+
+/* Accordion Animation Fix */
+.accordion-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 1s ease-in-out, margin-top 1s ease-in-out, opacity 1s ease-in-out;
+  opacity: 0;
+  margin-top: 0;
+}
+.accordion-grid.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 0.375rem;
+}
+.accordion-inner {
+  overflow: hidden;
+  min-height: 0;
+}

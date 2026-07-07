@@ -115,6 +115,8 @@ export interface AppStat {
   upload: number;
   favicon?: string;
   category?: string;
+  first_seen?: string;
+  last_seen?: string;
 }
 
 export interface ProtocolStat {
@@ -764,22 +766,21 @@ export interface DeviceMacBandwidth {
 }
 
 export interface DeviceDetails {
-  ip: string;
+  ip_address: string;
   mac_address: string | null;
+  device_label: string | null;
+  device_type: string | null;
+  os_label: string | null;
+  manufacturer: string | null;
+  last_seen: string | null;
   total_download: number;
   total_upload: number;
-  flow_count: number;
-  device_info: DeviceInfo;
-  top_apps: DeviceAppItem[];
-  top_domains: DeviceDomainItem[];
-  flows: DeviceFlowItem[];
-  encryption: DeviceEncryption | null;
-  server_discovery: DeviceServerItem[];
-  unencrypted_passwords: DevicePwdItem[];
-  ip_reputation: DeviceReputationItem[];
-  vpn_detections: DeviceVpnItem[];
-  events: DeviceEventItem[];
-  mac_bandwidth: DeviceMacBandwidth | null;
+  flows: FlowStat[];
+  apps: AppStat[];
+  protocols: AppStat[];
+  domains: AppStat[];
+  destinations: AppStat[];
+  threats: ThreatStat[];
 }
 
 
@@ -834,8 +835,8 @@ export async function fetchAgentDetails(uuid: string): Promise<AgentDetails> {
   return fetcher<AgentDetails>(`/agent-details?uuid=${encodeURIComponent(uuid)}`);
 }
 
-export async function fetchDeviceDetails(ip: string): Promise<DeviceDetails> {
-  return fetcher<DeviceDetails>(`/device-details?ip=${encodeURIComponent(ip)}`);
+export async function fetchDeviceDetails(ip: string, timeRange: string = 'last1hour'): Promise<DeviceDetails> {
+  return fetcher<DeviceDetails>(`/device-details?ip=${encodeURIComponent(ip)}&timeRange=${timeRange}`);
 }
 
 export async function fetchAppDetails(label: string): Promise<AppDetails> {

@@ -103,7 +103,7 @@ export default function AgentAccountModal({
 
   const handleDelete = async () => {
     if (!existingUser) return;
-    if (!confirm(`Hapus akun "${existingUser.username}"? Tindakan ini tidak dapat dibatalkan.`)) return;
+    if (!confirm(`Delete account "${existingUser.username}"? This action cannot be undone.`)) return;
     setIsDeleting(true);
     try {
       await deleteAdminAgentUser(existingUser.id);
@@ -129,7 +129,7 @@ export default function AgentAccountModal({
         <div className="flex items-center justify-between p-5 border-b border-slate-700 bg-gradient-to-r from-blue-900/40 to-slate-900">
           <div>
             <h3 className="text-lg font-bold text-white">
-              {isEdit ? "Edit Akun Agent" : "Buat Akun Agent Baru"}
+              {isEdit ? "Edit Agent Account" : "Create New Agent Account"}
             </h3>
             <p className="text-xs text-slate-400 mt-0.5 font-mono">{agentUuid}</p>
           </div>
@@ -162,13 +162,13 @@ export default function AgentAccountModal({
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5">
               <Tag className="w-3.5 h-3.5 inline mr-1" />
-              Nama Akun (Label Agent)
+              Account Name (Label Agent)
             </label>
             <input
               type="text"
               value={accountName}
               onChange={e => setAccountName(e.target.value)}
-              placeholder="Contoh: Gateway 007"
+              placeholder="e.g., Gateway 007"
               className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 transition-colors"
             />
             <p className="text-xs text-slate-500 mt-1">Nama ini akan tampil sebagai label di tab Agents</p>
@@ -244,23 +244,21 @@ export default function AgentAccountModal({
                 className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-red-900/30 border border-red-800 text-red-300 text-sm hover:bg-red-900/50 transition-colors disabled:opacity-50"
               >
                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                Hapus
-              </button>
+                Delete</button>
             )}
             <button
               type="button"
               onClick={onClose}
               className="flex-1 px-4 py-2.5 rounded-lg border border-slate-600 text-slate-300 text-sm hover:bg-slate-800 transition-colors"
             >
-              Batal
-            </button>
+              Cancel</button>
             <button
               type="submit"
               disabled={isSubmitting}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
             >
               {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {isEdit ? "Simpan Perubahan" : "Buat Akun"}
+              {isEdit ? "Save Changes" : "Create Account"}
             </button>
           </div>
         </form>
@@ -268,3 +266,4 @@ export default function AgentAccountModal({
     </div>
   );
 }
+

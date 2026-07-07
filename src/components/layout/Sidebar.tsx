@@ -5,13 +5,15 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Server, Activity, Globe, Radio, Zap,
   ShieldAlert, Shield, Lock, AppWindow, Search,
-  Bell, Check, Clock, User, LogOut, Sun, Moon, AlertTriangle, Info, Calendar, Router
+  Bell, Check, Clock, ChevronDown, User, LogOut, Sun, Moon, AlertTriangle, Info, Calendar, Router
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { motion, AnimatePresence } from "framer-motion";
 import { useThreats, useEvents } from "@/lib/api";
 import { AccountSettingsModal } from "./AccountSettingsModal";
+import { useTimeFilter } from "@/contexts/TimeFilterContext";
 
 interface AppNotification {
   id: string;
@@ -66,21 +68,36 @@ const navigationGroups = [
   }
 ];
 
+const TIME_OPTIONS = [
+  { value: "5m", label: "Last 5 Minutes" },
+  { value: "10m", label: "Last 10 Minutes" },
+  { value: "30m", label: "Last 30 Minutes" },
+  { value: "1h", label: "Last 1 Hour" },
+  { value: "1d", label: "Last 24 Hours" },
+  { value: "7d", label: "Last 7 Days" },
+  { value: "30d", label: "Last 30 Days" },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { timeRange, setTimeRange } = useTimeFilter();
 
   // State
   const [user, setUser] = useState<{ username?: string; account_name?: string; profile_picture?: string; role?: string; agent_uuid?: string } | null>(null);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false); // Notifications
+  const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false); // Time Filter
   const [readIds, setReadIds] = useState<string[]>([]);
   const [intervalText, setIntervalText] = useState<string>("");
 
   const accountDropdownRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const timeDropdownRef = useRef<HTMLDivElement>(null);
+
+  const selectedTimeOption = TIME_OPTIONS.find(opt => opt.value === timeRange) || TIME_OPTIONS[3];
 
   // Fetching
   const { data: threats } = useThreats(30);
@@ -123,6 +140,7 @@ export function Sidebar() {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsOpen(false);
       if (accountDropdownRef.current && !accountDropdownRef.current.contains(event.target as Node)) setIsAccountDropdownOpen(false);
+      if (timeDropdownRef.current && !timeDropdownRef.current.contains(event.target as Node)) setIsTimeDropdownOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -202,14 +220,14 @@ export function Sidebar() {
   return (
     <div className="flex h-full max-h-screen flex-col border-r border-white/5 bg-black/20 backdrop-blur-3xl transition-all w-64 shrink-0 relative z-40 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)]">
       {/* Brand & Site Info */}
-      <div className="flex flex-col p-4 shrink-0 gap-4 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <img src="/backone-logo.png" alt="BackOne Logo" className="w-8 h-8 rounded-full drop-shadow-[0_0_10px_rgba(255,0,0,0.3)]" />
-          <div className="flex flex-col min-w-0 justify-center">
-            <span className="text-lg font-bold font-backone text-foreground tracking-tight leading-none">
+      <div className="flex flex-col p-2 shrink-0 gap-4 border-b border-white/5">
+        <div className="flex items-center justify-center gap-3 w-full pt-4 pb-2 px-1">
+          <img src="/backone-logo.png" alt="BackOne Logo" className="w-9 h-9 rounded-full drop-shadow-[0_0_12px_rgba(255,0,0,0.35)] shrink-0" />
+          <div className="flex flex-col min-w-0 justify-center text-left">
+            <span className="text-xl font-bold font-backone text-foreground tracking-tight leading-none">
               BackOne
             </span>
-            <span className="text-[10px] text-muted-foreground mt-0.5 leading-tight tracking-wide whitespace-nowrap">
+            <span className="text-[11px] text-muted-foreground mt-1 leading-tight tracking-wider whitespace-nowrap">
               Deep Package Inspection
             </span>
           </div>
@@ -229,6 +247,53 @@ export function Sidebar() {
               <span className="truncate">{intervalText}</span>
             </div>
           )}
+          
+          {/* Time Filter Dropdown */}
+          <div className="relative mt-1" ref={timeDropdownRef}>
+            <button
+              onClick={() => setIsTimeDropdownOpen(!isTimeDropdownOpen)}
+              className="flex w-full items-center justify-between gap-2 rounded bg-secondary/20 hover:bg-secondary/50 px-2 py-1.5 transition-colors border border-border/20 shadow-sm"
+            >
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs text-foreground font-medium">{selectedTimeOption.label}</span>
+              </div>
+              <ChevronDown 
+                className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-1000 ${isTimeDropdownOpen ? 'rotate-180' : ''}`} 
+              />
+            </button>
+            <AnimatePresence>
+              {isTimeDropdownOpen && (
+                <motion.div 
+                  initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                  animate={{ height: 'auto', opacity: 1, marginTop: '0.375rem' }}
+                  exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                  transition={{ duration: 1, ease: "easeInOut" }}
+                  className="overflow-hidden"
+                >
+                  <div className="w-full rounded-md border border-white/10 bg-black/40 flex flex-col p-1">
+                    {TIME_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          setTimeRange(option.value as any);
+                          setIsTimeDropdownOpen(false);
+                        }}
+                        className={`flex items-center justify-between rounded px-2 py-1.5 text-xs transition-colors ${
+                          timeRange === option.value 
+                            ? 'bg-primary/20 text-primary font-semibold' 
+                            : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+                        }`}
+                      >
+                        {option.label}
+                        {timeRange === option.value && <Check className="w-3 h-3" />}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
@@ -322,7 +387,7 @@ export function Sidebar() {
                   }}
                   className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
                 >
-                  <User className="h-4 w-4" /> Pengaturan Akun
+                  <User className="h-4 w-4" /> Account Settings
                 </button>
                 <button
                   onClick={() => {
@@ -343,7 +408,7 @@ export function Sidebar() {
                   }}
                   className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
                 >
-                  <LogOut className="h-4 w-4" /> Keluar
+                  <LogOut className="h-4 w-4" /> Sign Out
                 </button>
               </div>
             )}

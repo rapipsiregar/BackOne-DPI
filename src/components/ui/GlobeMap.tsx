@@ -48,11 +48,15 @@ const ORIGIN_LNG = 106.8456;
 
 interface GlobeMapProps {
   data: {
-    countryCode: string;
+    startLat: number;
+    startLng: number;
+    endLat: number;
+    endLng: number;
+    fromLabel: string;
+    toLabel: string;
     value: number;
-    upload?: number;
-    download?: number;
-    label: string;
+    download: number;
+    upload: number;
   }[];
 }
 
@@ -109,12 +113,11 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         controls.minDistance = 140; // Zoom in limit
         controls.maxDistance = 350; // Zoom out limit
 
-        // Listen for interactions to pause auto-rotate smoothly
         controls.addEventListener('start', () => setUserInteracting(true));
         controls.addEventListener('end', () => setUserInteracting(false));
 
-        // Focus on Southeast Asia initially
-        globeRef.current.pointOfView({ lat: ORIGIN_LAT, lng: ORIGIN_LNG, altitude: 1.8 }, 2000);
+        // Focus on Southeast Asia initially (or dynamically from first data point if available)
+        globeRef.current.pointOfView({ lat: -6.2, lng: 106.8, altitude: 1.8 }, 2000);
       }
     }, 100);
 
@@ -139,12 +142,11 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
 
   // Smooth Material Color Interpolation for Theme Switching
   useEffect(() => {
-    // Target ocean colors
     const targetColor = new THREE.Color(isLight ? '#e0f2fe' : '#020617');
     
     let frameId: number;
     const lerpColor = () => {
-      customGlobeMaterial.color.lerp(targetColor, 0.08); // Smooth interpolation step
+      customGlobeMaterial.color.lerp(targetColor, 0.08); 
       
       const rDiff = Math.abs(customGlobeMaterial.color.r - targetColor.r);
       const gDiff = Math.abs(customGlobeMaterial.color.g - targetColor.g);
@@ -163,47 +165,50 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
 
   // Prepare Data Memos
   const arcsData = useMemo(() => {
-    return data
-      .filter(d => d.countryCode !== "ID" && COUNTRY_COORDS[d.countryCode])
-      .map(d => {
-        const [lng, lat] = COUNTRY_COORDS[d.countryCode];
-        return {
-          startLat: ORIGIN_LAT,
-          startLng: ORIGIN_LNG,
-          endLat: lat,
-          endLng: lng,
-          color: isLight ? ['#38bdf8', '#0284c7'] : ['#0ea5e9', '#38bdf8'],
-          name: d.label,
-          value: d.value,
-          upload: d.upload || 0,
-          download: d.download || 0
-        };
-      });
+    return data.map(d => ({
+      ...d,
+      color: isLight ? ['#38bdf8', '#0284c7'] : ['#0ea5e9', '#38bdf8'],
+    }));
   }, [data, isLight]);
 
   const pointsData = useMemo(() => {
-    const points = arcsData.map(arc => ({
-      lat: arc.endLat,
-      lng: arc.endLng,
-      size: 0.1,
-      color: isLight ? '#0284c7' : '#38bdf8',
-      name: arc.name,
-      value: arc.value,
-      upload: arc.upload,
-      download: arc.download,
-      isOrigin: false
-    }));
-
-    points.push({
-      lat: ORIGIN_LAT,
-      lng: ORIGIN_LNG,
-      size: 0.2,
-      color: '#f43f5e',
-      name: 'Indonesia (Origin)',
-      value: 0,
-      upload: 0,
-      download: 0,
-      isOrigin: true
+    const points = [];
+    const originSet = new Set();
+    const destSet = new Set();
+    
+    arcsData.forEach(arc => {
+      const originKey = `${arc.startLat},${arc.startLng}`;
+      const destKey = `${arc.endLat},${arc.endLng}`;
+      
+      if (!destSet.has(destKey)) {
+        points.push({
+          lat: arc.endLat,
+          lng: arc.endLng,
+          size: 0.1,
+          color: isLight ? '#0284c7' : '#38bdf8',
+          name: arc.toLabel,
+          value: arc.value,
+          upload: arc.upload,
+          download: arc.download,
+          isOrigin: false
+        });
+        destSet.add(destKey);
+      }
+      
+      if (!originSet.has(originKey)) {
+        points.push({
+          lat: arc.startLat,
+          lng: arc.startLng,
+          size: 0.2,
+          color: '#f43f5e',
+          name: arc.fromLabel,
+          value: 0,
+          upload: 0,
+          download: 0,
+          isOrigin: true
+        });
+        originSet.add(originKey);
+      }
     });
 
     return points;
@@ -211,22 +216,36 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
 
   // Extract All Labels + Origin to display statically
   const labelsData = useMemo(() => {
-    const staticLabels = arcsData.map(arc => ({
-      lat: arc.endLat,
-      lng: arc.endLng,
-      name: arc.name,
-      color: isLight ? '#0f172a' : '#f8fafc'
-    }));
-    
-    // Add origin
-    staticLabels.push({
-      lat: ORIGIN_LAT,
-      lng: ORIGIN_LNG,
-      name: 'Indonesia',
-      color: isLight ? '#e11d48' : '#fda4af'
+    const labels: any[] = [];
+    const originSet = new Set();
+    const destSet = new Set();
+
+    arcsData.forEach(arc => {
+      const originKey = `${arc.startLat},${arc.startLng}`;
+      const destKey = `${arc.endLat},${arc.endLng}`;
+      
+      if (!destSet.has(destKey)) {
+        labels.push({
+          lat: arc.endLat,
+          lng: arc.endLng,
+          name: arc.toLabel,
+          color: isLight ? '#0f172a' : '#f8fafc'
+        });
+        destSet.add(destKey);
+      }
+      
+      if (!originSet.has(originKey)) {
+        labels.push({
+          lat: arc.startLat,
+          lng: arc.startLng,
+          name: arc.fromLabel,
+          color: isLight ? '#0f172a' : '#f8fafc'
+        });
+        originSet.add(originKey);
+      }
     });
     
-    return staticLabels;
+    return labels;
   }, [arcsData, isLight]);
 
   return (
@@ -247,14 +266,12 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         atmosphereColor={isLight ? "#38bdf8" : "#1e40af"}
         atmosphereAltitude={isLight ? 0.15 : 0.25}
         
-        // Polygons Configuration
         polygonsData={countries ? countries.features : []}
         polygonAltitude={0.015}
         polygonCapColor={() => isLight ? '#4ade80' : '#0f172a'} 
         polygonSideColor={() => isLight ? '#22c55e' : '#020617'} 
         polygonStrokeColor={() => isLight ? '#ffffff' : '#0ea5e9'} 
 
-        // Arcs configuration
         arcsData={arcsData}
         arcStartLat={(d: any) => d.startLat}
         arcStartLng={(d: any) => d.startLng}
@@ -264,11 +281,21 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         arcDashLength={0.4}
         arcDashGap={0.2}
         arcDashAnimateTime={2000}
-        arcAltitude={0.3}
+        arcAltitude={(d: any) => {
+          const latDiff = Math.abs(d.startLat - d.endLat);
+          const lngDiff = Math.abs(d.startLng - d.endLng);
+          const dist = Math.sqrt(latDiff*latDiff + lngDiff*lngDiff);
+          return Math.max(0.1, dist * 0.005);
+        }}
         arcStroke={isLight ? 0.8 : 0.6}
         arcLabel={(d: any) => `
           <div style="background: rgba(0,0,0,0.85); color: white; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; min-width: 180px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-            <div style="font-weight: 600; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px; margin-bottom: 6px;">Flow to ${d.name}</div>
+            <div style="font-weight: 600; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px; margin-bottom: 6px; color: #facc15;">
+              ${d.fromLabel} 
+            </div>
+            <div style="font-weight: 600; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px; margin-bottom: 6px; color: #38bdf8;">
+              ${d.toLabel}
+            </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
               <span style="color: #9ca3af;">Total Traffic:</span> <span>${fmtBytes(d.value)}</span>
             </div>
@@ -281,7 +308,6 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
           </div>
         `}
 
-        // Points configuration
         pointsData={pointsData}
         pointLat="lat"
         pointLng="lng"
@@ -306,7 +332,6 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
           </div>
         `}
 
-        // Rings configuration (Ping effect for points)
         ringsData={pointsData}
         ringLat="lat"
         ringLng="lng"
@@ -315,16 +340,14 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         ringPropagationSpeed={3}
         ringRepeatPeriod={1000}
 
-        // Labels Configuration (All Destinations + Origin)
         labelsData={labelsData}
-        labelLat="lat"
-        labelLng="lng"
+        labelLat={(d: any) => d.lat}
+        labelLng={(d: any) => d.lng}
+        labelDotRadius={0}
+        labelSize={1.5}
         labelText="name"
-        labelSize={1.4}
-        labelDotRadius={0.2}
-        labelColor="color"
-        labelResolution={5}
-        labelAltitude={0.03}
+        labelColor={(d: any) => d.color}
+        labelResolution={2}
       />
     </div>
   );

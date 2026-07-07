@@ -65,7 +65,7 @@ export default function GeographyPage() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
+<div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Geographic Traffic
@@ -74,6 +74,7 @@ export default function GeographyPage() {
           <p className="text-muted-foreground mt-1">Visualize data flow and activity across the globe.</p>
         </div>
       </div>
+      
 
       {showMap && (
         <Card className="bg-card/80 backdrop-blur-xl border-border/50 animate-slide-up" style={{ animationDelay: '100ms' }}>

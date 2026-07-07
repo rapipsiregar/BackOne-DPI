@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DataTable, Column } from "@/components/ui/DataTable";
@@ -13,7 +13,9 @@ import { Suspense } from "react";
 
 function ThreatsContent() {
   const [mounted, setMounted] = useState(false);
-  const threats = useThreats(100);
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
+  const threats = useThreats(pageSize, page * pageSize);
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
 
@@ -33,6 +35,7 @@ function ThreatsContent() {
   };
 
   const columns: Column<ThreatStat>[] = [
+    { header: "Timestamp", accessor: (row) => row.timestamp ? new Date(row.timestamp).toLocaleString() : '-' },
     { header: "#", accessor: (row, i) => i + 1 },
     { header: "Type", accessor: (row) => row.threat_type || 'Unknown' },
     { header: "Severity", accessor: (row) => getSeverityBadge(row.severity) },
@@ -54,7 +57,7 @@ function ThreatsContent() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
+<div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Threat Intelligence
@@ -67,6 +70,7 @@ function ThreatsContent() {
           <span>Active Monitoring</span>
         </div>
       </div>
+      
 
       <Card className="bg-card/80 backdrop-blur-xl border-border/50 animate-slide-up" style={{ animationDelay: '100ms' }}>
         <CardHeader className="border-b border-border/50 pb-4 mb-4">
@@ -103,3 +107,4 @@ export default function ThreatsPage() {
     </Suspense>
   );
 }
+

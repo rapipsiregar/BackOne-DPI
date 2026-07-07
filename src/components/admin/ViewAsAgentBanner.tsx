@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { Eye, ArrowLeft, Loader2 } from "lucide-react";
@@ -50,8 +50,9 @@ export default function ViewAsAgentBanner() {
         ) : (
           <ArrowLeft className="w-3.5 h-3.5" />
         )}
-        Kembali ke Admin
+        Return to Admin
       </button>
     </div>
   );
 }
+

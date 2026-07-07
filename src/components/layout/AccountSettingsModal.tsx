@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Eye, EyeOff, Image as ImageIcon, Upload, Trash2 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
@@ -72,12 +72,12 @@ export function AccountSettingsModal({
 
       const data = await res.json();
       if (res.ok) {
-        setSuccessMsg("Password berhasil diubah!");
+        setSuccessMsg("Password changed successfully!");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
       } else {
-        setErrorMsg(data.error || "Gagal mengubah password.");
+        setErrorMsg(data.error || "Failed to change password.");
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Terjadi kesalahan sistem.");
@@ -101,13 +101,13 @@ export function AccountSettingsModal({
 
       const data = await res.json();
       if (res.ok) {
-        setUsernameSuccessMsg("Username berhasil diubah!");
+        setUsernameSuccessMsg("Username changed successfully!");
         setCurrentPassword("");
         if (user) {
           setUser({ ...user, username: data.newUsername });
         }
       } else {
-        setUsernameErrorMsg(data.error || "Gagal mengubah username.");
+        setUsernameErrorMsg(data.error || "Failed to change username.");
       }
     } catch (err: any) {
       setUsernameErrorMsg(err.message || "Terjadi kesalahan sistem.");
@@ -131,13 +131,13 @@ export function AccountSettingsModal({
 
       const data = await res.json();
       if (res.ok) {
-        setAccountNameSuccessMsg("Nama akun berhasil diubah!");
+        setAccountNameSuccessMsg("Account name changed successfully!");
         setCurrentPassword("");
         if (user) {
           setUser({ ...user, account_name: data.newAccountName });
         }
       } else {
-        setAccountNameErrorMsg(data.error || "Gagal mengubah nama akun.");
+        setAccountNameErrorMsg(data.error || "Failed to change account name.");
       }
     } catch (err: any) {
       setAccountNameErrorMsg(err.message || "Terjadi kesalahan sistem.");
@@ -165,13 +165,13 @@ export function AccountSettingsModal({
 
       const data = await res.json();
       if (res.ok) {
-        setProfilePicSuccessMsg("Foto profil berhasil diperbarui!");
+        setProfilePicSuccessMsg("Profile picture updated successfully!");
         setProfilePicFile(null);
         if (user) {
           setUser({ ...user, profile_picture: data.profile_picture });
         }
       } else {
-        setProfilePicErrorMsg(data.error || "Gagal mengunggah foto profil.");
+        setProfilePicErrorMsg(data.error || "Failed to upload profile picture.");
       }
     } catch (err: any) {
       setProfilePicErrorMsg(err.message || "Terjadi kesalahan sistem.");
@@ -192,12 +192,12 @@ export function AccountSettingsModal({
 
       const data = await res.json();
       if (res.ok) {
-        setProfilePicSuccessMsg("Foto profil berhasil dihapus!");
+        setProfilePicSuccessMsg("Profile picture deleted successfully!");
         if (user) {
           setUser({ ...user, profile_picture: undefined });
         }
       } else {
-        setProfilePicErrorMsg(data.error || "Gagal menghapus foto profil.");
+        setProfilePicErrorMsg(data.error || "Failed to delete profile picture.");
       }
     } catch (err: any) {
       setProfilePicErrorMsg(err.message || "Terjadi kesalahan sistem.");
@@ -235,7 +235,7 @@ export function AccountSettingsModal({
               activeTab === 'account_name' ? "text-primary" : "text-slate-400 hover:text-slate-200"
             )}
           >
-            Ubah Nama
+            Change Name
             {activeTab === 'account_name' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full shadow-[0_-2px_10px_rgba(59,130,246,0.5)]" />
             )}
@@ -259,7 +259,7 @@ export function AccountSettingsModal({
               activeTab === 'username' ? "text-primary" : "text-slate-400 hover:text-slate-200"
             )}
           >
-            Ubah Username
+            Change Username
             {activeTab === 'username' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full shadow-[0_-2px_10px_rgba(59,130,246,0.5)]" />
             )}
@@ -271,7 +271,7 @@ export function AccountSettingsModal({
               activeTab === 'password' ? "text-primary" : "text-slate-400 hover:text-slate-200"
             )}
           >
-            Ubah Password
+            Change Password
             {activeTab === 'password' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full shadow-[0_-2px_10px_rgba(59,130,246,0.5)]" />
             )}
@@ -316,7 +316,7 @@ export function AccountSettingsModal({
                     <div className="flex items-center justify-center w-full px-4 py-2 border border-dashed border-border rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
                       <Upload className="w-4 h-4 mr-2 text-slate-400" />
                       <span className="text-sm text-slate-300 truncate">
-                        {profilePicFile ? profilePicFile.name : "Pilih File Gambar"}
+                        {profilePicFile ? profilePicFile.name : "Choose Image File"}
                       </span>
                     </div>
                   </div>
@@ -342,7 +342,7 @@ export function AccountSettingsModal({
                     className="flex flex-col items-center justify-center px-4 py-2 border border-red-500/30 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors shrink-0 disabled:opacity-50"
                   >
                     <Trash2 className="w-5 h-5 mb-1" />
-                    <span className="text-[10px] font-medium">Hapus</span>
+                    <span className="text-[10px] font-medium">Delete</span>
                   </button>
                 )}
               </div>
@@ -354,7 +354,7 @@ export function AccountSettingsModal({
                 onClick={() => onClose()}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 hover:bg-secondary hover:text-white transition-colors"
               >
-                Tutup
+                Close
               </button>
             </div>
           </div>
@@ -379,7 +379,7 @@ export function AccountSettingsModal({
                 onChange={(e) => setNewAccountName(e.target.value)}
                 required
                 className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none"
-                placeholder="Misal: Super Admin Budi"
+                placeholder="e.g., Super Admin Budi"
               />
             </div>
 
@@ -392,7 +392,7 @@ export function AccountSettingsModal({
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   required
                   className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none pr-10"
-                  placeholder="Ketik password untuk melanjutkan"
+                  placeholder="Enter password to continue"
                 />
                 <button
                   type="button"
@@ -410,7 +410,7 @@ export function AccountSettingsModal({
                 onClick={() => onClose()}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 hover:bg-secondary hover:text-white transition-colors"
               >
-                Batal
+                Cancel
               </button>
               <button
                 type="submit"
@@ -420,7 +420,7 @@ export function AccountSettingsModal({
                 {isSubmittingAccountName ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
                 ) : null}
-                {isSubmittingAccountName ? "Menyimpan..." : "Simpan Nama Akun"}
+                {isSubmittingAccountName ? "Saving..." : "Save Account Name"}
               </button>
             </div>
           </form>
@@ -458,7 +458,7 @@ export function AccountSettingsModal({
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   required
                   className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none pr-10"
-                  placeholder="Ketik password untuk melanjutkan"
+                  placeholder="Enter password to continue"
                 />
                 <button
                   type="button"
@@ -476,7 +476,7 @@ export function AccountSettingsModal({
                 onClick={() => onClose()}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 hover:bg-secondary hover:text-white transition-colors"
               >
-                Batal
+                Cancel
               </button>
               <button
                 type="submit"
@@ -486,7 +486,7 @@ export function AccountSettingsModal({
                 {isSubmittingUsername ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
                 ) : null}
-                {isSubmittingUsername ? "Menyimpan..." : "Simpan Username"}
+                {isSubmittingUsername ? "Saving..." : "Save Username"}
               </button>
             </div>
           </form>
@@ -533,7 +533,7 @@ export function AccountSettingsModal({
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
                   className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none pr-10"
-                  placeholder="Ketik password baru"
+                  placeholder="Enter new password"
                 />
                 <button
                   type="button"
@@ -554,7 +554,7 @@ export function AccountSettingsModal({
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   className="w-full rounded-lg border border-border bg-background/50 backdrop-blur-sm px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all focus:outline-none pr-10"
-                  placeholder="Ketik ulang password baru"
+                  placeholder="Re-enter new password"
                 />
                 <button
                   type="button"
@@ -571,19 +571,19 @@ export function AccountSettingsModal({
               <span className="text-xs font-semibold text-slate-200">Syarat Kekuatan Password:</span>
               <ul className="text-xs space-y-2">
                 <li className={cn("flex items-center transition-colors duration-200", isMinLength ? "text-green-400 font-medium" : "text-slate-400")}>
-                  <span className="mr-2.5 text-sm">{isMinLength ? "✓" : "○"}</span> Minimal 6 karakter
+                  <span className="mr-2.5 text-sm">{isMinLength ? "âœ“" : "â—‹"}</span> Minimal 6 karakter
                 </li>
                 <li className={cn("flex items-center transition-colors duration-200", hasUppercase ? "text-green-400 font-medium" : "text-slate-400")}>
-                  <span className="mr-2.5 text-sm">{hasUppercase ? "✓" : "○"}</span> Mengandung huruf besar (A-Z)
+                  <span className="mr-2.5 text-sm">{hasUppercase ? "âœ“" : "â—‹"}</span> Mengandung huruf besar (A-Z)
                 </li>
                 <li className={cn("flex items-center transition-colors duration-200", hasLowercase ? "text-green-400 font-medium" : "text-slate-400")}>
-                  <span className="mr-2.5 text-sm">{hasLowercase ? "✓" : "○"}</span> Mengandung huruf kecil (a-z)
+                  <span className="mr-2.5 text-sm">{hasLowercase ? "âœ“" : "â—‹"}</span> Mengandung huruf kecil (a-z)
                 </li>
                 <li className={cn("flex items-center transition-colors duration-200", hasNumber ? "text-green-400 font-medium" : "text-slate-400")}>
-                  <span className="mr-2.5 text-sm">{hasNumber ? "✓" : "○"}</span> Mengandung angka (0-9)
+                  <span className="mr-2.5 text-sm">{hasNumber ? "âœ“" : "â—‹"}</span> Mengandung angka (0-9)
                 </li>
                 <li className={cn("flex items-center transition-colors duration-200", passwordsMatch ? "text-green-400 font-medium" : "text-slate-400")}>
-                  <span className="mr-2.5 text-sm">{passwordsMatch ? "✓" : "○"}</span> Password cocok
+                  <span className="mr-2.5 text-sm">{passwordsMatch ? "âœ“" : "â—‹"}</span> Password cocok
                 </li>
               </ul>
             </div>
@@ -594,7 +594,7 @@ export function AccountSettingsModal({
                 onClick={() => onClose()}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-slate-300 hover:bg-secondary hover:text-white transition-colors"
               >
-                Batal
+                Cancel
               </button>
               <button
                 type="submit"
@@ -604,7 +604,7 @@ export function AccountSettingsModal({
                 {isSubmitting ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
                 ) : null}
-                {isSubmitting ? "Menyimpan..." : "Simpan Password"}
+                {isSubmitting ? "Saving..." : "Save Password"}
               </button>
             </div>
           </form>
@@ -613,3 +613,4 @@ export function AccountSettingsModal({
     </Modal>
   );
 }
+

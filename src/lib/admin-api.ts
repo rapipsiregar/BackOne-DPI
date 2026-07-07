@@ -103,7 +103,7 @@ export async function startViewAs(agent_uuid: string, agent_label: string): Prom
     throw new Error(`Server error (${res.status}): Backend mungkin perlu di-restart`);
   }
   const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'Gagal masuk mode view-as');
+  if (!json.ok) throw new Error(json.error || 'Failed to enter view-as mode');
 
   // Simpan token di localStorage — akan dikirim sebagai X-View-As-Agent header
   if (typeof window !== 'undefined') {
@@ -140,3 +140,4 @@ export function resolveAgentLabel(agentUuid: string, users: ManagedUser[]): stri
   const user = users.find(u => u.agent_uuid === agentUuid && u.role === 'AGENT_VIEWER');
   return user?.account_name || agentUuid;
 }
+

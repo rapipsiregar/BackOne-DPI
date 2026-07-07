@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { fetchAgentDetails, AgentDetails } from "@/lib/api";
@@ -19,7 +19,7 @@ interface Props {
 
 type Tab = "devices" | "flows" | "apps" | "security" | "events" | "mac";
 
-// ── Severity colour helper ─────────────────────────────────────────────────
+// â”€â”€ Severity colour helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function severityStyle(sev: string | null) {
   switch ((sev || "").toLowerCase()) {
     case "critical": return { badge: "bg-red-500/15 text-red-400 ring-red-500/30", dot: "bg-red-400" };
@@ -32,17 +32,17 @@ function severityStyle(sev: string | null) {
 
 function riskStyle(level: string | null) {
   switch ((level || "").toLowerCase()) {
-    case "rawan":
+    case "vulnerable":
     case "critical": return { badge: "bg-red-500/15 text-red-400 ring-red-500/30", dot: "bg-red-400" };
-    case "sedang":
+    case "moderate":
     case "medium":   return { badge: "bg-yellow-500/15 text-yellow-400 ring-yellow-500/30", dot: "bg-yellow-400" };
-    case "aman":
+    case "safe":
     case "low":      return { badge: "bg-green-500/15 text-green-400 ring-green-500/30", dot: "bg-green-400" };
     default:         return { badge: "bg-slate-500/15 text-muted-foreground ring-slate-500/30", dot: "bg-slate-400" };
   }
 }
 
-// ── Shared table wrapper ────────────────────────────────────────────────────
+// â”€â”€ Shared table wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function TableWrap({ children, head }: { children: React.ReactNode; head: string[] }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-border/50">
@@ -64,7 +64,7 @@ function EmptyState({ msg }: { msg: string }) {
   return <p className="text-muted-foreground text-sm text-center py-10">{msg}</p>;
 }
 
-// ── Main component ──────────────────────────────────────────────────────────
+// â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
   const [data,      setData]      = useState<AgentDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -114,7 +114,7 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
         className={`relative bg-card border border-border rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Header ── */}
+        {/* â”€â”€ Header â”€â”€ */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-blue-900/30 to-purple-900/20 rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-500/20 rounded-lg ring-1 ring-blue-500/30">
@@ -130,24 +130,24 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
           </button>
         </div>
 
-        {/* ── Body ── */}
+        {/* â”€â”€ Body â”€â”€ */}
         <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-              <p className="text-muted-foreground text-sm">Loading agent data…</p>
+              <p className="text-muted-foreground text-sm">Loading agent dataâ€¦</p>
             </div>
           ) : error ? (
             <div className="p-6 text-center text-red-400 text-sm">{error}</div>
           ) : data ? (
             <>
-              {/* ── KPI row ── */}
+              {/* â”€â”€ KPI row â”€â”€ */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-4 border-b border-border/50 flex-shrink-0">
                 {[
-                  { label: "Devices",    value: data.devices.length,                           color: "text-card-foreground" },
-                  { label: "Flows",      value: data.summary?.active_flows ?? data.flows.length, color: "text-card-foreground" },
-                  { label: "Download",   value: fmtBytes(data.summary?.bandwidth_down ?? 0),    color: "text-cyan-400" },
-                  { label: "Upload",     value: fmtBytes(data.summary?.bandwidth_up   ?? 0),    color: "text-green-400" },
+                  { label: "Devices",    value: data.summary?.total_devices || data.devices.length, color: "text-card-foreground" },
+                  { label: "Flows",      value: data.summary?.active_flows || data.flows.length, color: "text-card-foreground" },
+                  { label: "Download",   value: fmtBytes(data.summary?.bandwidth_down || data.devices.reduce((acc, d) => acc + (d.download ?? 0), 0)), color: "text-cyan-400" },
+                  { label: "Upload",     value: fmtBytes(data.summary?.bandwidth_up || data.devices.reduce((acc, d) => acc + (d.upload ?? 0), 0)), color: "text-green-400" },
                 ].map((kpi) => (
                   <div key={kpi.label} className="bg-secondary rounded-xl p-3 border border-border/50">
                     <p className="text-xs text-muted-foreground mb-1">{kpi.label}</p>
@@ -156,15 +156,15 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                 ))}
               </div>
 
-              {/* ── Security alert strip ── */}
+              {/* â”€â”€ Security alert strip â”€â”€ */}
               {secCount > 0 && (
                 <div className="mx-6 mt-3 flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">
                   <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                  <span><strong>{secCount}</strong> security alerts detected on this agent — check the Security tab</span>
+                  <span><strong>{secCount}</strong> security alerts detected on this agent â€” check the Security tab</span>
                 </div>
               )}
 
-              {/* ── Tabs ── */}
+              {/* â”€â”€ Tabs â”€â”€ */}
               <div className="flex gap-1 px-6 py-3 border-b border-border/50 flex-shrink-0 flex-wrap">
                 {tabs.map((tab) => (
                   <button
@@ -187,7 +187,7 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                 ))}
               </div>
 
-              {/* ── Tab content ── */}
+              {/* â”€â”€ Tab content â”€â”€ */}
               <div className="px-6 py-4 space-y-4">
 
                 {/* DEVICES */}
@@ -217,7 +217,7 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                                   )}
                                   {d.has_insecure && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ring-1 bg-orange-500/10 ring-orange-500/30 text-orange-400">
-                                      ⚠ Insecure
+                                      âš  Insecure
                                     </span>
                                   )}
                                 </div>
@@ -229,10 +229,10 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                                 </div>
                               </div>
                               <div className="text-right flex-shrink-0 space-y-0.5">
-                                <p className="text-xs text-cyan-400">↓ {fmtBytes(d.download ?? 0)}</p>
-                                <p className="text-xs text-green-400">↑ {fmtBytes(d.upload ?? 0)}</p>
+                                <p className="text-xs text-cyan-400">â†“ {fmtBytes(d.download ?? 0)}</p>
+                                <p className="text-xs text-green-400">â†‘ {fmtBytes(d.upload ?? 0)}</p>
                                 {d.encrypted_pct !== null && (
-                                  <p className="text-xs text-muted-foreground">🔒 {d.encrypted_pct}%</p>
+                                  <p className="text-xs text-muted-foreground">ðŸ”’ {d.encrypted_pct}%</p>
                                 )}
                                 <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 ml-auto transition-colors" />
                               </div>
@@ -247,22 +247,22 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                 {/* FLOWS */}
                 {activeTab === "flows" && (
                   data.flows.length === 0 ? <EmptyState msg="No flows found for this agent." /> : (
-                    <TableWrap head={["Source IP", "Destination", "App / Domain", "Proto", "↓", "↑", "Last Seen"]}>
+                    <TableWrap head={["Source IP", "Destination", "App / Domain", "Proto", "â†“", "â†‘", "Last Seen"]}>
                       {data.flows.map((f, i) => (
                         <tr key={i} className="hover:bg-white/[0.03] transition-colors">
-                          <td className="px-3 py-2 font-mono text-xs text-blue-400 whitespace-nowrap">{f.src_ip || "—"}</td>
+                          <td className="px-3 py-2 font-mono text-xs text-blue-400 whitespace-nowrap">{f.src_ip || "â€”"}</td>
                            <td className="px-3 py-2 whitespace-nowrap">
                             <div className="flex flex-col gap-0.5">
                               <span className="font-mono text-xs text-slate-300">
-                                {f.dst_ip || "—"}{f.dst_port ? <span className="text-muted-foreground">:{f.dst_port}</span> : ""}
+                                {f.dst_ip || "â€”"}{f.dst_port ? <span className="text-muted-foreground">:{f.dst_port}</span> : ""}
                               </span>
                               {f.dst_ip && <IpDetails ip={f.dst_ip} />}
                             </div>
                           </td>
                            <td className="px-3 py-2 whitespace-nowrap max-w-[200px]">
                             <div className="flex flex-col gap-0.5">
-                              <span className="font-semibold text-purple-300 text-xs truncate" title={f.app_label || "—"}>
-                                {f.app_label || "—"}
+                              <span className="font-semibold text-purple-300 text-xs truncate" title={f.app_label || "â€”"}>
+                                {f.app_label || "â€”"}
                               </span>
                               {f.domain && (
                                 <span className="text-[10px] text-muted-foreground italic truncate" title={f.domain}>
@@ -271,10 +271,10 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                               )}
                             </div>
                            </td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">{f.protocol || "—"}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">{f.protocol || "â€”"}</td>
                           <td className="px-3 py-2 text-right text-xs text-cyan-400 whitespace-nowrap">{fmtBytes(f.download)}</td>
                           <td className="px-3 py-2 text-right text-xs text-green-400 whitespace-nowrap">{fmtBytes(f.upload)}</td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{f.last_seen?.slice(0, 16) || "—"}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{f.last_seen?.slice(0, 16) || "â€”"}</td>
                         </tr>
                       ))}
                     </TableWrap>
@@ -301,8 +301,8 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                               <span className="text-xs font-mono text-card-foreground">{fmtBytes(total)}</span>
                             </div>
                             <div className="flex gap-3 text-xs text-muted-foreground mb-2">
-                              <span className="text-cyan-400">↓ {fmtBytes(a.download ?? 0)}</span>
-                              <span className="text-green-400">↑ {fmtBytes(a.upload ?? 0)}</span>
+                              <span className="text-cyan-400">â†“ {fmtBytes(a.download ?? 0)}</span>
+                              <span className="text-green-400">â†‘ {fmtBytes(a.upload ?? 0)}</span>
                             </div>
                             <div className="h-1 bg-secondary rounded-full overflow-hidden">
                               <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
@@ -329,8 +329,8 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                             const rc = riskStyle(r.risk_level);
                             return (
                               <tr key={i} className="hover:bg-white/[0.03]">
-                                <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.ip_address || "—"}</td>
-                                <td className="px-3 py-2 text-xs text-slate-300 truncate max-w-[120px]">{r.device_label || "—"}</td>
+                                <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.ip_address || "â€”"}</td>
+                                <td className="px-3 py-2 text-xs text-slate-300 truncate max-w-[120px]">{r.device_label || "â€”"}</td>
                                 <td className="px-3 py-2 text-xs">
                                   <div className="flex items-center gap-2">
                                     <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -342,7 +342,7 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                                 <td className="px-3 py-2">
                                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ring-1 ${rc.badge}`}>
                                     <span className={`w-1.5 h-1.5 rounded-full ${rc.dot}`} />
-                                    {r.risk_level || "—"}
+                                    {r.risk_level || "â€”"}
                                   </span>
                                 </td>
                                 <td className="px-3 py-2 text-xs text-cyan-400">{fmtBytes(r.encrypted ?? 0)}</td>
@@ -361,24 +361,24 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                         <span className="ml-auto text-xs text-muted-foreground">{data.security?.insecure_protocols.length ?? 0} records</span>
                       </h4>
                       {(data.security?.insecure_protocols.length ?? 0) === 0 ? <EmptyState msg="No insecure protocols detected for this agent." /> : (
-                        <TableWrap head={["IP", "Protocol", "Risk", "App", "Dst IP:Port", "↓", "↑"]}>
+                        <TableWrap head={["IP", "Protocol", "Risk", "App", "Dst IP:Port", "â†“", "â†‘"]}>
                           {data.security!.insecure_protocols.map((r, i) => {
                             const sc = severityStyle(r.risk);
                             return (
                               <tr key={i} className="hover:bg-white/[0.03]">
-                                <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.ip_address || "—"}</td>
-                                <td className="px-3 py-2 text-xs text-slate-200">{r.protocol || "—"}</td>
+                                <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.ip_address || "â€”"}</td>
+                                <td className="px-3 py-2 text-xs text-slate-200">{r.protocol || "â€”"}</td>
                                 <td className="px-3 py-2">
                                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ring-1 ${sc.badge}`}>
                                     <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                                    {r.risk || "—"}
+                                    {r.risk || "â€”"}
                                   </span>
                                 </td>
-                                <td className="px-3 py-2 text-xs text-purple-300 truncate max-w-[100px]">{r.app_label || "—"}</td>
+                                <td className="px-3 py-2 text-xs text-purple-300 truncate max-w-[100px]">{r.app_label || "â€”"}</td>
                                 <td className="px-3 py-2 whitespace-nowrap">
                                   <div className="flex flex-col gap-0.5">
                                     <span className="font-mono text-xs text-muted-foreground">
-                                      {r.dst_ip ? `${r.dst_ip}:${r.dst_port ?? "?"}` : "—"}
+                                      {r.dst_ip ? `${r.dst_ip}:${r.dst_port ?? "?"}` : "â€”"}
                                     </span>
                                     {r.dst_ip && <IpDetails ip={r.dst_ip} />}
                                   </div>
@@ -404,21 +404,21 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                             const sc = severityStyle(r.severity);
                             return (
                               <tr key={i} className="hover:bg-white/[0.03]">
-                                <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.ip_address || "—"}</td>
+                                <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.ip_address || "â€”"}</td>
                                 <td className="px-3 py-2 whitespace-nowrap">
                                   <div className="flex flex-col gap-0.5">
                                     <span className="font-mono text-xs text-muted-foreground">
-                                      {r.dst_ip ? `${r.dst_ip}:${r.dst_port ?? "?"}` : "—"}
+                                      {r.dst_ip ? `${r.dst_ip}:${r.dst_port ?? "?"}` : "â€”"}
                                     </span>
                                     {r.dst_ip && <IpDetails ip={r.dst_ip} />}
                                   </div>
                                 </td>
-                                <td className="px-3 py-2 text-xs text-slate-300">{r.protocol || "—"}</td>
-                                <td className="px-3 py-2 text-xs text-yellow-300 font-mono">{r.username || "—"}</td>
+                                <td className="px-3 py-2 text-xs text-slate-300">{r.protocol || "â€”"}</td>
+                                <td className="px-3 py-2 text-xs text-yellow-300 font-mono">{r.username || "â€”"}</td>
                                 <td className="px-3 py-2">
                                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ring-1 ${sc.badge}`}>
                                     <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                                    {r.severity || "—"}
+                                    {r.severity || "â€”"}
                                   </span>
                                 </td>
                               </tr>
@@ -438,15 +438,15 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                         <TableWrap head={["Remote IP", "Local IP", "Reputation", "Score", "Country", "Blacklisted"]}>
                           {data.security!.ip_reputation.map((r, i) => (
                             <tr key={i} className="hover:bg-white/[0.03]">
-                              <td className="px-3 py-2 font-mono text-xs text-red-400">{r.ip_address || "—"}</td>
-                              <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.local_ip || "—"}</td>
-                              <td className="px-3 py-2 text-xs text-slate-300">{r.reputation || "—"}</td>
-                              <td className="px-3 py-2 text-xs text-yellow-400">{r.score ?? "—"}</td>
-                              <td className="px-3 py-2 text-xs text-muted-foreground">{r.country || "—"}</td>
+                              <td className="px-3 py-2 font-mono text-xs text-red-400">{r.ip_address || "â€”"}</td>
+                              <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.local_ip || "â€”"}</td>
+                              <td className="px-3 py-2 text-xs text-slate-300">{r.reputation || "â€”"}</td>
+                              <td className="px-3 py-2 text-xs text-yellow-400">{r.score ?? "â€”"}</td>
+                              <td className="px-3 py-2 text-xs text-muted-foreground">{r.country || "â€”"}</td>
                               <td className="px-3 py-2 text-xs">
                                 {r.blacklisted
-                                  ? <span className="text-red-400 font-semibold">⛔ Yes</span>
-                                  : <span className="text-green-400">✓ No</span>
+                                  ? <span className="text-red-400 font-semibold">â›” Yes</span>
+                                  : <span className="text-green-400">âœ“ No</span>
                                 }
                               </td>
                             </tr>
@@ -468,10 +468,10 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                           : <div className="space-y-2">{data.security!.tor_detections.map((r, i) => (
                               <div key={i} className="p-2 bg-red-500/5 border border-red-500/20 rounded-lg text-xs">
                                 <div className="flex justify-between">
-                                  <span className="font-mono text-blue-400">{r.ip_address || "—"}</span>
-                                  <span className="text-muted-foreground">{r.country || "—"}</span>
+                                  <span className="font-mono text-blue-400">{r.ip_address || "â€”"}</span>
+                                  <span className="text-muted-foreground">{r.country || "â€”"}</span>
                                 </div>
-                                <div className="text-muted-foreground mt-0.5">Exit: {r.exit_node || "—"}</div>
+                                <div className="text-muted-foreground mt-0.5">Exit: {r.exit_node || "â€”"}</div>
                               </div>
                             ))}</div>
                         }
@@ -488,11 +488,11 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                           : <div className="space-y-2">{data.security!.vpn_detections.map((r, i) => (
                               <div key={i} className="p-2 bg-blue-500/5 border border-blue-500/20 rounded-lg text-xs">
                                 <div className="flex justify-between">
-                                  <span className="font-mono text-blue-400">{r.ip_address || "—"}</span>
-                                  <span className="text-purple-400">{r.vpn_type || "—"}</span>
+                                  <span className="font-mono text-blue-400">{r.ip_address || "â€”"}</span>
+                                  <span className="text-purple-400">{r.vpn_type || "â€”"}</span>
                                 </div>
                                  <div className="text-muted-foreground mt-0.5 flex flex-col gap-0.5">
-                                   <span>Remote: {r.remote_ip || "—"} • {r.country || "—"}</span>
+                                   <span>Remote: {r.remote_ip || "â€”"} â€¢ {r.country || "â€”"}</span>
                                    {r.remote_ip && <IpDetails ip={r.remote_ip} />}
                                  </div>
                                 {r.confidence && <div className="text-muted-foreground">Confidence: {(r.confidence * 100).toFixed(0)}%</div>}
@@ -514,15 +514,15 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                             <tr key={i} className="hover:bg-white/[0.03]">
                                <td className="px-3 py-2 whitespace-nowrap">
                                  <div className="flex flex-col gap-0.5">
-                                   <span className="font-mono text-xs text-blue-400">{r.ip_address || "—"}</span>
+                                   <span className="font-mono text-xs text-blue-400">{r.ip_address || "â€”"}</span>
                                    {r.ip_address && <IpDetails ip={r.ip_address} />}
                                  </div>
                                </td>
-                              <td className="px-3 py-2 text-xs text-slate-300 truncate max-w-[120px]">{r.hostname || "—"}</td>
-                              <td className="px-3 py-2 text-xs text-cyan-400">{r.server_type || "—"}</td>
-                              <td className="px-3 py-2 text-xs text-muted-foreground">{r.port ?? "—"}</td>
-                              <td className="px-3 py-2 text-xs text-purple-300">{r.protocol || "—"}</td>
-                              <td className="px-3 py-2 text-xs text-muted-foreground">{r.os_label || "—"}</td>
+                              <td className="px-3 py-2 text-xs text-slate-300 truncate max-w-[120px]">{r.hostname || "â€”"}</td>
+                              <td className="px-3 py-2 text-xs text-cyan-400">{r.server_type || "â€”"}</td>
+                              <td className="px-3 py-2 text-xs text-muted-foreground">{r.port ?? "â€”"}</td>
+                              <td className="px-3 py-2 text-xs text-purple-300">{r.protocol || "â€”"}</td>
+                              <td className="px-3 py-2 text-xs text-muted-foreground">{r.os_label || "â€”"}</td>
                             </tr>
                           ))}
                         </TableWrap>
@@ -546,17 +546,17 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                             <div className="flex items-start gap-3">
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ring-1 flex-shrink-0 ${sc.badge}`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                                {ev.severity || "—"}
+                                {ev.severity || "â€”"}
                               </span>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap mb-1">
                                   <span className="font-semibold text-card-foreground">{ev.event_type || "Unknown"}</span>
-                                  <span className="font-mono text-blue-400">{ev.ip_address || "—"}</span>
+                                  <span className="font-mono text-blue-400">{ev.ip_address || "â€”"}</span>
                                   {ev.mac_address && <span className="font-mono text-muted-foreground">{ev.mac_address}</span>}
                                 </div>
                                 {ev.description && <p className="text-muted-foreground leading-relaxed">{ev.description}</p>}
                               </div>
-                              <span className="text-slate-600 flex-shrink-0 whitespace-nowrap">{ev.event_at?.slice(0, 16) || "—"}</span>
+                              <span className="text-slate-600 flex-shrink-0 whitespace-nowrap">{ev.event_at?.slice(0, 16) || "â€”"}</span>
                             </div>
                           </div>
                         );
@@ -586,8 +586,8 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                               </div>
                             </div>
                             <div className="flex gap-4 text-xs mb-2">
-                              <span className="text-cyan-400">↓ {fmtBytes(m.download ?? 0)}</span>
-                              <span className="text-green-400">↑ {fmtBytes(m.upload ?? 0)}</span>
+                              <span className="text-cyan-400">â†“ {fmtBytes(m.download ?? 0)}</span>
+                              <span className="text-green-400">â†‘ {fmtBytes(m.upload ?? 0)}</span>
                             </div>
                             <div className="h-1 bg-secondary rounded-full overflow-hidden">
                               <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" style={{ width: `${pct}%` }} />
@@ -616,3 +616,6 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
     </>
   );
 }
+
+
+
