@@ -53,9 +53,12 @@ services:
       - MONGODB_URI=mongodb://mongodb:27017/backone_dpi
       - PROXY_PORT=4000
       # Mode 1: kumpulkan SEMUA agent (default)
-      # Ubah ke PROXY_COLLECT_MODE=agent dan isi PROXY_AGENT_UUID untuk mode spesifik
+      # Ubah ke PROXY_COLLECT_MODE=agent dan isi PROXY_AGENT_UUID untuk mode spesifik (1 agent)
+      # Ubah ke PROXY_COLLECT_MODE=agents dan isi PROXY_AGENT_UUIDS untuk mode multi-agent
       - PROXY_COLLECT_MODE=${PROXY_COLLECT_MODE:-all}
       - PROXY_AGENT_UUID=${PROXY_AGENT_UUID:-}
+      - PROXY_AGENT_UUIDS=${PROXY_AGENT_UUIDS:-}
+      - PROXY_AGENT_DELAY_MS=${PROXY_AGENT_DELAY_MS:-5000}
       - PROXY_CRON_SCHEDULE=${PROXY_CRON_SCHEDULE:-*/5 * * * *}
     networks:
       - backone-infra
