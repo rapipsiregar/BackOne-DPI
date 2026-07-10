@@ -58,3 +58,11 @@ backend/*.sqlite
 Laporan_*.docx
 temp_docx/
 *.zip
+
+# AI and confidential files
+AGENTS.md
+CLAUDE.md
+.agents/
+docs/
+plans/
+.env*
