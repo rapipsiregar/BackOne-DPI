@@ -7,6 +7,8 @@ export interface Column<T> {
   header: React.ReactNode;
   accessor: (row: T, index: number) => React.ReactNode;
   className?: string;
+  sortable?: boolean;
+  sortAccessor?: (row: T) => number | string | null | undefined;
 }
 
 export interface CsvExportOptions<T> {
@@ -60,10 +62,39 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState<{ key: number; direction: 'asc' | 'desc' } | null>(null);
 
-  const filteredData = searchFilter
-    ? data.filter(row => searchFilter(row, query.trim()))
-    : data;
+  const handleSort = (columnIndex: number) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === columnIndex && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key: columnIndex, direction });
+  };
+
+  let processedData = [...data];
+
+  if (searchFilter && query.trim()) {
+    processedData = processedData.filter(row => searchFilter(row, query.trim()));
+  }
+
+  if (sortConfig !== null) {
+    const column = columns[sortConfig.key];
+    if (column && column.sortable && column.sortAccessor) {
+      processedData.sort((a, b) => {
+        const valA = column.sortAccessor!(a);
+        const valB = column.sortAccessor!(b);
+        if (valA === valB) return 0;
+        if (valA === null || valA === undefined) return 1;
+        if (valB === null || valB === undefined) return -1;
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+  }
+
+  const filteredData = processedData;
 
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
@@ -113,8 +144,20 @@ export function DataTable<T>({
             <thead className="bg-secondary/30 text-muted-foreground border-b border-border/50 relative z-20">
               <tr>
                 {columns.map((col, i) => (
-                  <th key={i} className={`px-4 py-3.5 h-[48px] font-medium tracking-wide whitespace-nowrap ${col.className?.includes("text-") ? "" : "text-center"} ${col.className || ""}`}>
-                    {col.header}
+                  <th 
+                    key={i} 
+                    onClick={() => col.sortable && handleSort(i)}
+                    className={`px-4 py-3.5 h-[48px] font-medium tracking-wide whitespace-nowrap ${col.className?.includes("text-") ? "" : "text-center"} ${col.className || ""} ${col.sortable ? "cursor-pointer hover:bg-white/5 transition-colors group select-none" : ""}`}
+                  >
+                    <div className={`flex items-center gap-1 ${col.className?.includes("text-") && !col.className?.includes("text-center") ? "" : "justify-center"}`}>
+                      {col.header}
+                      {col.sortable && (
+                        <div className="flex flex-col text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">
+                          <span className={`${sortConfig?.key === i && sortConfig.direction === 'asc' ? 'text-primary opacity-100' : ''}`}>▲</span>
+                          <span className={`-mt-1 ${sortConfig?.key === i && sortConfig.direction === 'desc' ? 'text-primary opacity-100' : ''}`}>▼</span>
+                        </div>
+                      )}
+                    </div>
                   </th>
                 ))}
               </tr>

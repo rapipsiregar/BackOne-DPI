@@ -117,11 +117,15 @@ export default function FlowsPage() {
     },
     { 
       header: "Download", 
-      accessor: (row) => <span className="text-blue-400">{fmtBytes(row.bytes_download)}</span> 
+      accessor: (row) => <span className="text-blue-400">{fmtBytes(row.bytes_download)}</span>,
+      sortable: true,
+      sortAccessor: (row) => row.bytes_download ?? 0
     },
     { 
       header: "Upload", 
-      accessor: (row) => <span className="text-green-500">{fmtBytes(row.bytes_upload)}</span> 
+      accessor: (row) => <span className="text-green-500">{fmtBytes(row.bytes_upload)}</span>,
+      sortable: true,
+      sortAccessor: (row) => row.bytes_upload ?? 0
     }
   ];
 
