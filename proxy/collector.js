@@ -144,7 +144,29 @@ async function collectSpecificAgent(agentUuid) {
   return { success: result.success, mode: 'specific', agent_uuid: agentUuid };
 }
 
+async function collectSpecificAgents(agentUuids, delayMs = 5000) {
+  const timestamp = new Date();
+  const timeString = timestamp.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
+  console.log(`[Collector] === MODE: SPECIFIC AGENTS [${agentUuids.join(', ')}] === Started at ${timeString}`);
+  const results = [];
+  for (let i = 0; i < agentUuids.length; i++) {
+    if (i > 0) {
+      console.log(`[Collector] Waiting ${delayMs}ms before next agent...`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+    const result = await collectForAgent(agentUuids[i], timestamp);
+    results.push(result);
+  }
+  const successful = results.filter(r => r.success).length;
+  console.log(`[Collector] === SPECIFIC AGENTS DONE === ${successful}/${agentUuids.length} successful`);
+
+  await pruneOldData().catch(err => console.error('[Collector] [Retention] error:', err.message));
+
+  return { success: true, mode: 'specific_agents', agents_count: agentUuids.length, successful, results };
+}
+
 module.exports = {
   collectAllAgents,
-  collectSpecificAgent
+  collectSpecificAgent,
+  collectSpecificAgents
 };
