@@ -10,10 +10,15 @@ const COLLECT_MODE   = process.env.PROXY_COLLECT_MODE || 'all';
 const SPECIFIC_AGENT = process.env.PROXY_AGENT_UUID   || null;
 const CRON_SCHEDULE  = process.env.PROXY_CRON_SCHEDULE || '*/5 * * * *';
 
+// Capacity logging is an expensive full-scan aggregation. Run it at most once per
+// interval (default 24h) instead of every collection cycle to reduce CPU/DB load.
+const CAPACITY_LOG_INTERVAL_MS = parseInt(process.env.PROXY_CAPACITY_LOG_INTERVAL_MS || String(24 * 60 * 60 * 1000));
+
 let isRunning = false;
 let lastRunAt = null;
 let lastRunResult = null;
 let runCount = 0;
+let lastCapacityLogAt = 0;
 
 /**
  * Execute one collection cycle (called by cron and manual trigger).
@@ -39,11 +44,16 @@ async function runCollection() {
       result = await collectAllAgents();
     }
     lastRunResult = { ...result, run_count: runCount };
-    
-    // Log MongoDB database capacity usage after collection run
-    const { logCapacityStats } = require('../backend/db/capacityTracker');
-    await logCapacityStats(`[PROXY] [MongoDB] Capacity Used after Run #${runCount}:`);
-    
+
+    // Log MongoDB database capacity usage (expensive full-scan aggregation).
+    // Only run periodically (default: every 24h) to avoid high CPU/DB load each cycle.
+    const now = Date.now();
+    if (now - lastCapacityLogAt >= CAPACITY_LOG_INTERVAL_MS) {
+      lastCapacityLogAt = now;
+      const { logCapacityStats } = require('../backend/db/capacityTracker');
+      await logCapacityStats(`[PROXY] [MongoDB] Capacity Used after Run #${runCount}:`);
+    }
+
     return lastRunResult;
   } catch (err) {
     console.error('[Scheduler] Unhandled error during collection:', err.message);
