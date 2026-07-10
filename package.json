@@ -13,6 +13,7 @@
     "lint": "eslint",
     "backend": "node backend/server.js",
     "proxy": "node proxy/index.js",
+    "proxy:bun": "bun proxy/index.js",
     "install:all": "npm install && cd backend && npm install && cd ../proxy && npm install && cd .."
   },
   "dependencies": {

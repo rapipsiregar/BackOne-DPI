@@ -81,7 +81,8 @@ async function collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, netify, la
 }
 
 async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipToMacMap) {
-  const flows = await netify.fetchFlows(10000, agentUuid);
+  const flowLimit = parseInt(process.env.PROXY_FLOW_LIMIT || '10000');
+  const flows = await netify.fetchFlows(flowLimit, agentUuid);
   if (flows && flows.length > 0) {
     const flowDocs = flows.map(f => {
       const mac = f.src_mac || ipToMacMap[f.src_ip] || generateMacFromIp(f.src_ip);
@@ -136,9 +137,15 @@ async function collectEvents(agentUuid, timestamp, SITE_UUID, netify, label) {
     const existingSet = new Set(existing);
 
     const macToAgentMap = {};
-    const storedDevices = await DeviceStat.find({ site_uuid: SITE_UUID }).lean();
-    for (const d of storedDevices) {
-      if (d.mac_address && d.agent_uuid) macToAgentMap[d.mac_address] = d.agent_uuid;
+    const eventMacs = [...new Set(events.map(e => e.mac_address).filter(Boolean))];
+    if (eventMacs.length > 0) {
+      const storedDevices = await DeviceStat.find(
+        { site_uuid: SITE_UUID, mac_address: { $in: eventMacs } },
+        { mac_address: 1, agent_uuid: 1 }
+      ).lean();
+      for (const d of storedDevices) {
+        if (d.mac_address && d.agent_uuid) macToAgentMap[d.mac_address] = d.agent_uuid;
+      }
     }
 
     const eventDocs = events.filter(e => e.event_id === null || !existingSet.has(e.event_id)).map(e => {
