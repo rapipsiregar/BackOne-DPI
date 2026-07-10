@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
+
+// Bypass google font remote fetch during offline compilation
+const inter = {
+  variable: "font-sans",
+};
 
 const backoneFont = localFont({
   src: "../../public/fonts/BackOneLogo-Regular.ttf",

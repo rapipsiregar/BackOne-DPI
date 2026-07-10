@@ -1,15 +1,21 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { fetchAgentDetails, AgentDetails } from "@/lib/api";
-import { fmtBytes } from "@/lib/utils";
+import { fmtBytes, getAppFavicon } from "@/lib/utils";
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
-import { IpDetails } from "@/components/ui/IpDetails";
+import { AppDetailModal } from "@/components/ui/AppDetailModal";
 import {
   Loader2, X, Server, Monitor, Activity, Globe, Shield,
-  Bell, Wifi, AlertTriangle, Lock, Unlock, ChevronRight,
-  Eye, Router
+  Bell, Wifi, ChevronRight, LineChart
 } from "lucide-react";
+
+import AgentDevicesTab from "./AgentDevicesTab";
+import AgentFlowsTab from "./AgentFlowsTab";
+import AgentSecurityTab from "./AgentSecurityTab";
+import AgentEventsTab from "./AgentEventsTab";
+import AgentMacTab from "./AgentMacTab";
+import AgentTelemetryTab from "./AgentTelemetryTab";
 
 interface Props {
   agentUuid: string;
@@ -17,61 +23,20 @@ interface Props {
   onClose: () => void;
 }
 
-type Tab = "devices" | "flows" | "apps" | "security" | "events" | "mac";
-
-// â”€â”€ Severity colour helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function severityStyle(sev: string | null) {
-  switch ((sev || "").toLowerCase()) {
-    case "critical": return { badge: "bg-red-500/15 text-red-400 ring-red-500/30", dot: "bg-red-400" };
-    case "high":     return { badge: "bg-orange-500/15 text-orange-400 ring-orange-500/30", dot: "bg-orange-400" };
-    case "warning":  return { badge: "bg-yellow-500/15 text-yellow-400 ring-yellow-500/30", dot: "bg-yellow-400" };
-    case "info":     return { badge: "bg-blue-500/15 text-blue-400 ring-blue-500/30", dot: "bg-blue-400" };
-    default:         return { badge: "bg-slate-500/15 text-muted-foreground ring-slate-500/30", dot: "bg-slate-400" };
-  }
-}
-
-function riskStyle(level: string | null) {
-  switch ((level || "").toLowerCase()) {
-    case "vulnerable":
-    case "critical": return { badge: "bg-red-500/15 text-red-400 ring-red-500/30", dot: "bg-red-400" };
-    case "moderate":
-    case "medium":   return { badge: "bg-yellow-500/15 text-yellow-400 ring-yellow-500/30", dot: "bg-yellow-400" };
-    case "safe":
-    case "low":      return { badge: "bg-green-500/15 text-green-400 ring-green-500/30", dot: "bg-green-400" };
-    default:         return { badge: "bg-slate-500/15 text-muted-foreground ring-slate-500/30", dot: "bg-slate-400" };
-  }
-}
-
-// â”€â”€ Shared table wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function TableWrap({ children, head }: { children: React.ReactNode; head: string[] }) {
-  return (
-    <div className="overflow-x-auto rounded-xl border border-border/50">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-border bg-muted/50">
-            {head.map((h) => (
-              <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/5">{children}</tbody>
-      </table>
-    </div>
-  );
-}
+type Tab = "devices" | "flows" | "apps" | "security" | "events" | "mac" | "telemetry";
 
 function EmptyState({ msg }: { msg: string }) {
   return <p className="text-muted-foreground text-sm text-center py-10">{msg}</p>;
 }
 
-// â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
   const [data,      setData]      = useState<AgentDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error,     setError]     = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("devices");
-  const [selectedDevice, setSelectedDevice] = useState<{ ip: string; label: string | null; mac: string | null } | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<{ ip: string; label: string | null; mac: string | null; agent_uuid?: string } | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [selectedAppLabel, setSelectedAppLabel] = useState<string | null>(null);
 
   const handleClose = () => {
     setIsClosing(true);
@@ -89,7 +54,12 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
       .finally(() => setIsLoading(false));
   }, [agentUuid]);
 
-  // Count security alerts
+  // Reset tab scroll/state when switching tabs
+  useEffect(() => {
+    const el = document.querySelector(".custom-scrollbar");
+    if (el) el.scrollTop = 0;
+  }, [activeTab]);
+
   const secCount = data
     ? (data.security?.insecure_protocols?.length ?? 0) +
       (data.security?.unencrypted_passwords?.length ?? 0) +
@@ -98,12 +68,13 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
     : 0;
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
-    { key: "devices",  label: "Devices",      icon: <Monitor className="w-3.5 h-3.5" />,       count: data?.devices.length },
-    { key: "flows",    label: "Flows",         icon: <Activity className="w-3.5 h-3.5" />,      count: data?.flows.length },
-    { key: "apps",     label: "Top Apps",      icon: <Globe className="w-3.5 h-3.5" />,         count: data?.top_apps.length },
-    { key: "security", label: "Security",      icon: <Shield className="w-3.5 h-3.5" />,        count: secCount || undefined },
-    { key: "events",   label: "Events",        icon: <Bell className="w-3.5 h-3.5" />,          count: data?.events.length },
-    { key: "mac",      label: "MAC Bandwidth", icon: <Wifi className="w-3.5 h-3.5" />,          count: data?.mac_bandwidth.length },
+    { key: "devices",   label: "Devices",      icon: <Monitor className="w-3.5 h-3.5" />,       count: data?.devices?.length },
+    { key: "flows",     label: "Flows",         icon: <Activity className="w-3.5 h-3.5" />,      count: data?.flows?.length },
+    { key: "apps",      label: "Top Apps",      icon: <Globe className="w-3.5 h-3.5" />,         count: data?.top_apps?.length },
+    { key: "security",  label: "Security",      icon: <Shield className="w-3.5 h-3.5" />,        count: secCount || undefined },
+    { key: "events",    label: "Events",        icon: <Bell className="w-3.5 h-3.5" />,          count: data?.events?.length },
+    { key: "mac",       label: "MAC Bandwidth", icon: <Wifi className="w-3.5 h-3.5" />,          count: data?.mac_bandwidth?.length },
+    { key: "telemetry", label: "Telemetry",     icon: <LineChart className="w-3.5 h-3.5" /> },
   ];
 
   return (
@@ -114,7 +85,7 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
         className={`relative bg-card border border-border rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* â”€â”€ Header â”€â”€ */}
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-blue-900/30 to-purple-900/20 rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-500/20 rounded-lg ring-1 ring-blue-500/30">
@@ -130,18 +101,17 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
           </button>
         </div>
 
-        {/* â”€â”€ Body â”€â”€ */}
         <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-              <p className="text-muted-foreground text-sm">Loading agent dataâ€¦</p>
+              <p className="text-muted-foreground text-sm">Loading agent data...</p>
             </div>
           ) : error ? (
             <div className="p-6 text-center text-red-400 text-sm">{error}</div>
           ) : data ? (
             <>
-              {/* â”€â”€ KPI row â”€â”€ */}
+              {/* KPI row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-4 border-b border-border/50 flex-shrink-0">
                 {[
                   { label: "Devices",    value: data.summary?.total_devices || data.devices.length, color: "text-card-foreground" },
@@ -156,15 +126,7 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                 ))}
               </div>
 
-              {/* â”€â”€ Security alert strip â”€â”€ */}
-              {secCount > 0 && (
-                <div className="mx-6 mt-3 flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                  <span><strong>{secCount}</strong> security alerts detected on this agent â€” check the Security tab</span>
-                </div>
-              )}
-
-              {/* â”€â”€ Tabs â”€â”€ */}
+              {/* Tabs */}
               <div className="flex gap-1 px-6 py-3 border-b border-border/50 flex-shrink-0 flex-wrap">
                 {tabs.map((tab) => (
                   <button
@@ -187,56 +149,42 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                 ))}
               </div>
 
-              {/* â”€â”€ Tab content â”€â”€ */}
+              {/* Tab content */}
               <div className="px-6 py-4 space-y-4">
-
-                {/* DEVICES */}
                 {activeTab === "devices" && (
-                  data.devices.length === 0 ? <EmptyState msg="No devices found for this agent." /> : (
-                    <div className="space-y-2">
-                      {data.devices.map((d, i) => {
-                        const rc = riskStyle(d.risk_level);
+                  <AgentDevicesTab
+                    devices={data.devices}
+                    onSelectDevice={(d) => setSelectedDevice({ ip: d.ip, label: d.label, mac: d.mac, agent_uuid: agentUuid })}
+                  />
+                )}
+
+                {activeTab === "flows" && (
+                  <AgentFlowsTab flows={data.flows} />
+                )}
+
+                {activeTab === "apps" && (
+                  data.top_apps.length === 0 ? <EmptyState msg="No applications accessed by this agent." /> : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {data.top_apps.map((app) => {
+                        const appTotal = app.download + app.upload;
                         return (
                           <button
-                            key={i}
-                            onClick={() => setSelectedDevice({ ip: d.ip_address || "", label: d.device_label, mac: d.mac_address })}
-                            className="w-full text-left p-3 bg-white/[0.03] hover:bg-white/[0.07] hover:border-cyan-500/30 border border-border/50 rounded-xl transition-all group cursor-pointer"
+                            key={app.app_id}
+                            onClick={() => setSelectedAppLabel(app.app_label)}
+                            className="flex items-center gap-3 p-3 bg-white/[0.03] hover:bg-white/[0.07] border border-border/50 rounded-xl transition-all group w-full text-left"
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="flex-shrink-0 p-2 bg-slate-800/60 group-hover:bg-cyan-500/10 rounded-lg transition-colors">
-                                <Monitor className="w-4 h-4 text-muted-foreground group-hover:text-cyan-400 transition-colors" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="font-medium text-card-foreground text-sm truncate group-hover:text-cyan-300 transition-colors">{d.device_label || d.ip_address || "Unknown"}</p>
-                                  {d.risk_level && (
-                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ring-1 ${rc.badge}`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full ${rc.dot}`} />
-                                      {d.risk_level}
-                                    </span>
-                                  )}
-                                  {d.has_insecure && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ring-1 bg-orange-500/10 ring-orange-500/30 text-orange-400">
-                                      âš  Insecure
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                                  <p className="text-xs text-muted-foreground font-mono">{d.ip_address}</p>
-                                  {d.mac_address && <p className="text-xs text-muted-foreground font-mono">{d.mac_address}</p>}
-                                  {d.os_label && <p className="text-xs text-blue-400">{d.os_label}</p>}
-                                  {d.manufacturer && <p className="text-xs text-muted-foreground">{d.manufacturer}</p>}
-                                </div>
-                              </div>
-                              <div className="text-right flex-shrink-0 space-y-0.5">
-                                <p className="text-xs text-cyan-400">â†“ {fmtBytes(d.download ?? 0)}</p>
-                                <p className="text-xs text-green-400">â†‘ {fmtBytes(d.upload ?? 0)}</p>
-                                {d.encrypted_pct !== null && (
-                                  <p className="text-xs text-muted-foreground">ðŸ”’ {d.encrypted_pct}%</p>
-                                )}
-                                <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 ml-auto transition-colors" />
-                              </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-card-foreground text-sm truncate group-hover:text-cyan-300 transition-colors">{app.app_label}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{app.category || "Web"}</p>
                             </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-xs text-card-foreground font-semibold">{fmtBytes(appTotal)}</p>
+                              <span className="text-[10px] text-muted-foreground flex gap-2">
+                                <span className="text-cyan-400">DL: {fmtBytes(app.download)}</span>
+                                <span className="text-green-400">UL: {fmtBytes(app.upload)}</span>
+                              </span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-colors" />
                           </button>
                         );
                       })}
@@ -244,361 +192,21 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
                   )
                 )}
 
-                {/* FLOWS */}
-                {activeTab === "flows" && (
-                  data.flows.length === 0 ? <EmptyState msg="No flows found for this agent." /> : (
-                    <TableWrap head={["Source IP", "Destination", "App / Domain", "Proto", "â†“", "â†‘", "Last Seen"]}>
-                      {data.flows.map((f, i) => (
-                        <tr key={i} className="hover:bg-white/[0.03] transition-colors">
-                          <td className="px-3 py-2 font-mono text-xs text-blue-400 whitespace-nowrap">{f.src_ip || "â€”"}</td>
-                           <td className="px-3 py-2 whitespace-nowrap">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-mono text-xs text-slate-300">
-                                {f.dst_ip || "â€”"}{f.dst_port ? <span className="text-muted-foreground">:{f.dst_port}</span> : ""}
-                              </span>
-                              {f.dst_ip && <IpDetails ip={f.dst_ip} />}
-                            </div>
-                          </td>
-                           <td className="px-3 py-2 whitespace-nowrap max-w-[200px]">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-semibold text-purple-300 text-xs truncate" title={f.app_label || "â€”"}>
-                                {f.app_label || "â€”"}
-                              </span>
-                              {f.domain && (
-                                <span className="text-[10px] text-muted-foreground italic truncate" title={f.domain}>
-                                  {f.domain}
-                                </span>
-                              )}
-                            </div>
-                           </td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">{f.protocol || "â€”"}</td>
-                          <td className="px-3 py-2 text-right text-xs text-cyan-400 whitespace-nowrap">{fmtBytes(f.download)}</td>
-                          <td className="px-3 py-2 text-right text-xs text-green-400 whitespace-nowrap">{fmtBytes(f.upload)}</td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{f.last_seen?.slice(0, 16) || "â€”"}</td>
-                        </tr>
-                      ))}
-                    </TableWrap>
-                  )
-                )}
-
-                {/* TOP APPS */}
-                {activeTab === "apps" && (
-                  data.top_apps.length === 0 ? <EmptyState msg="No application data for this agent." /> : (
-                    <div className="space-y-2">
-                      {data.top_apps.map((a, i) => {
-                        const total   = (a.download ?? 0) + (a.upload ?? 0);
-                        const maxTotal = Math.max(...data.top_apps.map(x => (x.download ?? 0) + (x.upload ?? 0)), 1);
-                        const pct     = (total / maxTotal) * 100;
-                        return (
-                          <div key={i} className="p-3 bg-white/[0.03] hover:bg-white/[0.06] border border-border/50 rounded-xl transition-colors">
-                            <div className="flex items-center gap-3 mb-2">
-                              {a.favicon
-                                ? <img src={a.favicon} alt={a.app_label} className="w-5 h-5 rounded bg-white p-0.5 flex-shrink-0" />
-                                : <div className="w-5 h-5 rounded bg-slate-700 flex-shrink-0" />
-                              }
-                              <span className="font-medium text-card-foreground text-sm flex-1">{a.app_label}</span>
-                              {a.category && <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded">{a.category}</span>}
-                              <span className="text-xs font-mono text-card-foreground">{fmtBytes(total)}</span>
-                            </div>
-                            <div className="flex gap-3 text-xs text-muted-foreground mb-2">
-                              <span className="text-cyan-400">â†“ {fmtBytes(a.download ?? 0)}</span>
-                              <span className="text-green-400">â†‘ {fmtBytes(a.upload ?? 0)}</span>
-                            </div>
-                            <div className="h-1 bg-secondary rounded-full overflow-hidden">
-                              <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )
-                )}
-
-                {/* SECURITY */}
                 {activeTab === "security" && (
-                  <div className="space-y-6">
-                    {/* Encryption Audit */}
-                    <section>
-                      <h4 className="flex items-center gap-2 text-sm font-semibold text-card-foreground mb-3">
-                        <Lock className="w-4 h-4 text-blue-400" /> Encryption Audit
-                        <span className="ml-auto text-xs text-muted-foreground">{data.security?.encryption_audit.length ?? 0} devices</span>
-                      </h4>
-                      {(data.security?.encryption_audit.length ?? 0) === 0 ? <EmptyState msg="No encryption audit data for this agent." /> : (
-                        <TableWrap head={["IP Address", "Device", "Encrypted %", "Risk", "Enc Bytes", "Unenc Bytes"]}>
-                          {data.security!.encryption_audit.map((r, i) => {
-                            const rc = riskStyle(r.risk_level);
-                            return (
-                              <tr key={i} className="hover:bg-white/[0.03]">
-                                <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.ip_address || "â€”"}</td>
-                                <td className="px-3 py-2 text-xs text-slate-300 truncate max-w-[120px]">{r.device_label || "â€”"}</td>
-                                <td className="px-3 py-2 text-xs">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${r.encrypted_pct ?? 0}%` }} />
-                                    </div>
-                                    <span className="text-card-foreground">{r.encrypted_pct ?? 0}%</span>
-                                  </div>
-                                </td>
-                                <td className="px-3 py-2">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ring-1 ${rc.badge}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${rc.dot}`} />
-                                    {r.risk_level || "â€”"}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2 text-xs text-cyan-400">{fmtBytes(r.encrypted ?? 0)}</td>
-                                <td className="px-3 py-2 text-xs text-orange-400">{fmtBytes(r.unencrypted ?? 0)}</td>
-                              </tr>
-                            );
-                          })}
-                        </TableWrap>
-                      )}
-                    </section>
-
-                    {/* Insecure Protocols */}
-                    <section>
-                      <h4 className="flex items-center gap-2 text-sm font-semibold text-card-foreground mb-3">
-                        <Unlock className="w-4 h-4 text-orange-400" /> Insecure Protocols
-                        <span className="ml-auto text-xs text-muted-foreground">{data.security?.insecure_protocols.length ?? 0} records</span>
-                      </h4>
-                      {(data.security?.insecure_protocols.length ?? 0) === 0 ? <EmptyState msg="No insecure protocols detected for this agent." /> : (
-                        <TableWrap head={["IP", "Protocol", "Risk", "App", "Dst IP:Port", "â†“", "â†‘"]}>
-                          {data.security!.insecure_protocols.map((r, i) => {
-                            const sc = severityStyle(r.risk);
-                            return (
-                              <tr key={i} className="hover:bg-white/[0.03]">
-                                <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.ip_address || "â€”"}</td>
-                                <td className="px-3 py-2 text-xs text-slate-200">{r.protocol || "â€”"}</td>
-                                <td className="px-3 py-2">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ring-1 ${sc.badge}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                                    {r.risk || "â€”"}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2 text-xs text-purple-300 truncate max-w-[100px]">{r.app_label || "â€”"}</td>
-                                <td className="px-3 py-2 whitespace-nowrap">
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className="font-mono text-xs text-muted-foreground">
-                                      {r.dst_ip ? `${r.dst_ip}:${r.dst_port ?? "?"}` : "â€”"}
-                                    </span>
-                                    {r.dst_ip && <IpDetails ip={r.dst_ip} />}
-                                  </div>
-                                </td>
-                                <td className="px-3 py-2 text-right text-xs text-cyan-400">{fmtBytes(r.download)}</td>
-                                <td className="px-3 py-2 text-right text-xs text-green-400">{fmtBytes(r.upload)}</td>
-                              </tr>
-                            );
-                          })}
-                        </TableWrap>
-                      )}
-                    </section>
-
-                    {/* Unencrypted Passwords */}
-                    {(data.security?.unencrypted_passwords.length ?? 0) > 0 && (
-                      <section>
-                        <h4 className="flex items-center gap-2 text-sm font-semibold text-red-400 mb-3">
-                          <AlertTriangle className="w-4 h-4" /> Unencrypted Passwords Detected!
-                          <span className="ml-auto text-xs text-muted-foreground">{data.security!.unencrypted_passwords.length} records</span>
-                        </h4>
-                        <TableWrap head={["IP", "Dst IP:Port", "Protocol", "Username", "Severity"]}>
-                          {data.security!.unencrypted_passwords.map((r, i) => {
-                            const sc = severityStyle(r.severity);
-                            return (
-                              <tr key={i} className="hover:bg-white/[0.03]">
-                                <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.ip_address || "â€”"}</td>
-                                <td className="px-3 py-2 whitespace-nowrap">
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className="font-mono text-xs text-muted-foreground">
-                                      {r.dst_ip ? `${r.dst_ip}:${r.dst_port ?? "?"}` : "â€”"}
-                                    </span>
-                                    {r.dst_ip && <IpDetails ip={r.dst_ip} />}
-                                  </div>
-                                </td>
-                                <td className="px-3 py-2 text-xs text-slate-300">{r.protocol || "â€”"}</td>
-                                <td className="px-3 py-2 text-xs text-yellow-300 font-mono">{r.username || "â€”"}</td>
-                                <td className="px-3 py-2">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ring-1 ${sc.badge}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                                    {r.severity || "â€”"}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </TableWrap>
-                      </section>
-                    )}
-
-                    {/* IP Reputation */}
-                    {(data.security?.ip_reputation.length ?? 0) > 0 && (
-                      <section>
-                        <h4 className="flex items-center gap-2 text-sm font-semibold text-card-foreground mb-3">
-                          <Eye className="w-4 h-4 text-purple-400" /> IP Reputation
-                          <span className="ml-auto text-xs text-muted-foreground">{data.security!.ip_reputation.length} records</span>
-                        </h4>
-                        <TableWrap head={["Remote IP", "Local IP", "Reputation", "Score", "Country", "Blacklisted"]}>
-                          {data.security!.ip_reputation.map((r, i) => (
-                            <tr key={i} className="hover:bg-white/[0.03]">
-                              <td className="px-3 py-2 font-mono text-xs text-red-400">{r.ip_address || "â€”"}</td>
-                              <td className="px-3 py-2 font-mono text-xs text-blue-400">{r.local_ip || "â€”"}</td>
-                              <td className="px-3 py-2 text-xs text-slate-300">{r.reputation || "â€”"}</td>
-                              <td className="px-3 py-2 text-xs text-yellow-400">{r.score ?? "â€”"}</td>
-                              <td className="px-3 py-2 text-xs text-muted-foreground">{r.country || "â€”"}</td>
-                              <td className="px-3 py-2 text-xs">
-                                {r.blacklisted
-                                  ? <span className="text-red-400 font-semibold">â›” Yes</span>
-                                  : <span className="text-green-400">âœ“ No</span>
-                                }
-                              </td>
-                            </tr>
-                          ))}
-                        </TableWrap>
-                      </section>
-                    )}
-
-                    {/* Tor & VPN side-by-side */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Tor */}
-                      <section>
-                        <h4 className="flex items-center gap-2 text-sm font-semibold text-card-foreground mb-3">
-                          <Router className="w-4 h-4 text-red-400" /> Tor Detections
-                          <span className="ml-auto text-xs text-muted-foreground">{data.security?.tor_detections.length ?? 0}</span>
-                        </h4>
-                        {(data.security?.tor_detections.length ?? 0) === 0
-                          ? <EmptyState msg="No Tor usage detected." />
-                          : <div className="space-y-2">{data.security!.tor_detections.map((r, i) => (
-                              <div key={i} className="p-2 bg-red-500/5 border border-red-500/20 rounded-lg text-xs">
-                                <div className="flex justify-between">
-                                  <span className="font-mono text-blue-400">{r.ip_address || "â€”"}</span>
-                                  <span className="text-muted-foreground">{r.country || "â€”"}</span>
-                                </div>
-                                <div className="text-muted-foreground mt-0.5">Exit: {r.exit_node || "â€”"}</div>
-                              </div>
-                            ))}</div>
-                        }
-                      </section>
-
-                      {/* VPN */}
-                      <section>
-                        <h4 className="flex items-center gap-2 text-sm font-semibold text-card-foreground mb-3">
-                          <Shield className="w-4 h-4 text-blue-400" /> VPN Detections
-                          <span className="ml-auto text-xs text-muted-foreground">{data.security?.vpn_detections.length ?? 0}</span>
-                        </h4>
-                        {(data.security?.vpn_detections.length ?? 0) === 0
-                          ? <EmptyState msg="No VPN usage detected." />
-                          : <div className="space-y-2">{data.security!.vpn_detections.map((r, i) => (
-                              <div key={i} className="p-2 bg-blue-500/5 border border-blue-500/20 rounded-lg text-xs">
-                                <div className="flex justify-between">
-                                  <span className="font-mono text-blue-400">{r.ip_address || "â€”"}</span>
-                                  <span className="text-purple-400">{r.vpn_type || "â€”"}</span>
-                                </div>
-                                 <div className="text-muted-foreground mt-0.5 flex flex-col gap-0.5">
-                                   <span>Remote: {r.remote_ip || "â€”"} â€¢ {r.country || "â€”"}</span>
-                                   {r.remote_ip && <IpDetails ip={r.remote_ip} />}
-                                 </div>
-                                {r.confidence && <div className="text-muted-foreground">Confidence: {(r.confidence * 100).toFixed(0)}%</div>}
-                              </div>
-                            ))}</div>
-                        }
-                      </section>
-                    </div>
-
-                    {/* Server Discovery */}
-                    {(data.server_discovery?.length ?? 0) > 0 && (
-                      <section>
-                        <h4 className="flex items-center gap-2 text-sm font-semibold text-card-foreground mb-3">
-                          <Server className="w-4 h-4 text-cyan-400" /> Servers Discovered
-                          <span className="ml-auto text-xs text-muted-foreground">{data.server_discovery!.length} records</span>
-                        </h4>
-                        <TableWrap head={["IP", "Hostname", "Server Type", "Port", "Protocol", "OS"]}>
-                          {data.server_discovery!.map((r, i) => (
-                            <tr key={i} className="hover:bg-white/[0.03]">
-                               <td className="px-3 py-2 whitespace-nowrap">
-                                 <div className="flex flex-col gap-0.5">
-                                   <span className="font-mono text-xs text-blue-400">{r.ip_address || "â€”"}</span>
-                                   {r.ip_address && <IpDetails ip={r.ip_address} />}
-                                 </div>
-                               </td>
-                              <td className="px-3 py-2 text-xs text-slate-300 truncate max-w-[120px]">{r.hostname || "â€”"}</td>
-                              <td className="px-3 py-2 text-xs text-cyan-400">{r.server_type || "â€”"}</td>
-                              <td className="px-3 py-2 text-xs text-muted-foreground">{r.port ?? "â€”"}</td>
-                              <td className="px-3 py-2 text-xs text-purple-300">{r.protocol || "â€”"}</td>
-                              <td className="px-3 py-2 text-xs text-muted-foreground">{r.os_label || "â€”"}</td>
-                            </tr>
-                          ))}
-                        </TableWrap>
-                      </section>
-                    )}
-                  </div>
+                  <AgentSecurityTab data={data} />
                 )}
 
-                {/* EVENTS */}
                 {activeTab === "events" && (
-                  data.events.length === 0 ? <EmptyState msg="No events found for this agent." /> : (
-                    <div className="space-y-2">
-                      {data.events.map((ev, i) => {
-                        const sc = severityStyle(ev.severity);
-                        return (
-                          <div key={i} className={`p-3 border rounded-xl text-xs transition-colors ${
-                            (ev.severity || "").toLowerCase() === "critical" ? "bg-red-500/5 border-red-500/20 hover:bg-red-500/10" :
-                            (ev.severity || "").toLowerCase() === "high"     ? "bg-orange-500/5 border-orange-500/20 hover:bg-orange-500/10" :
-                            "bg-white/[0.03] border-border/50 hover:bg-white/[0.06]"
-                          }`}>
-                            <div className="flex items-start gap-3">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ring-1 flex-shrink-0 ${sc.badge}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                                {ev.severity || "â€”"}
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap mb-1">
-                                  <span className="font-semibold text-card-foreground">{ev.event_type || "Unknown"}</span>
-                                  <span className="font-mono text-blue-400">{ev.ip_address || "â€”"}</span>
-                                  {ev.mac_address && <span className="font-mono text-muted-foreground">{ev.mac_address}</span>}
-                                </div>
-                                {ev.description && <p className="text-muted-foreground leading-relaxed">{ev.description}</p>}
-                              </div>
-                              <span className="text-slate-600 flex-shrink-0 whitespace-nowrap">{ev.event_at?.slice(0, 16) || "â€”"}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )
+                  <AgentEventsTab events={data.events} />
                 )}
 
-                {/* MAC BANDWIDTH */}
                 {activeTab === "mac" && (
-                  data.mac_bandwidth.length === 0 ? <EmptyState msg="No MAC bandwidth data for this agent." /> : (
-                    <div className="space-y-2">
-                      {data.mac_bandwidth.map((m, i) => {
-                        const maxTotal = Math.max(...data.mac_bandwidth.map(x => x.total ?? 0), 1);
-                        const pct = ((m.total ?? 0) / maxTotal) * 100;
-                        return (
-                          <div key={i} className="p-3 bg-white/[0.03] hover:bg-white/[0.06] border border-border/50 rounded-xl transition-colors">
-                            <div className="flex items-center gap-3 mb-2">
-                              <Wifi className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="font-mono text-xs text-slate-200">{m.mac_address}</p>
-                                <p className="text-xs text-muted-foreground">{m.manufacturer || "Unknown Manufacturer"}</p>
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <p className="text-xs text-card-foreground font-medium">{fmtBytes(m.total ?? 0)}</p>
-                                <p className="text-xs text-muted-foreground">Total</p>
-                              </div>
-                            </div>
-                            <div className="flex gap-4 text-xs mb-2">
-                              <span className="text-cyan-400">â†“ {fmtBytes(m.download ?? 0)}</span>
-                              <span className="text-green-400">â†‘ {fmtBytes(m.upload ?? 0)}</span>
-                            </div>
-                            <div className="h-1 bg-secondary rounded-full overflow-hidden">
-                              <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" style={{ width: `${pct}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )
+                  <AgentMacTab macBandwidth={data.mac_bandwidth} />
                 )}
 
+                {activeTab === "telemetry" && (
+                  <AgentTelemetryTab agentUuid={agentUuid} />
+                )}
               </div>
             </>
           ) : null}
@@ -608,14 +216,19 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
     {selectedDevice && selectedDevice.ip && (
       <DeviceDetailModal
         ip={selectedDevice.ip}
-        deviceLabel={selectedDevice.label}
-        macAddress={selectedDevice.mac}
+        mac={selectedDevice.mac || ''}
+        deviceData={{ agent_uuid: selectedDevice.agent_uuid || agentUuid } as any}
         onClose={() => setSelectedDevice(null)}
+      />
+    )}
+    {selectedAppLabel && (
+      <AppDetailModal
+        appLabel={selectedAppLabel}
+        favicon={getAppFavicon(selectedAppLabel)}
+        agentUuid={agentUuid}
+        onClose={() => setSelectedAppLabel(null)}
       />
     )}
     </>
   );
 }
-
-
-

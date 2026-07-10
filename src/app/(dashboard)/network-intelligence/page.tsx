@@ -8,7 +8,8 @@ import {
   PieChart, Pie, Cell
 } from "recharts";
 import { Activity, Loader2 } from "lucide-react";
-import { useAppCategories, useContinents, AppCategoryStat } from "@/lib/api";
+import { AppCategoryStat } from "@/lib/api";
+import { useAppCategories, useContinents } from "@/lib/api-with-context";
 import { fmtBytes } from "@/lib/utils";
 
 const COLORS = ['#58a6ff', '#3fb950', '#f0883e', '#bc8cff', '#f85149'];
@@ -25,21 +26,29 @@ export default function NetworkIntelligencePage() {
   if (!mounted) return null;
 
   const appCols: Column<AppCategoryStat>[] = [
-    { header: "#", accessor: (row, i) => i + 1 },
-    { header: "Category", accessor: (row) => <span className="font-semibold text-white">{row.category_label || '-'}</span> },
-    { header: "Download", accessor: (row) => <span className="text-cyan-400">{fmtBytes(row.download)}</span> },
-    { header: "Upload", accessor: (row) => <span className="text-green-400">{fmtBytes(row.upload)}</span> },
-    { header: "Total", accessor: (row) => fmtBytes(row.total) },
+    { header: "#", accessor: (row, i) => i + 1, className: "w-[60px] min-w-[60px] max-w-[60px]" },
+    { 
+      header: "Category", 
+      accessor: (row) => (
+        <div title={row.category_label || '-'} className="font-semibold text-white truncate w-full block text-center cursor-help">
+          {row.category_label || '-'}
+        </div>
+      ),
+      className: "w-[180px] min-w-[180px] max-w-[180px]"
+    },
+    { header: "Download", accessor: (row) => <span className="text-cyan-400">{fmtBytes(row.download)}</span>, className: "w-[120px] min-w-[120px] max-w-[120px]" },
+    { header: "Upload", accessor: (row) => <span className="text-green-400">{fmtBytes(row.upload)}</span>, className: "w-[120px] min-w-[120px] max-w-[120px]" },
+    { header: "Total", accessor: (row) => fmtBytes(row.total), className: "w-[120px] min-w-[120px] max-w-[120px]" },
   ];
 
   const isLoading = appCategories.isLoading || continents.isLoading;
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-<div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            Network Intelligence
+            Traffic Categories
             {isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
           </h2>
           <p className="text-muted-foreground mt-1">Deep packet inspection analytics and geography.</p>
@@ -58,7 +67,7 @@ export default function NetworkIntelligencePage() {
             <CardTitle className="text-lg text-white">App Categories List</CardTitle>
           </CardHeader>
           <CardContent>
-            <DataTable data={appCategories.data || []} columns={appCols} />
+            <DataTable data={appCategories.data || []} columns={appCols} pageSize={50} />
           </CardContent>
         </Card>
 

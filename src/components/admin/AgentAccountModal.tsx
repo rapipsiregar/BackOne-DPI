@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { X, User, Key, Tag, Cpu, Upload, Trash2, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
@@ -80,7 +80,7 @@ export default function AgentAccountModal({
         fd.append("agent_uuid", agentUuid);
         if (picFile) fd.append("profile_picture", picFile);
         await updateAdminAgentUser(fd);
-        setSuccess("Akun berhasil diperbarui!");
+        setSuccess("Account successfully updated!");
       } else {
         await createAdminAgentUser({
           username: username.trim(),
@@ -88,7 +88,7 @@ export default function AgentAccountModal({
           account_name: accountName.trim() || undefined,
           agent_uuid: agentUuid,
         });
-        setSuccess("Akun Network Agent berhasil dibuat!");
+        setSuccess("Network Agent account successfully created!");
       }
       setTimeout(() => {
         onSuccess();
@@ -152,8 +152,8 @@ export default function AgentAccountModal({
               )}
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-300">Foto Profil</p>
-              <p className="text-xs text-slate-500">Klik untuk upload gambar</p>
+              <p className="text-sm font-medium text-slate-300">Profile Picture</p>
+              <p className="text-xs text-slate-500">Click to upload image</p>
             </div>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePicChange} />
           </div>
@@ -171,14 +171,14 @@ export default function AgentAccountModal({
               placeholder="e.g., Gateway 007"
               className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 transition-colors"
             />
-            <p className="text-xs text-slate-500 mt-1">Nama ini akan tampil sebagai label di tab Agents</p>
+            <p className="text-xs text-slate-500 mt-1">This name will appear as a label in the Agents tab</p>
           </div>
 
           {/* Agent UUID (readonly info) */}
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5">
               <Cpu className="w-3.5 h-3.5 inline mr-1" />
-              UUID Agent
+              Agent UUID
             </label>
             <input
               type="text"
@@ -192,13 +192,13 @@ export default function AgentAccountModal({
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5">
               <User className="w-3.5 h-3.5 inline mr-1" />
-              Username Login
+              Login Username
             </label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              placeholder="Username untuk login"
+              placeholder="Username for login"
               required={!isEdit}
               className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 transition-colors"
             />
@@ -208,13 +208,13 @@ export default function AgentAccountModal({
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5">
               <Key className="w-3.5 h-3.5 inline mr-1" />
-              Password {isEdit && <span className="text-slate-500">(kosongkan jika tidak ingin mengubah)</span>}
+              Password {isEdit && <span className="text-slate-500">(leave blank to keep unchanged)</span>}
             </label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder={isEdit ? "••••••••" : "Password baru"}
+              placeholder={isEdit ? "••••••••" : "New password"}
               required={!isEdit}
               className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 transition-colors"
             />

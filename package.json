@@ -3,12 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"next dev\" \"node backend/server.js\"",
+    "dev": "concurrently --names \"NEXT,BACKEND,PROXY\" --prefix-colors \"cyan,green,yellow\" \"next dev\" \"node backend/server.js\" \"node proxy/index.js\"",
+    "dev:next": "next dev",
+    "dev:backend": "node backend/server.js",
+    "dev:proxy": "node proxy/index.js",
     "build": "next build",
     "start": "next start",
-    "start:prod": "concurrently \"next start\" \"node backend/server.js\"",
+    "start:prod": "concurrently \"next start\" \"node backend/server.js\" \"node proxy/index.js\"",
     "lint": "eslint",
-    "backend": "node backend/server.js"
+    "backend": "node backend/server.js",
+    "proxy": "node proxy/index.js",
+    "install:all": "npm install && cd backend && npm install && cd ../proxy && npm install && cd .."
   },
   "dependencies": {
     "axios": "^1.18.1",

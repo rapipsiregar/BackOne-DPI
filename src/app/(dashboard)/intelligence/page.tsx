@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useIntelligenceStats } from "@/lib/api";
+import { useIntelligenceStats } from "@/lib/api-with-context";
 import { 
   useIntelCryptoMining, useIntelTorDetection, useIntelVpnDetection, 
   useIntelIpReputation, useIntelInsecureProtocols, useIntelUnencryptedPasswords, 
@@ -229,10 +229,10 @@ export default function IntelligencePage() {
   return (
     <div className="space-y-6">
 <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-          Deep Packet Inspection Intelligence
-          {loadingStats && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
-        </h2>
+          <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
+            Threat Intelligence Feeds
+            {loadingStats && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+          </h2>
       </div>
       
 

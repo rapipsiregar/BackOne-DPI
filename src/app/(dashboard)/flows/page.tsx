@@ -1,12 +1,13 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
-import { useFlows } from "@/lib/api";
+import { useFlows } from "@/lib/api-with-context";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Loader2 } from "lucide-react";
 import { fmtBytes } from "@/lib/utils";
 import { IpDetails } from "@/components/ui/IpDetails";
+import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
 
 function explainAppOrPort(appLabel: string | null, domain: string | null, port: number) {
   const label = appLabel || domain || "";
@@ -57,7 +58,8 @@ function explainAppOrPort(appLabel: string | null, domain: string | null, port: 
 
 export default function FlowsPage() {
   const [mounted, setMounted] = useState(false);
-  const { data, isLoading } = useFlows(100); // fetch 100 flows
+  const [selectedIp, setSelectedIp] = useState<string | null>(null);
+  const { data, isLoading } = useFlows();
 
   useEffect(() => {
     setMounted(true);
@@ -68,12 +70,27 @@ export default function FlowsPage() {
   const columns: Column<typeof data[0]>[] = [
     { header: "#", accessor: (row, i) => i + 1 },
     { header: "Flow ID", accessor: (row) => row.flow_id },
-    { header: "Src IP", accessor: (row) => <span className="text-blue-400">{row.src_ip}</span> },
+    { 
+      header: "Src IP", 
+      accessor: (row) => (
+        <button
+          onClick={() => setSelectedIp(row.src_ip)}
+          className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-left focus:outline-none"
+        >
+          {row.src_ip}
+        </button>
+      ) 
+    },
     { 
       header: "Dst IP", 
       accessor: (row) => (
-        <div className="flex flex-col">
-          <span className="font-mono text-blue-400">{row.dst_ip}</span>
+        <div className="flex flex-col items-start">
+          <button
+            onClick={() => setSelectedIp(row.dst_ip)}
+            className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-left focus:outline-none"
+          >
+            {row.dst_ip}
+          </button>
           <IpDetails ip={row.dst_ip} />
         </div>
       ) 
@@ -110,13 +127,12 @@ export default function FlowsPage() {
 
   return (
     <div className="space-y-6">
-<div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
           Active Flows
           {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
         </h2>
       </div>
-      
       
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader>
@@ -137,10 +153,27 @@ export default function FlowsPage() {
                 (row.protocol || "").toLowerCase().includes(q)
               );
             }}
+            csvExport={{
+              filename: `flows-${new Date().toISOString().slice(0,10)}.csv`,
+              headers: ["Flow ID", "Src IP", "Dst IP", "Dst Port", "Protocol", "App / Domain", "Download (bytes)", "Upload (bytes)"],
+              rowSerializer: (row) => [
+                row.flow_id || "",
+                row.src_ip || "",
+                row.dst_ip || "",
+                row.dst_port ?? "",
+                row.protocol || "",
+                row.app_label || row.domain || `Port ${row.dst_port}`,
+                row.bytes_download ?? 0,
+                row.bytes_upload ?? 0,
+              ],
+            }}
           />
         </CardContent>
       </Card>
+
+      {selectedIp && (
+        <DeviceDetailModal ip={selectedIp} onClose={() => setSelectedIp(null)} />
+      )}
     </div>
   );
 }
-

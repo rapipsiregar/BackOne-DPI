@@ -1,3 +1,5 @@
+import { WORLD_COUNTRY_COORDS } from "./countryCoordinates";
+
 export interface GeoLocation {
   lat: number;
   lng: number;
@@ -5,38 +7,7 @@ export interface GeoLocation {
 }
 
 // ─── 1. GLOBAL DESTINATION COORDINATES (By Country Code) ────────────────
-export const COUNTRY_COORDS: Record<string, [number, number]> = {
-  "ID": [113.9213, -0.7893],
-  "US": [-95.7129, 37.0902],
-  "HK": [114.1095, 22.3964],
-  "SG": [103.8198, 1.3521],
-  "JP": [138.2529, 36.2048],
-  "SC": [55.4920, -4.6796],
-  "GB": [-3.4360, 55.3781],
-  "IT": [12.5674, 41.8719],
-  "CN": [104.1954, 35.8617],
-  "KR": [127.7669, 35.9078],
-  "CA": [-106.3468, 56.1304],
-  "LU": [6.1296, 49.8153],
-  "NL": [5.2913, 52.1326],
-  "TR": [35.2433, 38.9637],
-  "UA": [31.1656, 48.3794],
-  "RU": [105.3188, 61.5240],
-  "HU": [19.5033, 47.1625],
-  "BD": [90.3563, 23.6850],
-  "AU": [133.7751, -25.2744],
-  "IN": [78.9629, 20.5937],
-  "DE": [10.4515, 51.1657],
-  "FR": [2.2137, 46.2276],
-  "ES": [-3.7492, 40.4637],
-  "BR": [-51.9253, -14.2350],
-  "MY": [101.9758, 4.2105],
-  "TH": [100.9925, 15.8700],
-  "VN": [108.2772, 14.0583],
-  "PH": [121.7740, 12.8797],
-  "TW": [120.9605, 23.6978],
-  "GR": [21.8243, 39.0742],
-};
+export const COUNTRY_COORDS: Record<string, [number, number]> = WORLD_COUNTRY_COORDS;
 
 // ─── 2. MANUAL CONFIGURATION (For Local IPs, Agent UUIDs, or City Names) ───
 // Users can edit this section to map their internal locations accurately.
@@ -87,7 +58,7 @@ export const COUNTRY_CAPITALS: Record<string, string> = {
   "DE": "Berlin",
   "FR": "Paris",
   "ES": "Madrid",
-  "BR": "Brasília",
+  "BR": "Brasilia",
   "MY": "Kuala Lumpur",
   "TH": "Bangkok",
   "VN": "Hanoi",
@@ -118,13 +89,13 @@ export function getDestinationLocation(countryCode: string, countryName?: string
   const coords = COUNTRY_COORDS[countryCode];
   if (!coords) return null;
   
-  const cityName = COUNTRY_CAPITALS[countryCode] || "Unknown City";
+  const cityName = COUNTRY_CAPITALS[countryCode];
   const cName = countryName || countryCode;
   
   // Note: COUNTRY_COORDS uses [lng, lat] format
   return {
     lat: coords[1],
     lng: coords[0],
-    label: `${cityName}, ${cName}`
+    label: cityName ? `${cityName}, ${cName}` : cName
   };
 }

@@ -1,5 +1,6 @@
 # dependencies
-/node_modules
+node_modules/
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -11,7 +12,11 @@
 # testing
 /coverage
 
+# logs
+*.log
+
 # next.js
+.next/
 /.next/
 /out/
 
@@ -48,7 +53,6 @@ backend/*.sqlite
 *.db
 *.db-shm
 *.db-wal
-!backend/netify_data.db
 
 # reports and temporary docx folders
 Laporan_*.docx

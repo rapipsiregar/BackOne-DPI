@@ -4,60 +4,14 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useTheme } from "next-themes";
 import * as THREE from 'three';
-import { fmtBytes } from "@/lib/utils";
+import { getArcTooltip, getPointTooltip } from './GlobeTooltips';
+import { useGlobeData, GlobeDataInput } from './useGlobeData';
 
 // Dynamically import Globe to avoid SSR issues
 const Globe = dynamic(() => import('react-globe.gl'), { ssr: false });
 
-const COUNTRY_COORDS: Record<string, [number, number]> = {
-  "ID": [113.9213, -0.7893],
-  "US": [-95.7129, 37.0902],
-  "HK": [114.1095, 22.3964],
-  "SG": [103.8198, 1.3521],
-  "JP": [138.2529, 36.2048],
-  "SC": [55.4920, -4.6796],
-  "GB": [-3.4360, 55.3781],
-  "IT": [12.5674, 41.8719],
-  "CN": [104.1954, 35.8617],
-  "KR": [127.7669, 35.9078],
-  "CA": [-106.3468, 56.1304],
-  "LU": [6.1296, 49.8153],
-  "NL": [5.2913, 52.1326],
-  "TR": [35.2433, 38.9637],
-  "UA": [31.1656, 48.3794],
-  "RU": [105.3188, 61.5240],
-  "HU": [19.5033, 47.1625],
-  "BD": [90.3563, 23.6850],
-  "AU": [133.7751, -25.2744],
-  "IN": [78.9629, 20.5937],
-  "DE": [10.4515, 51.1657],
-  "FR": [2.2137, 46.2276],
-  "ES": [-3.7492, 40.4637],
-  "BR": [-51.9253, -14.2350],
-  "MY": [101.9758, 4.2105],
-  "TH": [100.9925, 15.8700],
-  "VN": [108.2772, 14.0583],
-  "PH": [121.7740, 12.8797],
-  "TW": [120.9605, 23.6978],
-  "GR": [21.8243, 39.0742]
-};
-
-// Jakarta, Indonesia as Origin
-const ORIGIN_LAT = -6.2088;
-const ORIGIN_LNG = 106.8456;
-
 interface GlobeMapProps {
-  data: {
-    startLat: number;
-    startLng: number;
-    endLat: number;
-    endLng: number;
-    fromLabel: string;
-    toLabel: string;
-    value: number;
-    download: number;
-    upload: number;
-  }[];
+  data: GlobeDataInput[];
 }
 
 export const GlobeMap = ({ data }: GlobeMapProps) => {
@@ -116,7 +70,7 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         controls.addEventListener('start', () => setUserInteracting(true));
         controls.addEventListener('end', () => setUserInteracting(false));
 
-        // Focus on Southeast Asia initially (or dynamically from first data point if available)
+        // Focus on Southeast Asia initially
         globeRef.current.pointOfView({ lat: -6.2, lng: 106.8, altitude: 1.8 }, 2000);
       }
     }, 100);
@@ -163,90 +117,23 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
     return () => cancelAnimationFrame(frameId);
   }, [isLight, customGlobeMaterial]);
 
-  // Prepare Data Memos
-  const arcsData = useMemo(() => {
-    return data.map(d => ({
-      ...d,
-      color: isLight ? ['#38bdf8', '#0284c7'] : ['#0ea5e9', '#38bdf8'],
-    }));
-  }, [data, isLight]);
+  const { arcsData, pointsData, labelsData } = useGlobeData(data, isLight);
 
-  const pointsData = useMemo(() => {
-    const points = [];
-    const originSet = new Set();
-    const destSet = new Set();
-    
-    arcsData.forEach(arc => {
-      const originKey = `${arc.startLat},${arc.startLng}`;
-      const destKey = `${arc.endLat},${arc.endLng}`;
-      
-      if (!destSet.has(destKey)) {
-        points.push({
-          lat: arc.endLat,
-          lng: arc.endLng,
-          size: 0.1,
-          color: isLight ? '#0284c7' : '#38bdf8',
-          name: arc.toLabel,
-          value: arc.value,
-          upload: arc.upload,
-          download: arc.download,
-          isOrigin: false
-        });
-        destSet.add(destKey);
-      }
-      
-      if (!originSet.has(originKey)) {
-        points.push({
-          lat: arc.startLat,
-          lng: arc.startLng,
-          size: 0.2,
-          color: '#f43f5e',
-          name: arc.fromLabel,
-          value: 0,
-          upload: 0,
-          download: 0,
-          isOrigin: true
-        });
-        originSet.add(originKey);
-      }
-    });
+  // Stable polygon color callbacks to prevent mesh rebuilds and fix drag lag (Requirement 1 & 2)
+  const getPolygonCapColor = useMemo(() => {
+    const color = isLight ? '#4ade80' : '#0f172a';
+    return () => color;
+  }, [isLight]);
 
-    return points;
-  }, [arcsData, isLight]);
+  const getPolygonSideColor = useMemo(() => {
+    const color = isLight ? '#22c55e' : '#020617';
+    return () => color;
+  }, [isLight]);
 
-  // Extract All Labels + Origin to display statically
-  const labelsData = useMemo(() => {
-    const labels: any[] = [];
-    const originSet = new Set();
-    const destSet = new Set();
-
-    arcsData.forEach(arc => {
-      const originKey = `${arc.startLat},${arc.startLng}`;
-      const destKey = `${arc.endLat},${arc.endLng}`;
-      
-      if (!destSet.has(destKey)) {
-        labels.push({
-          lat: arc.endLat,
-          lng: arc.endLng,
-          name: arc.toLabel,
-          color: isLight ? '#0f172a' : '#f8fafc'
-        });
-        destSet.add(destKey);
-      }
-      
-      if (!originSet.has(originKey)) {
-        labels.push({
-          lat: arc.startLat,
-          lng: arc.startLng,
-          name: arc.fromLabel,
-          color: isLight ? '#0f172a' : '#f8fafc'
-        });
-        originSet.add(originKey);
-      }
-    });
-    
-    return labels;
-  }, [arcsData, isLight]);
+  const getPolygonStrokeColor = useMemo(() => {
+    const color = isLight ? '#ffffff' : '#0ea5e9';
+    return () => color;
+  }, [isLight]);
 
   return (
     <div
@@ -268,9 +155,9 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         
         polygonsData={countries ? countries.features : []}
         polygonAltitude={0.015}
-        polygonCapColor={() => isLight ? '#4ade80' : '#0f172a'} 
-        polygonSideColor={() => isLight ? '#22c55e' : '#020617'} 
-        polygonStrokeColor={() => isLight ? '#ffffff' : '#0ea5e9'} 
+        polygonCapColor={getPolygonCapColor} 
+        polygonSideColor={getPolygonSideColor} 
+        polygonStrokeColor={getPolygonStrokeColor} 
 
         arcsData={arcsData}
         arcStartLat={(d: any) => d.startLat}
@@ -282,31 +169,24 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         arcDashGap={0.2}
         arcDashAnimateTime={2000}
         arcAltitude={(d: any) => {
-          const latDiff = Math.abs(d.startLat - d.endLat);
-          const lngDiff = Math.abs(d.startLng - d.endLng);
-          const dist = Math.sqrt(latDiff*latDiff + lngDiff*lngDiff);
-          return Math.max(0.1, dist * 0.005);
+          // Convert lat/lng to radians
+          const phi1 = d.startLat * Math.PI / 180;
+          const lambda1 = d.startLng * Math.PI / 180;
+          const phi2 = d.endLat * Math.PI / 180;
+          const lambda2 = d.endLng * Math.PI / 180;
+          
+          // Great-circle angular distance
+          const cosTheta = Math.sin(phi1) * Math.sin(phi2) + Math.cos(phi1) * Math.cos(phi2) * Math.cos(lambda1 - lambda2);
+          const theta = Math.acos(Math.max(-1, Math.min(1, cosTheta)));
+          
+          // Chord depth under the sphere surface
+          const chordDepth = 1 - Math.cos(theta / 2);
+          
+          // Sleeker hover height that hugs the sphere surface closely (Requirement 2)
+          return chordDepth + 0.02 + (theta * 0.008);
         }}
         arcStroke={isLight ? 0.8 : 0.6}
-        arcLabel={(d: any) => `
-          <div style="background: rgba(0,0,0,0.85); color: white; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; min-width: 180px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-            <div style="font-weight: 600; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px; margin-bottom: 6px; color: #facc15;">
-              ${d.fromLabel} 
-            </div>
-            <div style="font-weight: 600; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px; margin-bottom: 6px; color: #38bdf8;">
-              ${d.toLabel}
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span style="color: #9ca3af;">Total Traffic:</span> <span>${fmtBytes(d.value)}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span style="color: #38bdf8;">Download:</span> <span>${fmtBytes(d.download)}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: #4ade80;">Upload:</span> <span>${fmtBytes(d.upload)}</span>
-            </div>
-          </div>
-        `}
+        arcLabel={(d: any) => getArcTooltip(d)}
 
         pointsData={pointsData}
         pointLat="lat"
@@ -315,22 +195,7 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         pointAltitude={0.01}
         pointRadius="size"
         pointsMerge={true}
-        pointLabel={(d: any) => `
-          <div style="background: rgba(0,0,0,0.85); color: white; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; min-width: ${d.value > 0 ? '180px' : 'auto'}; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-            <div style="font-weight: 600; font-size: 14px; ${d.value > 0 ? 'border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px; margin-bottom: 6px;' : ''}">${d.name}</div>
-            ${d.value > 0 ? `
-              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                <span style="color: #9ca3af;">Total Traffic:</span> <span>${fmtBytes(d.value)}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                <span style="color: #38bdf8;">Download:</span> <span>${fmtBytes(d.download)}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between;">
-                <span style="color: #4ade80;">Upload:</span> <span>${fmtBytes(d.upload)}</span>
-              </div>
-            ` : ''}
-          </div>
-        `}
+        pointLabel={(d: any) => getPointTooltip(d)}
 
         ringsData={pointsData}
         ringLat="lat"
@@ -344,10 +209,11 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         labelLat={(d: any) => d.lat}
         labelLng={(d: any) => d.lng}
         labelDotRadius={0}
-        labelSize={1.5}
+        labelSize={(d: any) => d.size || 1.4}
         labelText="name"
         labelColor={(d: any) => d.color}
         labelResolution={2}
+        labelAltitude={0.02} // float labels above polygon altitude to make them visible (Requirement 1)
       />
     </div>
   );

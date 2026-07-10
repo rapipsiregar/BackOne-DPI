@@ -1,6 +1,25 @@
 version: '3.8'
 
+# ═══════════════════════════════════════════════════════════════
+#  BackOne DPI — Docker Compose
+#
+#  Arsitektur 2 Kelompok Container:
+#
+#  [Container Group 1 — INFRA]  (network: backone-infra)
+#    backone_mongodb  : MongoDB database (port 27017)
+#    backone_proxy    : Proxy Server - ambil data Netify → simpan MongoDB (port 4000)
+#
+#  [Container Group 2 — APP]   (network: backone-app)
+#    backone_backend  : Backend API - baca MongoDB → JSON REST (port 3001)
+#    backone_frontend : Frontend Next.js Dashboard (port 3000)
+#
+#  MongoDB dijangkau dari KEDUA network (terhubung ke backone-infra & backone-app)
+#  Proxy TIDAK bisa diakses langsung dari frontend — hanya dari backend via backone-app
+# ═══════════════════════════════════════════════════════════════
+
 services:
+
+  # ─── Container Group 1: INFRA ───────────────────────────────
   mongodb:
     image: mongo:6.0
     container_name: backone_mongodb
@@ -11,21 +30,58 @@ services:
       - mongodb_data:/data/db
     environment:
       - MONGO_INITDB_DATABASE=backone_dpi
+    networks:
+      - backone-infra
+      - backone-app        # backend juga bisa connect ke MongoDB
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
 
+  proxy:
+    build:
+      context: ./proxy
+    container_name: backone_proxy
+    restart: always
+    ports:
+      - "4000:4000"        # Admin/DevOps bisa akses proxy API dari host
+    env_file:
+      - .env.local
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/backone_dpi
+      - PROXY_PORT=4000
+      # Mode 1: kumpulkan SEMUA agent (default)
+      # Ubah ke PROXY_COLLECT_MODE=agent dan isi PROXY_AGENT_UUID untuk mode spesifik
+      - PROXY_COLLECT_MODE=${PROXY_COLLECT_MODE:-all}
+      - PROXY_AGENT_UUID=${PROXY_AGENT_UUID:-}
+      - PROXY_CRON_SCHEDULE=${PROXY_CRON_SCHEDULE:-*/5 * * * *}
+    networks:
+      - backone-infra
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  # ─── Container Group 2: APP ─────────────────────────────────
   backend:
-    build: 
+    build:
       context: ./backend
     container_name: backone_backend
     restart: always
     ports:
       - "3001:3001"
+    env_file:
+      - .env.local
     environment:
       - MONGODB_URI=mongodb://mongodb:27017/backone_dpi
       - BACKEND_PORT=3001
-    env_file:
-      - .env.local
+      - PROXY_URL=http://proxy:4000   # untuk trigger manual refresh dari dashboard
+    networks:
+      - backone-app
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
 
   frontend:
     build:
@@ -34,12 +90,23 @@ services:
     restart: always
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3001
     env_file:
       - .env.local
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+    networks:
+      - backone-app
     depends_on:
       - backend
 
+networks:
+  backone-infra:
+    driver: bridge
+    name: backone-infra
+  backone-app:
+    driver: bridge
+    name: backone-app
+
 volumes:
   mongodb_data:
+    name: backone_mongodb_data

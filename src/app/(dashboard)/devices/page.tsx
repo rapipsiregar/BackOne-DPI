@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
 import { useState, useEffect, useRef } from "react";
-import { useDevices, DeviceStat } from "@/lib/api";
+import { DeviceStat } from "@/lib/api";
+import { useDevices } from "@/lib/api-with-context";
 import { fmtBytes } from "@/lib/utils";
 import { Loader2, ChevronRight, ChevronDown } from "lucide-react";
 
@@ -87,7 +88,7 @@ export default function DevicesPage() {
       header: "Last Seen", 
       className: "w-[13%]",
       accessor: (row) => {
-        const dateStr = row.last_seen ? new Date(row.last_seen) : (row.timestamp ? new Date(row.timestamp) : null);
+        const dateStr = row.last_seen ? new Date(row.last_seen) : null;
         if (!dateStr) return "-";
         return (
           <div className="flex flex-col items-center justify-center gap-0.5">
@@ -102,16 +103,23 @@ export default function DevicesPage() {
       header: "IP Address",
       className: "w-[12%]",
       accessor: (row) => (
-        <button
-          onClick={() => setSelectedDevice(row)}
-          className="flex items-center justify-center gap-1.5 group mx-auto text-center"
-          title="Click to view device details"
-        >
-          <span className="font-medium text-blue-400 group-hover:text-blue-300 transition-colors font-mono text-sm">
-            {row.ip_address || "-"}
-          </span>
-          <ChevronRight className="w-3 h-3 text-slate-600 group-hover:text-blue-400 transition-colors" />
-        </button>
+        <div className="flex flex-col items-center justify-center">
+          <button
+            onClick={() => setSelectedDevice(row)}
+            className="flex items-center justify-center gap-1 group text-center"
+            title="Click to view device details"
+          >
+            <span className="font-semibold text-blue-400 group-hover:text-blue-300 transition-colors font-mono text-sm">
+              {row.ip_address || "-"}
+            </span>
+            <ChevronRight className="w-3 h-3 text-slate-600 group-hover:text-blue-400 transition-colors" />
+          </button>
+          {row.device_label && (
+            <span className="text-[10px] text-slate-400 font-medium mt-0.5 truncate max-w-[120px]" title={row.device_label}>
+              {row.device_label}
+            </span>
+          )}
+        </div>
       ),
     },
     {
@@ -213,6 +221,21 @@ export default function DevicesPage() {
               const matchesOS = filterOS === "All" || row.os_label === filterOS;
 
               return matchesSearch && matchesMan && matchesType && matchesOS;
+            }}
+            csvExport={{
+              filename: `devices-${new Date().toISOString().slice(0,10)}.csv`,
+              headers: ["IP Address", "Device Label", "MAC Address", "Device Type", "OS", "Manufacturer", "Download (bytes)", "Upload (bytes)", "Last Seen"],
+              rowSerializer: (row) => [
+                row.ip_address || "",
+                row.device_label || "",
+                row.mac_address || "",
+                row.device_type || "",
+                row.os_label || "",
+                row.manufacturer || "",
+                row.download ?? 0,
+                row.upload ?? 0,
+                row.last_seen ? new Date(row.last_seen).toISOString() : "",
+              ],
             }}
           />
         </CardContent>

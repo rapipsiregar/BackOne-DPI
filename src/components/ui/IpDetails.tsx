@@ -32,7 +32,7 @@ export function IpDetails({ ip }: { ip: string }) {
         setDetails(resolved);
       })
       .catch((err) => {
-        console.error("GeoIP lookup client error:", err);
+        console.warn("GeoIP lookup client error:", err);
         if (isMounted) {
           setDetails({
             isp: "Public IP",

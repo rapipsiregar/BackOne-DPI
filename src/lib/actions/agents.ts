@@ -23,7 +23,7 @@ const getHeaders = () => {
     "Content-Type": "application/json",
   };
 
-  // Prioritize long-term API Key as recommended by Netify support team
+  // Prioritize long-term API Key as recommended by the DPI API support team
   if (API_KEY) {
     headers["x-api-key"] = API_KEY;
   } else if (JWT_TOKEN) {
@@ -57,104 +57,54 @@ export async function getAgents(): Promise<Agent[]> {
     const API_KEY = getApiKey();
     const SITE_UUID = getSiteUuid();
 
-    // Fallback to Informatics Scorecard Agent if site-scoped API key is used
+    // All agent data comes from MongoDB (single source of truth per Rule 13)
     if (API_KEY && API_KEY.startsWith("sk_db_")) {
-      const Database = require('better-sqlite3');
-      const path = require('path');
-      const dbPath = path.join(process.cwd(), 'backend', 'netify_data.db');
-      const db = new Database(dbPath);
+      const mongoose = require('mongoose');
+      const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
 
-      // Query the Informatics API dynamically for all active agents
-      let apiAgents: any[] = [];
-      try {
-        const res = await fetch("https://informatics.netify.ai/api/v1/data/stats/top/agent/download?filter_interval=43200&settings_limit=100", {
-          method: "GET",
-          headers: {
-            "Accept": "application/json",
-            "x-api-key": API_KEY,
-            "x-net-site": SITE_UUID || ""
-          },
-          cache: "no-store"
-        });
-        if (res.ok) {
-          const json = await res.json();
-          apiAgents = json.data || [];
-        }
-      } catch (err) {
-        console.error("Failed to fetch dynamic agents from Netify API:", err);
+      // Connect to MongoDB if not already connected
+      if (mongoose.connection.readyState === 0) {
+        await mongoose.connect(MONGODB_URI);
       }
+      const db = mongoose.connection.db;
 
-      // If API query fails, apiAgents will be empty. We still process from knownAgents.
-      const knownAgents = db.prepare('SELECT DISTINCT agent_uuid FROM users WHERE agent_uuid IS NOT NULL').all().map((r: any) => r.agent_uuid);
-      
-      const agentMap = new Map<string, any>();
-      
-      // 1. Add agents that have traffic from the API (Active in last 12 hours = Online)
-      apiAgents.forEach((item: any, idx: number) => {
-        const uuid = item.agent?.uuid;
-        if (uuid) {
-          agentMap.set(uuid, {
-            id: item.agent.id,
-            uuid: uuid,
-            label: item.agent.label,
-            isOnline: true
-          });
-        }
-      });
+      // Get all agents from MongoDB summaries collection
+      const agentSummaries = await db.collection('summaries')
+        .aggregate([
+          { $sort: { timestamp: -1 } },
+          { $group: { _id: '$agent_uuid', lastSeen: { $first: '$timestamp' }, label: { $first: '$agent_label' } } },
+        ]).toArray();
 
-      // 2. Add any other configured agents from DB (These might be Last Seen or Offline)
-      knownAgents.forEach((uuid: string) => {
-        if (!agentMap.has(uuid)) {
-          agentMap.set(uuid, {
-            id: parseInt(uuid.replace(/[^0-9]/g, '')) || Math.floor(Math.random() * 100000), // Fallback ID
-            uuid: uuid,
-            label: uuid, // Label diselesaikan oleh frontend via resolveAgentLabel
-            isOnline: false
-          });
-        }
-      });
+      const agents: Agent[] = agentSummaries.map((item: any, idx: number) => {
+        const lastSeenDate = item.lastSeen ? new Date(item.lastSeen) : null;
+        const nowMs = Date.now();
+        const diffMin = lastSeenDate ? (nowMs - lastSeenDate.getTime()) / 60000 : Infinity;
+        const isOnline = diffMin < 10;
+        const statusHuman = isOnline
+          ? 'Online'
+          : lastSeenDate
+            ? `Last Seen ${lastSeenDate.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} WIB`
+            : 'Offline';
 
-      const agents: Agent[] = Array.from(agentMap.values()).map((item, idx) => {
-        let statusHuman = "Offline";
-        
-        if (item.isOnline) {
-          statusHuman = "Online";
-        } else {
-          // Cari data terakhir dari DB
-          const f = db.prepare('SELECT MAX(fetched_at) as t FROM flows WHERE agent_uuid = ?').get(item.uuid)?.t;
-          const a = db.prepare('SELECT MAX(fetched_at) as t FROM bandwidth_apps WHERE agent_uuid = ?').get(item.uuid)?.t;
-          const e = db.prepare('SELECT MAX(fetched_at) as t FROM events WHERE agent_uuid = ?').get(item.uuid)?.t;
-          
-          const times = [f, a, e].filter(Boolean);
-          if (times.length > 0) {
-            times.sort();
-            const latest = times[times.length - 1];
-            const d = new Date(latest);
-            const formatted = d.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-            statusHuman = `Last Seen ${formatted} WIB`;
-          }
-        }
-        
         return {
-          id: item.id || idx,
-          uuid: item.uuid,
-          serial: item.uuid,
-          site_uuid: SITE_UUID || "",
-          organization_uuid: "",
+          id: idx + 1,
+          uuid: item._id,
+          serial: item._id,
+          site_uuid: SITE_UUID || '',
+          organization_uuid: '',
           provisioned: true,
-          activated: true,
-          label: item.label,
-          created_at: { human: "N/A", date: "", unix_time: 0 },
-          updated_at: { human: "N/A", date: "", unix_time: 0 },
-          last_seen_at: { 
-            human: statusHuman, 
-            date: new Date().toISOString(), 
-            unix_time: Date.now() / 1000 
-          }
+          activated: isOnline,
+          label: item.label || item._id,
+          created_at: { human: 'N/A', date: '', unix_time: 0 },
+          updated_at: { human: 'N/A', date: '', unix_time: 0 },
+          last_seen_at: {
+            human: statusHuman,
+            date: lastSeenDate?.toISOString() || '',
+            unix_time: lastSeenDate ? lastSeenDate.getTime() / 1000 : 0,
+          },
         };
       });
 
-      db.close();
       return agents;
     }
 

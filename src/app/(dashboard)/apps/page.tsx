@@ -1,19 +1,20 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
-import { useTopApps, AppStat } from "@/lib/api";
+import { AppStat } from "@/lib/api";
+import { useTopApps } from "@/lib/api-with-context";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { AppDetailModal } from "@/components/ui/AppDetailModal";
-import { Loader2, ChevronRight } from "lucide-react";
-import { fmtBytes } from "@/lib/utils";
+import { Loader2, ChevronRight, Globe } from "lucide-react";
+import { fmtBytes, getAppFavicon } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 
 export default function AppsPage() {
   const [mounted, setMounted] = useState(false);
   const [page, setPage] = useState(0);
   const pageSize = 20;
-  const { data, isLoading } = useTopApps(pageSize, page * pageSize);
+  const { data, isLoading } = useTopApps(pageSize);
   const [selectedApp, setSelectedApp] = useState<AppStat | null>(null);
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export default function AppsPage() {
   const top5 = data.slice(0, 5);
 
   const columns: Column<AppStat>[] = [
-    { header: "Last Seen", accessor: (row) => row.timestamp ? new Date(row.timestamp).toLocaleString() : '-' },
+    { header: "Last Seen", accessor: (row) => row.last_seen ? new Date(row.last_seen).toLocaleString() : '-' },
     { header: "#", accessor: (row, i) => i + 1 },
     {
       header: "Application",
@@ -35,9 +36,16 @@ export default function AppsPage() {
           className="flex items-center gap-2 group text-left"
           title="Click to view app details"
         >
-          {row.favicon && (
-            <img src={row.favicon} alt={row.app_label} className="w-5 h-5 rounded-sm bg-white p-0.5 flex-shrink-0" />
-          )}
+          {(() => {
+            const fav = row.favicon || getAppFavicon(row.app_label);
+            return fav ? (
+              <img src={fav} alt={row.app_label} className="w-5 h-5 rounded-sm bg-white p-0.5 flex-shrink-0" />
+            ) : (
+              <div className="w-5 h-5 rounded bg-blue-500/10 border border-blue-500/25 flex items-center justify-center flex-shrink-0">
+                <Globe className="w-3 h-3 text-blue-400" />
+              </div>
+            );
+          })()}
           <span className="group-hover:text-blue-300 transition-colors">{row.app_label}</span>
           <ChevronRight className="w-3 h-3 text-slate-600 group-hover:text-blue-400 transition-colors" />
         </button>
@@ -60,7 +68,7 @@ export default function AppsPage() {
 
   return (
     <div className="space-y-6">
-<div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
             Applications
@@ -72,7 +80,6 @@ export default function AppsPage() {
         </div>
       </div>
       
-
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader>
           <CardTitle className="text-white">Top 5 Applications by Volume</CardTitle>
@@ -138,6 +145,3 @@ export default function AppsPage() {
     </div>
   );
 }
-
-
-

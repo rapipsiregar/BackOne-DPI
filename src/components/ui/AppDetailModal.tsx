@@ -1,142 +1,219 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { fetchAppDetails, AppDetails } from "@/lib/api";
 import { useTimeFilter } from "@/contexts/TimeFilterContext";
 import { fmtBytes } from "@/lib/utils";
 import { Loader2, X, Globe, Server, Monitor } from "lucide-react";
+import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
+import ActiveDurationDisplay from "./ActiveDurationDisplay";
+import { Pagination } from "./Pagination";
+
+interface ColDef {
+  header: string;
+  width: string;
+  align?: "center" | "right";
+}
+
+function TableWrap({ children, cols }: { children: React.ReactNode; cols: ColDef[] }) {
+  return (
+    <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-border/50 bg-secondary/10 custom-scrollbar">
+      <table className="w-full text-xs text-left whitespace-nowrap min-w-[700px]">
+        <thead>
+          <tr className="border-b border-border bg-muted/50">
+            {cols.map((c) => (
+              <th
+                key={c.header}
+                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] ${
+                  c.align === "center" ? "text-center" : c.align === "right" ? "text-right" : "text-left"
+                } ${c.width}`}
+              >
+                {c.header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/[0.04]">
+          {children}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Cell({ value, className = "", center = false, right = false }: { value: string | number; className?: string; center?: boolean; right?: boolean }) {
+  const str = String(value ?? "—");
+  const align = center ? "text-center" : right ? "text-right" : "";
+  return (
+    <div className={`truncate overflow-hidden text-ellipsis ${align} ${className}`} title={str}>
+      {str || "—"}
+    </div>
+  );
+}
 
 interface Props {
   appLabel: string;
   favicon?: string | null;
   category?: string | null;
+  agentUuid?: string | null;
   onClose: () => void;
 }
 
-export function AppDetailModal({ appLabel, favicon, category, onClose }: Props) {
+export function AppDetailModal({ appLabel, favicon, category, agentUuid, onClose }: Props) {
   const [data, setData] = useState<AppDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [selectedIp, setSelectedIp] = useState<string | null>(null);
   const { timeRange } = useTimeFilter();
+
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
   const handleClose = () => {
     setIsClosing(true);
-    setTimeout(() => {
-      onClose();
-    }, 480);
+    setTimeout(() => { onClose(); }, 480);
   };
 
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-    fetchAppDetails(appLabel, timeRange)
+    setPage(1); // Reset page on query updates
+    fetchAppDetails(appLabel, timeRange, agentUuid)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setIsLoading(false));
-  }, [appLabel, timeRange]);
+  }, [appLabel, timeRange, agentUuid]);
+
+  const topIps = data?.top_ips || [];
+  const totalPages = Math.ceil(topIps.length / pageSize);
+  const startIndex = (page - 1) * pageSize;
+  const paginatedIps = topIps.slice(startIndex, startIndex + pageSize);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleClose}>
-      <div className={`absolute inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`} />
-      <div
-        className={`relative bg-card border border-border rounded-2xl w-full max-w-2xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-green-900/30 to-emerald-900/20 rounded-t-2xl">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-500/20 rounded-lg ring-1 ring-green-500/30">
-              {favicon ? (
-                <img src={favicon} alt={appLabel} className="w-5 h-5 rounded" />
-              ) : (
-                <Globe className="w-5 h-5 text-green-400" />
-              )}
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-card-foreground">{appLabel}</h3>
-              {category && <p className="text-xs text-muted-foreground">{category}</p>}
-            </div>
-          </div>
-          <button
-            onClick={handleClose}
-            className="p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-lg transition-all flex-shrink-0"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-green-400" />
-              <p className="text-muted-foreground text-sm">Loading application data...</p>
-            </div>
-          ) : error ? (
-            <div className="p-6 text-center text-red-400 text-sm">{error}</div>
-          ) : data ? (
-            <div className="p-6 space-y-6">
-
-              {/* Total Summary */}
-              <div className="grid grid-cols-2 gap-3 p-4 bg-white/[0.03] border border-border/50 rounded-xl">
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground">Total Download</p>
-                  <p className="text-xl font-bold text-cyan-400">{fmtBytes(data.total_download ?? 0)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground">Total Upload</p>
-                  <p className="text-xl font-bold text-green-400">{fmtBytes(data.total_upload ?? 0)}</p>
-                </div>
-              </div>
-
-              {/* Devices accessing this app */}
-              <div>
-                <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <Monitor className="w-4 h-4 text-blue-400" />
-                  Devices Accessing {appLabel}
-                </h4>
-                {(!data.devices || data.devices.length === 0) ? (
-                  <p className="text-muted-foreground text-sm text-center py-4">No active devices found for this app in the selected time range.</p>
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleClose}>
+        <div className={`absolute inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`} />
+        <div
+          className={`relative bg-card border border-border rounded-2xl w-full max-w-3xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-green-900/30 to-emerald-900/20 rounded-t-2xl flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-500/20 rounded-lg ring-1 ring-green-500/30">
+                {favicon ? (
+                  <img src={favicon} alt={appLabel} className="w-5 h-5 rounded" />
                 ) : (
-                  <div className="overflow-x-auto rounded-lg border border-border/50 bg-white/[0.02]">
-                    <table className="w-full text-sm text-left whitespace-nowrap">
-                      <thead className="bg-secondary/40 text-muted-foreground">
-                        <tr>
-                          <th className="px-4 py-3 font-medium">Timestamp</th>
-                          <th className="px-4 py-3 font-medium">Agent</th>
-                          <th className="px-4 py-3 font-medium">IP Address</th>
-                          <th className="px-4 py-3 font-medium">Hostname</th>
-                          <th className="px-4 py-3 font-medium">OS</th>
-                          <th className="px-4 py-3 font-medium">MAC Address</th>
-                          <th className="px-4 py-3 font-medium">Download</th>
-                          <th className="px-4 py-3 font-medium">Upload</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/50">
-                        {data.devices.map((dev: any, i: number) => (
-                          <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                            <td className="px-4 py-3 text-muted-foreground">{new Date(dev.timestamp).toLocaleString()}</td>
-                            <td className="px-4 py-3">{dev.agent_uuid || 'Global'}</td>
-                            <td className="px-4 py-3 font-mono text-blue-300">{dev.ip || '-'}</td>
-                            <td className="px-4 py-3">{dev.hostname || '-'}</td>
-                            <td className="px-4 py-3">{dev.os || '-'}</td>
-                            <td className="px-4 py-3 font-mono text-muted-foreground">{dev.mac || '-'}</td>
-                            <td className="px-4 py-3 text-cyan-400">{fmtBytes(dev.download)}</td>
-                            <td className="px-4 py-3 text-green-400">{fmtBytes(dev.upload)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <Globe className="w-5 h-5 text-green-400" />
                 )}
               </div>
+              <div>
+                <h3 className="text-lg font-bold text-card-foreground">{appLabel}</h3>
+                {category && <p className="text-xs text-muted-foreground">{category}</p>}
+              </div>
             </div>
-          ) : null}
+            <button
+              onClick={handleClose}
+              className="p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-lg transition-all flex-shrink-0"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <Loader2 className="w-8 h-8 animate-spin text-green-400" />
+                <p className="text-muted-foreground text-sm">Loading application data...</p>
+              </div>
+            ) : error ? (
+              <div className="p-6 text-center text-red-400 text-sm">{error}</div>
+            ) : data ? (
+              <div className="p-6 space-y-6">
+                {/* Total Summary */}
+                <div className="grid grid-cols-2 gap-3 p-4 bg-white/[0.03] border border-border/50 rounded-xl">
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">Total Download</p>
+                    <p className="text-xl font-bold text-cyan-400">{fmtBytes(data.total_download ?? 0)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">Total Upload</p>
+                    <p className="text-xl font-bold text-green-400">{fmtBytes(data.total_upload ?? 0)}</p>
+                  </div>
+                </div>
+
+                {/* Devices list */}
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                    <Monitor className="w-4 h-4 text-blue-400" />
+                    Devices Accessing {appLabel}
+                  </h4>
+                  {topIps.length === 0 ? (
+                    <p className="text-muted-foreground text-sm text-center py-4">No active devices found for this app in the selected time range.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      <TableWrap cols={[
+                        { header: "Status / Last Seen", width: "w-[150px]", align: "center" },
+                        { header: "IP Address",         width: "min-w-[120px]" },
+                        { header: "Domain",             width: "min-w-[160px] w-full" },
+                        { header: "Protocol",           width: "w-[80px]", align: "center" },
+                        { header: "Download",           width: "w-[100px]", align: "right" },
+                        { header: "Upload",             width: "w-[100px]", align: "right" }
+                      ]}>
+                        {paginatedIps.map((dev: any, i: number) => (
+                          <tr key={i} className="hover:bg-white/[0.04] transition-colors duration-150">
+                            <td className="px-3 py-2.5 text-center">
+                              <ActiveDurationDisplay firstSeen={dev.first_seen} lastSeen={dev.last_seen} className="border-0 bg-transparent p-0 mb-0 flex justify-center" />
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <button
+                                onClick={() => setSelectedIp(dev.ip_address || dev.dst_ip)}
+                                className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs focus:outline-none truncate text-left"
+                                title={dev.ip_address || dev.dst_ip || '-'}
+                              >
+                                {dev.ip_address || dev.dst_ip || '-'}
+                              </button>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Cell value={dev.domain || '-'} className="text-slate-300" />
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Cell value={dev.protocol || '-'} className="text-slate-400 font-mono uppercase text-[10px]" center />
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Cell value={fmtBytes(dev.download)} className="text-cyan-400 font-mono" right />
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Cell value={fmtBytes(dev.upload)} className="text-green-400 font-mono" right />
+                            </td>
+                          </tr>
+                        ))}
+                      </TableWrap>
+                      <Pagination
+                        currentPage={page}
+                        totalPages={totalPages}
+                        onPageChange={setPage}
+                        totalResults={topIps.length}
+                        startIndex={startIndex}
+                        endIndex={startIndex + pageSize}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
-    </div>
+
+      {selectedIp && (
+        <DeviceDetailModal
+          ip={selectedIp}
+          onClose={() => setSelectedIp(null)}
+        />
+      )}
+    </>
   );
 }
-
-

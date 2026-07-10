@@ -1,4 +1,4 @@
-﻿// Admin User Management API helpers
+// Admin User Management API helpers
 
 export interface ManagedUser {
   id: number;
@@ -46,7 +46,7 @@ export function getViewAsStatusSync(): ViewAsStatus {
 export async function getAdminUsers(): Promise<ManagedUser[]> {
   const res = await fetch('/api/auth/admin/users', { credentials: 'include' });
   const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'Gagal mengambil daftar user');
+  if (!json.ok) throw new Error(json.error || 'Failed to retrieve user list');
   return json.data;
 }
 
@@ -64,7 +64,7 @@ export async function createAdminAgentUser(data: {
     body: JSON.stringify(data),
   });
   const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'Gagal membuat akun');
+  if (!json.ok) throw new Error(json.error || 'Failed to create account');
   return json;
 }
 
@@ -76,7 +76,7 @@ export async function updateAdminAgentUser(formData: FormData): Promise<{ ok: bo
     body: formData,
   });
   const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'Gagal memperbarui akun');
+  if (!json.ok) throw new Error(json.error || 'Failed to update account');
   return json;
 }
 
@@ -87,7 +87,7 @@ export async function deleteAdminAgentUser(userId: number): Promise<void> {
     credentials: 'include',
   });
   const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'Gagal menghapus akun');
+  if (!json.ok) throw new Error(json.error || 'Failed to delete account');
 }
 
 // POST /api/auth/admin/view-as — simpan token di localStorage
@@ -116,8 +116,17 @@ export async function startViewAs(agent_uuid: string, agent_label: string): Prom
   }
 }
 
-// Keluar dari mode view-as — hapus dari localStorage
+// Keluar dari mode view-as — hapus dari localStorage dan server session
 export async function stopViewAs(): Promise<void> {
+  try {
+    await fetch('/api/auth/admin/view-as', {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+  } catch (err) {
+    console.error('Failed to terminate server view-as session:', err);
+  }
+
   if (typeof window !== 'undefined') {
     localStorage.removeItem(VIEW_AS_KEY);
   }

@@ -1,27 +1,42 @@
-﻿const mongoose = require('mongoose');
+// backend/db/mongoose.js
+// Connects the backend to MongoDB.
+// The backend is READ-ONLY — all writes are done by the proxy server.
+// MongoDB URI is provided via MONGODB_URI environment variable.
+
+const mongoose = require('mongoose');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env.local') });
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
 
 async function connectDB() {
-  try {
-    if (mongoose.connection.readyState >= 1) return;
-    await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 2000 });
-    console.log('[MongoDB] Connected successfully');
-  } catch (error) {
-    console.error('[MongoDB] Connection failed, switching to In-Memory DB:', error.message);
+  if (mongoose.connection.readyState >= 1) return; // already connected
+
+  const MAX_RETRIES = 5;
+  const RETRY_DELAY = 5000;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { MongoMemoryServer } = require('mongodb-memory-server');
-      const mongod = await MongoMemoryServer.create();
-      const uri = mongod.getUri();
-      await mongoose.connect(uri, {});
-      console.log('[MongoDB] Connected successfully to Virtual Memory Database!');
-    } catch (memErr) {
-      console.error('[MongoDB] Memory DB failed:', memErr.message);
+      console.log(`[MongoDB] Connecting... (attempt ${attempt}/${MAX_RETRIES})`);
+      await mongoose.connect(MONGODB_URI, {
+        serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 10000,
+      });
+      console.log('[MongoDB] ✓ Connected successfully');
+      const { logCapacityStats } = require('./capacityTracker');
+      await logCapacityStats('[MongoDB]');
+      return;
+    } catch (error) {
+      console.error(`[MongoDB] ✗ Attempt ${attempt} failed: ${error.message}`);
+      if (attempt < MAX_RETRIES) {
+        console.log(`[MongoDB] Retrying in ${RETRY_DELAY / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      }
     }
   }
+
+  console.error('[MongoDB] All connection attempts failed. Backend cannot serve dashboard data.');
+  // Do NOT exit — allow health check endpoint to remain available
 }
 
 module.exports = connectDB;
-

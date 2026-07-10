@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-type TimeRange = '5m' | '10m' | '30m' | '1h' | '1d' | '7d' | '30d';
+type TimeRange = '5m' | '30m' | '1h' | '1d' | '7d';
 
 interface TimeFilterContextType {
   timeRange: TimeRange;
@@ -12,7 +12,7 @@ interface TimeFilterContextType {
 const TimeFilterContext = createContext<TimeFilterContextType | undefined>(undefined);
 
 export function TimeFilterProvider({ children }: { children: ReactNode }) {
-  const [timeRange, setTimeRange] = useState<TimeRange>('1h');
+  const [timeRange, setTimeRange] = useState<TimeRange>('1d');
 
   return (
     <TimeFilterContext.Provider value={{ timeRange, setTimeRange }}>
