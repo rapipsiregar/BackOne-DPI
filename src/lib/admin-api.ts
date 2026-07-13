@@ -3,7 +3,7 @@
 export interface ManagedUser {
   id: number;
   username: string;
-  role: 'SUPER_ADMIN' | 'AGENT_VIEWER';
+  role: 'SUPER_ADMIN' | 'AGENT_VIEWER' | 'SOC_ANALYST' | 'ENGINEER' | 'TENANT_ADMIN' | string;
   site_uuid: string | null;
   agent_uuid: string | null;
   account_name: string | null;
@@ -65,6 +65,18 @@ export async function createAdminAgentUser(data: {
   });
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'Failed to create account');
+  return json;
+}
+
+// POST /api/auth/admin/create-external-user (FormData)
+export async function createAdminExternalUser(formData: FormData): Promise<{ ok: boolean; message: string; userId: string }> {
+  const res = await fetch('/api/auth/admin/create-external-user', {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'Failed to create external account');
   return json;
 }
 
@@ -139,9 +151,16 @@ export async function getViewAsStatus(): Promise<ViewAsStatus> {
 
 // Buat headers untuk fetch yang menyertakan X-View-As-Agent jika aktif
 export function getViewAsHeaders(): Record<string, string> {
-  const token = getViewAsToken();
-  if (!token) return {};
-  return { 'X-View-As-Agent': token };
+  const headers: Record<string, string> = {};
+  
+  if (typeof window !== 'undefined') {
+    const token = getViewAsToken();
+    if (token) headers['X-View-As-Agent'] = token;
+    const siteUuid = localStorage.getItem('backone_site_uuid') || '6681452d_9cae_4ff4_8ae8_0d504774265e';
+    headers['x-backone-site-uuid'] = siteUuid;
+  }
+  
+  return headers;
 }
 
 // Resolusi label agent dari daftar users (account_name) atau fallback ke uuid

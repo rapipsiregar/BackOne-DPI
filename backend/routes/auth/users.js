@@ -115,4 +115,42 @@ router.post('/admin/upload-agent-picture/:id', requireAdmin, blockAnalyst, uploa
   }
 });
 
+// POST /api/auth/admin/create-external-user — buat akun Eksternal (SOC Analyst, Engineer, dll)
+router.post('/admin/create-external-user', requireAdmin, blockAnalyst, upload.single('profile_picture'), async (req, res) => {
+  try {
+    const { username, password, account_name, role } = req.body;
+    if (!username || !password || !role) {
+      return res.status(400).json({ ok: false, error: 'Username, password, dan role wajib diisi' });
+    }
+    
+    // Validasi role (hanya boleh role tertentu, tidak boleh SUPER_ADMIN baru atau AGENT_VIEWER)
+    const validRoles = ['SOC_ANALYST', 'ENGINEER', 'TENANT_ADMIN'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ ok: false, error: 'Role tidak valid untuk pembuatan akun eksternal' });
+    }
+
+    const existing = await User.findOne({ username: username.trim() });
+    if (existing) {
+      return res.status(400).json({ ok: false, error: 'Username sudah digunakan' });
+    }
+
+    const passwordHash = bcrypt.hashSync(password, 10);
+    const siteUuid = process.env.BACKONE_SITE_UUID || process.env.NETIFY_SITE_UUID || null;
+
+    const newUser = await User.create({
+      username: username.trim(),
+      password_hash: passwordHash,
+      account_name: account_name?.trim() || null,
+      role: role,
+      site_uuid: siteUuid,
+      profile_picture: req.file ? req.file.filename : null
+    });
+
+    res.json({ ok: true, message: 'Akun eksternal berhasil dibuat', userId: newUser._id.toString() });
+  } catch (err) {
+    const msg = err.code === 11000 ? 'Username sudah digunakan' : err.message;
+    res.status(400).json({ ok: false, error: msg });
+  }
+});
+
 module.exports = router;

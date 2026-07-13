@@ -20,8 +20,11 @@ interface KPICardsProps {
 }
 
 export function KPICards({ summary }: KPICardsProps) {
-  const downloadSpeedBits = summary?.download_speed ? summary.download_speed * 8 : 0;
-  const uploadSpeedBits = summary?.upload_speed ? summary.upload_speed * 8 : 0;
+  // Use average speed over 24 hours (86400 seconds) to match standard BackOne analytics.
+  const SECONDS_IN_24H = 86400;
+  const downloadSpeedBits = summary ? (summary.bandwidth_down * 8) / SECONDS_IN_24H : 0;
+  const uploadSpeedBits = summary ? (summary.bandwidth_up * 8) / SECONDS_IN_24H : 0;
+  const flowsPerHour = summary ? Math.floor(summary.active_flows / 24) : 0;
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -38,7 +41,7 @@ export function KPICards({ summary }: KPICardsProps) {
             <div className="text-3xl font-bold text-white tracking-tight">
               {summary ? fmtBytes(summary.bandwidth_down) : "0 B"}
             </div>
-            {summary?.download_speed !== undefined && (
+            {summary && (
               <div className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1 group-hover:text-blue-400/80 transition-colors">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                 Speed: {downloadSpeedBits >= 1e6 
@@ -65,7 +68,7 @@ export function KPICards({ summary }: KPICardsProps) {
             <div className="text-3xl font-bold text-white tracking-tight">
               {summary ? fmtBytes(summary.bandwidth_up) : "0 B"}
             </div>
-            {summary?.upload_speed !== undefined && (
+            {summary && (
               <div className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1 group-hover:text-emerald-400/80 transition-colors">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Speed: {uploadSpeedBits >= 1e6 
@@ -109,10 +112,10 @@ export function KPICards({ summary }: KPICardsProps) {
             <div className="text-3xl font-bold text-white tracking-tight">
               {summary?.active_flows?.toLocaleString() || "0"}
             </div>
-            {summary?.flow_speed !== undefined && summary.flow_speed > 0 && (
+            {summary && flowsPerHour > 0 && (
               <div className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1 group-hover:text-purple-400/80 transition-colors">
                 <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-                Speed: {summary.flow_speed.toLocaleString()} /hr
+                Speed: {flowsPerHour.toLocaleString()} /hr
               </div>
             )}
           </CardContent>

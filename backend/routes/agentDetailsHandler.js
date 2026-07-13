@@ -29,7 +29,7 @@ module.exports = async function agentDetailsHandler(req, res, helpers) {
       Summary.findOne(baseQuery).sort({ timestamp: -1 }),
       DeviceStat.find(baseQuery).sort({ timestamp: -1, download: -1 }).lean(),
       Threat.find(baseQuery).sort({ detected_at: -1 }).lean(),
-      Flow.find(baseQuery).sort({ timestamp: -1 }).lean(),
+      Flow.find(baseQuery).sort({ timestamp: -1 }).limit(2000).lean(),
       AppStat.find(baseQuery).sort({ timestamp: -1, download: -1 }).lean(),
       Event.find(baseQuery).sort({ timestamp: -1 }).lean(),
       getCustomLabelsMap()

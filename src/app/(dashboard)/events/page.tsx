@@ -1,32 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { TimestampCell } from "@/components/ui/TimestampCell";
 import { useEvents } from "@/lib/api-with-context";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Loader2, AlertCircle, Info, AlertTriangle } from "lucide-react";
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
+import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
-// Helper: format UTC ISO timestamp → Waktu WIB (UTC+7) formatted in English locale
-function formatTimestampWIB(ts: string): string {
-  try {
-    return new Date(ts).toLocaleString('en-US', {
-      timeZone: 'Asia/Jakarta',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    });
-  } catch {
-    return ts;
-  }
-}
+
 
 function EventsContent() {
   const [mounted, setMounted] = useState(false);
@@ -36,11 +22,54 @@ function EventsContent() {
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
 
+  const { 
+    filters, dateFrom, dateTo, 
+    handleFilterChange, setDateFrom, setDateTo, 
+    handleReset, activeCount 
+  } = useUniversalFilterState();
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
   if (!mounted) return null;
+
+  const all = data || [];
+
+  const opts = (key: string) => {
+    const raw = Array.from(new Set(all.map((r: any) => String(r[key] || "")).filter(Boolean)));
+    return raw.sort();
+  };
+
+  const filterConfigs: FilterConfig[] = [
+    { id: "severity", label: "Severity", type: "select", value: filters.severity, options: opts("severity") },
+    { id: "event_type", label: "Event Type", type: "select", value: filters.event_type, options: opts("event_type") },
+    { id: "source_ip", label: "Source IP", type: "select", value: filters.source_ip, options: opts("source_ip") },
+    { id: "mac_address", label: "MAC Address", type: "select", value: filters.mac_address, options: opts("mac_address") },
+  ];
+
+  const filteredData = all.filter((row: any) => {
+    if (filters.severity && filters.severity !== "All" && row.severity !== filters.severity) return false;
+    if (filters.event_type && filters.event_type !== "All" && row.event_type !== filters.event_type) return false;
+    if (filters.source_ip && filters.source_ip !== "All" && row.source_ip !== filters.source_ip) return false;
+    if (filters.mac_address && filters.mac_address !== "All" && row.mac_address !== filters.mac_address) return false;
+    
+    if (dateFrom || dateTo) {
+      const d = row.timestamp ? new Date(row.timestamp).toISOString().slice(0, 10) : "";
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo && d > dateTo) return false;
+    }
+    return true;
+  });
+
+  const minTime = all.reduce((min: number, r: any) => {
+    if (r.timestamp) {
+      const time = new Date(r.timestamp).getTime();
+      if (isFinite(time) && time < min) return time;
+    }
+    return min;
+  }, Infinity);
+  const minDate = minTime !== Infinity ? new Date(minTime).toISOString().slice(0, 10) : "2024-01-01";
 
   const getSeverityIcon = (severity: string) => {
     switch (severity.toLowerCase()) {
@@ -59,11 +88,7 @@ function EventsContent() {
     { header: "#", accessor: (row, i) => i + 1, className: "w-[60px] min-w-[60px] max-w-[60px]" },
     {
       header: "Timestamp (WIB)",
-      accessor: (row) => (
-        <span className="font-mono text-xs text-slate-300 whitespace-nowrap">
-          {formatTimestampWIB(row.timestamp)}
-        </span>
-      ),
+      accessor: (row) => <TimestampCell timestamp={row.timestamp} showActiveStatus={false} />,
       className: "w-[180px] min-w-[180px] max-w-[180px]"
     },
     {
@@ -139,13 +164,25 @@ function EventsContent() {
         </h2>
       </div>
       
+      <UniversalFilters
+        filters={filterConfigs}
+        onChange={handleFilterChange}
+        showDateRange={true}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        minDate={minDate}
+        onDateChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+        activeFilterCount={activeCount}
+        onReset={handleReset}
+      />
+      
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader>
-          <CardTitle className="text-white">Recent Events ({data.length})</CardTitle>
+          <CardTitle className="text-white">Recent Events ({filteredData.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
-            data={data}
+            data={filteredData}
             columns={columns}
             searchPlaceholder="Search by event type, severity, MAC, IP, or message..."
             searchFilter={(row, query) => {

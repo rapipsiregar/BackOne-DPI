@@ -52,10 +52,10 @@ export interface Agent {
   last_seen_at: { human: string; date: string; unix_time: number };
 }
 
-export async function getAgents(): Promise<Agent[]> {
+export async function getAgents(clientSiteUuid?: string): Promise<Agent[]> {
   try {
     const API_KEY = getApiKey();
-    const SITE_UUID = getSiteUuid();
+    const SITE_UUID = clientSiteUuid || getSiteUuid();
 
     // All agent data comes from MongoDB (single source of truth per Rule 13)
     if (API_KEY && API_KEY.startsWith("sk_db_")) {
@@ -68,18 +68,29 @@ export async function getAgents(): Promise<Agent[]> {
       }
       const db = mongoose.connection.db;
 
+      const filter: any = {};
+      if (SITE_UUID) {
+        filter.site_uuid = SITE_UUID;
+      }
+
       // Get all agents from MongoDB summaries collection
       const agentSummaries = await db.collection('summaries')
         .aggregate([
+          { $match: filter },
           { $sort: { timestamp: -1 } },
           { $group: { _id: '$agent_uuid', lastSeen: { $first: '$timestamp' }, label: { $first: '$agent_label' } } },
         ]).toArray();
 
+      // Check for any flows recorded in the last 12 hours to determine online status
+      const twelveHoursAgo = new Date(Date.now() - 12 * 3600000);
+      const activeAgents = await db.collection('flows').distinct('agent_uuid', {
+        timestamp: { $gte: twelveHoursAgo }
+      });
+      const activeAgentsSet = new Set(activeAgents);
+
       const agents: Agent[] = agentSummaries.map((item: any, idx: number) => {
         const lastSeenDate = item.lastSeen ? new Date(item.lastSeen) : null;
-        const nowMs = Date.now();
-        const diffMin = lastSeenDate ? (nowMs - lastSeenDate.getTime()) / 60000 : Infinity;
-        const isOnline = diffMin < 10;
+        const isOnline = activeAgentsSet.has(item._id);
         const statusHuman = isOnline
           ? 'Online'
           : lastSeenDate

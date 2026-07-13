@@ -364,4 +364,19 @@ export interface SecurityDevice {
   device_type: string | null;
   os_label: string | null;
   manufacturer: string | null;
+  timestamp?: string | null;
+}
+
+export interface RemoteIpDetails {
+  ip_address: string;
+  ip_version: number;
+  total_download: number;
+  total_upload: number;
+  last_seen: string | null;
+  first_seen: string | null;
+  protocols: { app_label: string; download: number; upload: number; last_seen: string; first_seen: string }[];
+  domains: { app_label: string; download: number; upload: number; last_seen: string; first_seen: string }[];
+  local_devices: { app_label: string; download: number; upload: number; last_seen: string; first_seen: string }[];
+  flows: FlowStat[];
+  threats: ThreatStat[];
 }

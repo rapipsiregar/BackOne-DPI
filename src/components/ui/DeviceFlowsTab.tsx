@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { Activity } from "lucide-react";
-import { fmtBytes } from "@/lib/utils";
+import { fmtBytes, formatAppLabel } from "@/lib/utils";
 import { Pagination } from "./Pagination";
+import { UniversalFilters, useUniversalFilterState, FilterConfig } from "./UniversalFilters";
 
 interface Props {
   flows: any[];
@@ -19,15 +20,13 @@ interface ColDef {
 function TableWrap({ children, cols }: { children: React.ReactNode; cols: ColDef[] }) {
   return (
     <div className="overflow-x-auto overflow-y-auto max-h-[60vh] rounded-xl border border-border/50 bg-secondary/10 custom-scrollbar">
-      <table className="w-full text-xs text-left whitespace-nowrap min-w-[800px]">
+      <table className="w-full text-xs text-center table-fixed whitespace-nowrap min-w-[800px]">
         <thead className="sticky top-0 bg-[#111827] z-10">
           <tr className="border-b border-border">
             {cols.map((c) => (
               <th
                 key={c.header}
-                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] ${
-                  c.align === "center" ? "text-center" : c.align === "right" ? "text-right" : "text-left"
-                } ${c.width}`}
+                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] text-center ${c.width}`}
               >
                 {c.header}
               </th>
@@ -42,11 +41,11 @@ function TableWrap({ children, cols }: { children: React.ReactNode; cols: ColDef
   );
 }
 
-function Cell({ value, className = "", center = false, right = false }: { value: string | number; className?: string; center?: boolean; right?: boolean }) {
+function Cell({ value, className = "", center = true, right = false }: { value: string | number; className?: string; center?: boolean; right?: boolean }) {
   const str = String(value ?? "—");
-  const align = center ? "text-center" : right ? "text-right" : "";
+  const align = center ? "text-center" : right ? "text-right" : "text-center";
   return (
-    <div className={`truncate overflow-hidden text-ellipsis ${align} ${className}`} title={str}>
+    <div className={`truncate overflow-hidden text-ellipsis flex items-center justify-center w-full ${align} ${className}`} title={str}>
       {str || "—"}
     </div>
   );
@@ -55,10 +54,31 @@ function Cell({ value, className = "", center = false, right = false }: { value:
 export default function DeviceFlowsTab({ flows, ip }: Props) {
   const [page, setPage] = useState(1);
   const pageSize = 50;
+  const { 
+    filters,
+    handleFilterChange,
+    handleReset, activeCount 
+  } = useUniversalFilterState();
 
-  const totalPages = Math.ceil(flows.length / pageSize);
+  const opts = (key: string) => {
+    const raw = Array.from(new Set(flows.map((r: any) => String(r[key] || "")).filter(Boolean)));
+    return raw.sort();
+  };
+
+  const filterConfigs: FilterConfig[] = [
+    { id: "app_name", label: "App", type: "select", value: filters.app_name, options: opts("app_name"), formatter: formatAppLabel },
+    { id: "protocol_name", label: "Protocol", type: "select", value: filters.protocol_name, options: opts("protocol_name"), formatter: formatAppLabel },
+  ];
+
+  const filteredData = flows.filter((row: any) => {
+    if (filters.app_name && filters.app_name !== "All" && row.app_name !== filters.app_name) return false;
+    if (filters.protocol_name && filters.protocol_name !== "All" && row.protocol_name !== filters.protocol_name) return false;
+    return true;
+  });
+
+  const totalPages = Math.ceil(filteredData.length / pageSize);
   const startIndex = (page - 1) * pageSize;
-  const paginated = flows.slice(startIndex, startIndex + pageSize);
+  const paginated = filteredData.slice(startIndex, startIndex + pageSize);
 
   if (flows.length === 0) {
     return (
@@ -73,23 +93,32 @@ export default function DeviceFlowsTab({ flows, ip }: Props) {
   }
 
   const COLS: ColDef[] = [
-    { header: "Time",           width: "w-[130px]", align: "center" },
-    { header: "Source",         width: "min-w-[120px]" },
-    { header: "Destination",    width: "min-w-[120px]" },
-    { header: "Port",           width: "w-[80px]", align: "center" },
-    { header: "App / Protocol", width: "min-w-[150px] w-full" },
-    { header: "Download",       width: "w-[90px]", align: "right" },
-    { header: "Upload",         width: "w-[90px]", align: "right" },
+    { header: "#",              width: "w-[5%]", align: "center" },
+    { header: "Time",           width: "w-[15%]", align: "center" },
+    { header: "Source",         width: "w-[15%]", align: "center" },
+    { header: "Destination",    width: "w-[15%]", align: "center" },
+    { header: "Port",           width: "w-[10%]", align: "center" },
+    { header: "App / Protocol", width: "w-[20%]", align: "center" },
+    { header: "Download",       width: "w-[10%]", align: "center" },
+    { header: "Upload",         width: "w-[10%]", align: "center" },
   ];
 
   return (
     <div className="space-y-3">
+      <UniversalFilters
+        filters={filterConfigs}
+        onChange={(id, val) => { handleFilterChange(id, val); setPage(1); }}
+        showDateRange={false}
+        activeFilterCount={activeCount}
+        onReset={() => { handleReset(); setPage(1); }}
+      />
       <TableWrap cols={COLS}>
         {paginated.map((f: any, i: number) => {
           const isOutbound = f.src_ip === ip;
           const timeStr = f.last_seen ? new Date(f.last_seen).toLocaleString() : '-';
           return (
             <tr key={i} className="hover:bg-white/[0.04] transition-colors duration-150">
+              <td className="px-3 py-2.5"><Cell value={startIndex + i + 1} center /></td>
               <td className="px-3 py-2.5"><Cell value={timeStr} className="text-muted-foreground" center /></td>
               <td className="px-3 py-2.5">
                 <Cell value={f.src_ip} className={`font-mono ${isOutbound ? 'text-blue-400 font-semibold' : 'text-slate-400'}`} />
@@ -101,25 +130,29 @@ export default function DeviceFlowsTab({ flows, ip }: Props) {
                 <Cell value={f.dst_port || '-'} className="text-amber-400/80 font-mono" center />
               </td>
               <td className="px-3 py-2.5">
-                <span className="bg-white/10 text-slate-200 px-2 py-0.5 rounded text-[10px] font-medium border border-white/5 truncate max-w-full inline-block align-middle" title={f.app_label || f.protocol || '-'}>
-                  {f.app_label || f.protocol || '-'}
-                </span>
+                <div className="flex items-center justify-center w-full">
+                  <span className="bg-white/10 text-slate-200 px-2 py-0.5 rounded text-[10px] font-medium border border-white/5 truncate max-w-full inline-block align-middle" title={f.app_label || f.protocol || '-'}>
+                    {f.app_label || f.protocol || '-'}
+                  </span>
+                </div>
               </td>
-              <td className="px-3 py-2.5"><Cell value={fmtBytes(f.download)} className="text-cyan-400 font-mono" right /></td>
-              <td className="px-3 py-2.5"><Cell value={fmtBytes(f.upload)} className="text-emerald-400 font-mono" right /></td>
+              <td className="px-3 py-2.5"><Cell value={fmtBytes(f.download)} className="text-cyan-400 font-mono" center /></td>
+              <td className="px-3 py-2.5"><Cell value={fmtBytes(f.upload)} className="text-emerald-400 font-mono" center /></td>
             </tr>
           );
         })}
       </TableWrap>
-      {totalPages > 0 && (
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          onPageChange={setPage}
-          totalResults={flows.length}
-          startIndex={startIndex}
-          endIndex={startIndex + pageSize}
-        />
+      {totalPages > 1 && (
+        <div className="pt-2">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            totalResults={filteredData.length}
+            startIndex={startIndex}
+            endIndex={startIndex + pageSize}
+          />
+        </div>
       )}
     </div>
   );

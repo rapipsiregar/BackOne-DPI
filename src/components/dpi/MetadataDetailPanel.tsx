@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import { X, Loader2, Database, AlertCircle, Globe, Monitor, Cpu, Fingerprint, Hash, Terminal, Radio } from "lucide-react";
 import { useMetadataDetail, MetadataDetailType, MetadataDetailRow } from "@/lib/api-metadata-detail";
 import { Pagination } from "@/components/ui/Pagination";
-import { fmtBytes } from "@/lib/utils";
+import { fmtBytes, getKnownDomainService } from "@/lib/utils";
 
 // ─── Type config ───────────────────────────────────────────────────────────────
 interface TypeConfig {
@@ -281,6 +281,11 @@ export function MetadataDetailPanel({ type, value, timeRange, onClose }: Props) 
             <div className="min-w-0">
               <p className={`text-xs font-semibold uppercase tracking-widest mb-0.5 ${colors.icon}`}>{cfg.title}</p>
               <h3 className="text-lg font-bold text-card-foreground truncate" title={value}>{value}</h3>
+              {getKnownDomainService(value) && (
+                <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold rounded uppercase tracking-wider">
+                  {getKnownDomainService(value)}
+                </span>
+              )}
               <p className="text-xs text-muted-foreground mt-0.5">{cfg.subtitle}</p>
             </div>
           </div>
@@ -315,7 +320,7 @@ export function MetadataDetailPanel({ type, value, timeRange, onClose }: Props) 
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
-              <p className="text-slate-400 text-sm font-medium">Loading data from MongoDB...</p>
+              <p className="text-slate-400 text-sm font-medium">Loading data from Database...</p>
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3 text-red-400">
@@ -326,11 +331,11 @@ export function MetadataDetailPanel({ type, value, timeRange, onClose }: Props) 
             <div className="flex flex-col items-center justify-center h-48 gap-3 text-slate-500">
               <Database className="h-8 w-8" />
               <p className="text-base font-semibold text-slate-400">No Data</p>
-              <p className="text-sm">No records found for this entry in MongoDB</p>
+              <p className="text-sm">No records found for this entry in Database</p>
             </div>
           ) : (
             <table className="w-full border-collapse text-center whitespace-nowrap text-sm table-fixed">
-              <thead className="sticky top-0 bg-[#111827] z-10">
+              <thead className="sticky top-0 bg-slate-900 z-10">
                 <TableHead cols={cols} />
               </thead>
               <tbody className="divide-y divide-white/[0.04]">

@@ -7,26 +7,63 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Loader2 } from "lucide-react";
 import { fmtBytes } from "@/lib/utils";
 import { WorldMap } from "@/components/ui/WorldMap";
+import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
 
 export default function GeographyPage() {
   const [mounted, setMounted] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const { data, isLoading } = useCountries(50); // fetch 50 countries
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const { 
+    filters,
+    handleFilterChange,
+    handleReset, activeCount 
+  } = useUniversalFilterState();
 
   const mapData = useMemo(() => {
     if (!data) return [];
     return data.map((row) => ({
       countryCode: row.country_code,
       value: row.download + row.upload,
+      download: row.download,
+      upload: row.upload,
       label: row.country_name,
     }));
   }, [data]);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   if (!mounted) return null;
+
+  const all = data || [];
+
+  const opts = (key: string) => {
+    const raw = Array.from(new Set(all.map((r: any) => String(r[key] || "")).filter(Boolean)));
+    return raw.sort();
+  };
+
+  const filterConfigs: FilterConfig[] = [
+    { id: "country_name", label: "Country", type: "select", value: filters.country_name, options: opts("country_name") },
+    { id: "sort_download", label: "Sort Download", type: "select", value: filters.sort_download, options: ["Descending", "Ascending"] },
+    { id: "sort_upload", label: "Sort Upload", type: "select", value: filters.sort_upload, options: ["Descending", "Ascending"] },
+  ];
+
+  const filteredData = all.filter((row: any) => {
+    if (filters.country_name && filters.country_name !== "All" && row.country_name !== filters.country_name) return false;
+    return true;
+  });
+
+  let processedData = [...filteredData];
+  const sortUpload = filters.sort_upload || "All";
+  const sortDownload = filters.sort_download || "All";
+  
+  if (sortUpload !== "All") {
+    processedData.sort((a, b) => sortUpload === "Descending" ? b.upload - a.upload : a.upload - b.upload);
+  } else if (sortDownload !== "All") {
+    processedData.sort((a, b) => sortDownload === "Descending" ? b.download - a.download : a.download - b.download);
+  }
 
   const columns: Column<typeof data[0]>[] = [
     { header: "#", accessor: (row, i) => i + 1 },
@@ -75,6 +112,23 @@ export default function GeographyPage() {
         </div>
       </div>
       
+      <UniversalFilters
+        filters={filterConfigs}
+        onChange={(id, val) => {
+          if (id === 'sort_download') {
+            handleFilterChange('sort_download', val);
+            handleFilterChange('sort_upload', 'All');
+          } else if (id === 'sort_upload') {
+            handleFilterChange('sort_upload', val);
+            handleFilterChange('sort_download', 'All');
+          } else {
+            handleFilterChange(id, val);
+          }
+        }}
+        showDateRange={false}
+        activeFilterCount={activeCount}
+        onReset={handleReset}
+      />
 
       {showMap && (
         <Card className="bg-card/80 backdrop-blur-xl border-border/50 animate-slide-up" style={{ animationDelay: '100ms' }}>
@@ -96,7 +150,7 @@ export default function GeographyPage() {
 
       <Card className="bg-card/80 backdrop-blur-xl border-border/50 animate-slide-up" style={{ animationDelay: '200ms' }}>
         <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 pb-4 mb-4">
-          <CardTitle className="text-lg text-white">Traffic by Country ({data.length})</CardTitle>
+          <CardTitle className="text-lg text-white">Traffic by Country ({processedData.length})</CardTitle>
           {!showMap && (
             <button 
               onClick={() => setShowMap(true)} 
@@ -109,7 +163,7 @@ export default function GeographyPage() {
         </CardHeader>
         <CardContent>
           <DataTable
-            data={data}
+            data={processedData}
             columns={columns}
             searchPlaceholder="Search by country name..."
             searchFilter={(row, query) => {

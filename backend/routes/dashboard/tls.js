@@ -3,6 +3,26 @@ const router  = express.Router();
 const { TlsVersionStat, TlsCipherStat, TlsSecurityStat } = require('../../models/Schemas');
 const { getTimeFilter, getBaseFilter } = require('./helpers');
 
+function analyzeCipherSuite(cipher) {
+  if (!cipher || cipher === '-' || cipher === 'Unknown') return { status: 'Unknown', description: 'Cipher suite information not available.' };
+  
+  const c = cipher.toUpperCase();
+  
+  if (c.includes('NULL') || c.includes('RC4') || c.includes('DES') || c.includes('MD5') || c.includes('EXP') || c.includes('ANON')) {
+    return { status: 'Vulnerable', description: 'Uses obsolete and highly insecure cryptographic algorithms. Must be disabled immediately.' };
+  }
+  
+  if (c.includes('CBC') || c.includes('SHA1') || c.startsWith('TLS_RSA_WITH') || (!c.includes('GCM') && !c.includes('POLY1305'))) {
+    return { status: 'Weak', description: 'Uses legacy algorithms that are theoretically breakable or lack modern forward secrecy.' };
+  }
+  
+  if ((c.includes('GCM') || c.includes('POLY1305')) && (c.includes('AES') || c.includes('CHACHA20'))) {
+    return { status: 'Secure', description: 'Modern, robust authenticated encryption providing forward secrecy.' };
+  }
+  
+  return { status: 'Moderate', description: 'Standard encryption but may lack the strongest current security guarantees.' };
+}
+
 // GET /api/dashboard/tls-versions
 router.get('/tls-versions', async (req, res) => {
   try {
@@ -16,13 +36,13 @@ router.get('/tls-versions', async (req, res) => {
           _id:      '$tls_version',
           download: { $sum: '$download' },
           upload:   { $sum: '$upload' },
+          timestamp: { $max: '$timestamp' },
       }},
-      { $project: { tls_version: '$_id', download: 1, upload: 1, total: { $add: ['$download', '$upload'] }, _id: 0 } },
+      { $project: { tls_version: '$_id', download: 1, upload: 1, total: { $add: ['$download', '$upload'] }, timestamp: 1, _id: 0 } },
       { $sort: { total: -1 } },
     ]);
 
-    const finalData = limit > 0 ? data.slice(0, limit) : data;
-    res.json({ ok: true, data: finalData });
+    res.json({ ok: true, data });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -41,12 +61,17 @@ router.get('/tls-ciphers', async (req, res) => {
           _id:      '$tls_cipher',
           download: { $sum: '$download' },
           upload:   { $sum: '$upload' },
+          timestamp: { $max: '$timestamp' },
       }},
-      { $project: { tls_cipher: '$_id', download: 1, upload: 1, total: { $add: ['$download', '$upload'] }, _id: 0 } },
+      { $project: { tls_cipher: '$_id', download: 1, upload: 1, total: { $add: ['$download', '$upload'] }, timestamp: 1, _id: 0 } },
       { $sort: { total: -1 } },
     ]);
 
-    const finalData = limit > 0 ? data.slice(0, limit) : data;
+    let finalData = data.map(d => {
+      const { status, description } = analyzeCipherSuite(d.tls_cipher);
+      return { ...d, security_status: status, description };
+    });
+
     res.json({ ok: true, data: finalData });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -65,12 +90,14 @@ router.get('/tls-security', async (req, res) => {
           _id:      '$tls_security',
           download: { $sum: '$download' },
           upload:   { $sum: '$upload' },
+          timestamp: { $max: '$timestamp' },
       }},
       { $project: {
           tls_security: '$_id',
           download: 1,
           upload:   1,
           total:    { $add: ['$download', '$upload'] },
+          timestamp: 1,
           _id: 0
       }},
       { $sort: { total: -1 } }

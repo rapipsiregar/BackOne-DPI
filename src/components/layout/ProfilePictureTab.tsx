@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Upload, ImageIcon, Trash2 } from "lucide-react";
+import { SafeImage } from "../ui/SafeImage";
 
 interface Props {
   user: any;
@@ -91,7 +92,7 @@ export default function ProfilePictureTab({ user, setUser, onClose }: Props) {
         <div className="h-24 w-24 rounded-full bg-gradient-to-tr from-primary to-blue-400 p-0.5 shadow-lg shadow-primary/20 mb-4 overflow-hidden relative group">
           <div className="flex h-full w-full items-center justify-center rounded-full bg-background overflow-hidden relative">
             {user?.profile_picture ? (
-              <img src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
+              <SafeImage src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
             ) : (
               <span className="text-3xl font-bold text-white uppercase">
                 {user?.account_name ? user.account_name.charAt(0) : (user?.username ? user.username.charAt(0) : 'A')}

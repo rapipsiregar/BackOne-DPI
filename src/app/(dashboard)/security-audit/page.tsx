@@ -10,6 +10,7 @@ import SecurityDistribution from "@/components/security-audit/SecurityDistributi
 import TlsVersionsChart from "@/components/security-audit/TlsVersionsChart";
 import TlsTables from "@/components/security-audit/TlsTables";
 import SslSanTable from "@/components/security-audit/SslSanTable";
+import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
 
 export default function SecurityAuditPage() {
   const [mounted, setMounted] = useState(false);
@@ -28,12 +29,27 @@ export default function SecurityAuditPage() {
       .finally(() => setSecDevicesLoading(false));
   }, []);
 
+  const { 
+    filters,
+    handleFilterChange,
+    handleReset, activeCount 
+  } = useUniversalFilterState();
+
   if (!mounted) return null;
 
+  const filterConfigs: FilterConfig[] = [
+    { id: "risk_level", label: "Risk Level", type: "select", value: filters.risk_level, options: ["Vulnerable", "Moderate", "Safe"] },
+  ];
+
+  const filteredDevices = secDevices.filter((d) => {
+    if (filters.risk_level && filters.risk_level !== "All" && d.risk_level !== filters.risk_level) return false;
+    return true;
+  });
+
   // Risk summary counts
-  const vulnerableCount = secDevices.filter((d) => d.risk_level === "Vulnerable").length;
-  const moderateCount = secDevices.filter((d) => d.risk_level === "Moderate").length;
-  const safeCount = secDevices.filter((d) => d.risk_level === "Safe").length;
+  const vulnerableCount = filteredDevices.filter((d) => d.risk_level === "Vulnerable").length;
+  const moderateCount = filteredDevices.filter((d) => d.risk_level === "Moderate").length;
+  const safeCount = filteredDevices.filter((d) => d.risk_level === "Safe").length;
 
   return (
     <div className="space-y-6">
@@ -44,17 +60,19 @@ export default function SecurityAuditPage() {
         </p>
       </div>
 
+      <UniversalFilters
+        filters={filterConfigs}
+        onChange={handleFilterChange}
+        showDateRange={false}
+        activeFilterCount={activeCount}
+        onReset={handleReset}
+      />
+
       {/* Risk Summary Cards */}
       <RiskSummaryCards
         vulnerableCount={vulnerableCount}
         moderateCount={moderateCount}
         safeCount={safeCount}
-      />
-
-      {/* Device Risk Table */}
-      <DeviceRiskTable
-        secDevices={secDevices}
-        secDevicesLoading={secDevicesLoading}
       />
 
       {/* Charts Grid */}
@@ -71,6 +89,12 @@ export default function SecurityAuditPage() {
 
       {/* SSL/TLS Subject Alternative Names Table */}
       <SslSanTable />
+
+      {/* Device Risk Table */}
+      <DeviceRiskTable
+        secDevices={filteredDevices}
+        secDevicesLoading={secDevicesLoading}
+      />
     </div>
   );
 }

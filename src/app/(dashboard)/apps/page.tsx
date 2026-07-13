@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { TimestampCell } from "@/components/ui/TimestampCell";
 import { AppStat } from "@/lib/api";
 import { useTopApps } from "@/lib/api-with-context";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { AppDetailModal } from "@/components/ui/AppDetailModal";
 import { Loader2, ChevronRight, Globe } from "lucide-react";
-import { fmtBytes, getAppFavicon } from "@/lib/utils";
+import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
+import { fmtBytes, getAppFavicon, formatAppLabel } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 
 export default function AppsPage() {
@@ -17,16 +19,74 @@ export default function AppsPage() {
   const { data, isLoading } = useTopApps(pageSize);
   const [selectedApp, setSelectedApp] = useState<AppStat | null>(null);
 
+  const { 
+    filters, dateFrom, dateTo, 
+    handleFilterChange, setDateFrom, setDateTo, 
+    handleReset, activeCount 
+  } = useUniversalFilterState();
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
   if (!mounted) return null;
 
-  const top5 = data.slice(0, 5);
+  const all = data || [];
+
+  const opts = (key: string) => {
+    const raw = Array.from(new Set(all.map((r: any) => String(r[key] || "")).filter(Boolean)));
+    return raw.sort();
+  };
+
+  const filterConfigs: FilterConfig[] = [
+    { id: "app_label", label: "Application", type: "select", value: filters.app_label, options: opts("app_label"), formatter: formatAppLabel },
+    { id: "category", label: "Category", type: "select", value: filters.category, options: opts("category") },
+    { id: "sort_download", label: "Sort Download", type: "select", value: filters.sort_download, options: ["Descending", "Ascending"] },
+    { id: "sort_upload", label: "Sort Upload", type: "select", value: filters.sort_upload, options: ["Descending", "Ascending"] },
+    { id: "sort_total", label: "Sort Total", type: "select", value: filters.sort_total, options: ["Descending", "Ascending"] },
+  ];
+
+  const filteredData = all.filter((row: any) => {
+    if (filters.app_label && filters.app_label !== "All" && row.app_label !== filters.app_label) return false;
+    if (filters.category && filters.category !== "All" && row.category !== filters.category) return false;
+    
+    if (dateFrom || dateTo) {
+      const d = row.last_seen ? new Date(row.last_seen).toISOString().slice(0, 10) : "";
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo && d > dateTo) return false;
+    }
+    return true;
+  });
+
+  let processedData = [...filteredData];
+  const sortUpload = filters.sort_upload || "All";
+  const sortDownload = filters.sort_download || "All";
+  const sortTotal = filters.sort_total || "All";
+  
+  if (sortTotal !== "All") {
+    processedData.sort((a, b) => sortTotal === "Descending" ? ((b.upload ?? 0) + (b.download ?? 0)) - ((a.upload ?? 0) + (a.download ?? 0)) : ((a.upload ?? 0) + (a.download ?? 0)) - ((b.upload ?? 0) + (b.download ?? 0)));
+  } else if (sortUpload !== "All") {
+    processedData.sort((a, b) => sortUpload === "Descending" ? (b.upload ?? 0) - (a.upload ?? 0) : (a.upload ?? 0) - (b.upload ?? 0));
+  } else if (sortDownload !== "All") {
+    processedData.sort((a, b) => sortDownload === "Descending" ? (b.download ?? 0) - (a.download ?? 0) : (a.download ?? 0) - (b.download ?? 0));
+  }
+
+  const minTime = all.reduce((min: number, r: any) => {
+    if (r.last_seen) {
+      const time = new Date(r.last_seen).getTime();
+      if (isFinite(time) && time < min) return time;
+    }
+    return min;
+  }, Infinity);
+  const minDate = minTime !== Infinity ? new Date(minTime).toISOString().slice(0, 10) : "2024-01-01";
+
+  const top5 = processedData.slice(0, 5);
 
   const columns: Column<AppStat>[] = [
-    { header: "Last Seen", accessor: (row) => row.last_seen ? new Date(row.last_seen).toLocaleString() : '-' },
+    { 
+      header: "Last Seen", 
+      accessor: (row) => <TimestampCell timestamp={row.last_seen} showActiveStatus={true} />
+    },
     { header: "#", accessor: (row, i) => i + 1 },
     {
       header: "Application",
@@ -46,7 +106,7 @@ export default function AppsPage() {
               </div>
             );
           })()}
-          <span className="group-hover:text-blue-300 transition-colors">{row.app_label}</span>
+          <span className="group-hover:text-blue-300 transition-colors">{formatAppLabel(row.app_label)}</span>
           <ChevronRight className="w-3 h-3 text-slate-600 group-hover:text-blue-400 transition-colors" />
         </button>
       ),
@@ -58,11 +118,11 @@ export default function AppsPage() {
     },
     {
       header: "Upload",
-      accessor: (row) => <span className="text-green-500">{fmtBytes(row.upload)}</span>,
+      accessor: (row) => <span className="text-green-500">{fmtBytes(row.upload)}</span>
     },
     {
       header: "Total",
-      accessor: (row) => <span className="font-medium text-white">{fmtBytes(row.download + row.upload)}</span>,
+      accessor: (row) => <span className="font-medium text-white">{fmtBytes(row.download + row.upload)}</span>
     },
   ];
 
@@ -79,6 +139,34 @@ export default function AppsPage() {
           </p>
         </div>
       </div>
+      
+      <UniversalFilters
+        filters={filterConfigs}
+        onChange={(id, val) => {
+          if (id === 'sort_download') {
+            handleFilterChange('sort_download', val);
+            handleFilterChange('sort_upload', 'All');
+            handleFilterChange('sort_total', 'All');
+          } else if (id === 'sort_upload') {
+            handleFilterChange('sort_upload', val);
+            handleFilterChange('sort_download', 'All');
+            handleFilterChange('sort_total', 'All');
+          } else if (id === 'sort_total') {
+            handleFilterChange('sort_total', val);
+            handleFilterChange('sort_download', 'All');
+            handleFilterChange('sort_upload', 'All');
+          } else {
+            handleFilterChange(id, val);
+          }
+        }}
+        showDateRange={true}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        minDate={minDate}
+        onDateChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+        activeFilterCount={activeCount}
+        onReset={handleReset}
+      />
       
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader>
@@ -115,11 +203,11 @@ export default function AppsPage() {
 
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader>
-          <CardTitle className="text-white">All Applications ({data.length})</CardTitle>
+          <CardTitle className="text-white">All Applications ({processedData.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
-            data={data}
+            data={processedData}
             columns={columns}
             searchPlaceholder="Search by application or category..."
             searchFilter={(row, query) => {

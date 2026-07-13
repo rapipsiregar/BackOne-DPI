@@ -18,7 +18,18 @@ function getTimeFilter(req) {
 function getBaseFilter(req, timeFilter = null) {
   const filter = {};
   if (timeFilter) filter.timestamp = timeFilter;
-  if (req.user?.site_uuid)  filter.site_uuid  = req.user.site_uuid;
+  
+  const requestedSiteUuid = req.headers['x-backone-site-uuid'];
+  console.log('[DEBUG] getBaseFilter headers:', Object.keys(req.headers), 'x-backone-site-uuid:', requestedSiteUuid, 'role:', req.user?.role);
+  
+  const hasSwitcherRole = ['SUPER_ADMIN', 'SOC_ANALYST', 'ENGINEER'].includes(req.user?.role);
+  
+  if (hasSwitcherRole && requestedSiteUuid) {
+    filter.site_uuid = requestedSiteUuid;
+  } else if (req.user?.site_uuid) {
+    filter.site_uuid = req.user.site_uuid;
+  }
+
   if (req.user?.role === 'AGENT_VIEWER' && req.user?.agent_uuid) {
     filter.agent_uuid = req.user.agent_uuid;
   } else if (req.query?.agent_uuid) {

@@ -1,12 +1,12 @@
-﻿"use client";
+"use client";
 
 import { useMemo } from "react";
 import { X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ThreatStat } from "@/lib/api";
 import { formatAppLabel } from "@/lib/utils";
-import { DropdownFilterSelect } from "./DropdownFilterSelect";
-import { DateRangePicker } from "./DateRangePicker";
+import { DropdownFilterSelect } from "@/components/ui/DropdownFilterSelect";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { sortAppOptions } from "./sortAppOptions";
 
 interface ThreatFiltersProps {

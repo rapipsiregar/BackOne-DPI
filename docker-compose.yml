@@ -32,9 +32,9 @@ services:
       - MONGO_INITDB_DATABASE=backone_dpi
     networks:
       - backone-infra
-      - backone-app        # backend juga bisa connect ke MongoDB
+      - backone-app # backend juga bisa connect ke MongoDB
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -46,7 +46,7 @@ services:
     container_name: backone_proxy
     restart: always
     ports:
-      - "4000:4000"        # Admin/DevOps bisa akses proxy API dari host
+      - "4000:4000" # Admin/DevOps bisa akses proxy API dari host
     env_file:
       - .env.local
     environment:
@@ -79,7 +79,7 @@ services:
     environment:
       - MONGODB_URI=mongodb://mongodb:27017/backone_dpi
       - BACKEND_PORT=3001
-      - PROXY_URL=http://proxy:4000   # untuk trigger manual refresh dari dashboard
+      - PROXY_URL=http://proxy:4000 # untuk trigger manual refresh dari dashboard
     networks:
       - backone-app
     depends_on:

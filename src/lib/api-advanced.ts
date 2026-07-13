@@ -35,19 +35,12 @@ export interface IntelTorDetection { id: number; fetched_at: string; detected_at
 export interface IntelUnencryptedPassword { id: number; fetched_at: string; detected_at: string; ip_address: string; mac_address: string; dst_ip: string; dst_port: number; protocol: string; username: string; download: number; upload: number; severity: string; }
 export interface IntelVpnDetection { id: number; fetched_at: string; detected_at: string; ip_address: string; mac_address: string; vpn_type: string; remote_ip: string; protocol: string; download: number; upload: number; country: string; confidence: number; }
 
+import { useTimeFilter } from '@/contexts/TimeFilterContext';
+import { useCtxFetch } from './api-context-core';
+
 function useGenericFetch<T>(endpoint: string, limit: number) {
-  const [data, setData] = useState<T[]>([]);
-  const [error, setError] = useState<Error | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    fetcher<T[]>(`${endpoint}?limit=${limit}`)
-      .then((res) => setData(res || []))
-      .catch(setError)
-      .finally(() => setIsLoading(false));
-  }, [endpoint, limit]);
-
-  return { data, error, isLoading };
+  const { timeRange } = useTimeFilter();
+  return useCtxFetch<T[]>(`${endpoint}?limit=${limit}`, timeRange, []);
 }
 
 // Network Infrastructure Hooks

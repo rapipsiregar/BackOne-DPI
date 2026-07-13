@@ -33,7 +33,12 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ rou
     
     // Prepare headers
     const headers = new Headers();
-    headers.set('Content-Type', 'application/json');
+    const contentType = req.headers.get('content-type');
+    if (contentType) {
+      headers.set('Content-Type', contentType);
+    } else {
+      headers.set('Content-Type', 'application/json');
+    }
     
     // Forward cookie for authentication
     const cookie = req.headers.get('cookie');
@@ -51,18 +56,19 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ rou
     let body = null;
     
     if (hasBody) {
-      body = await req.text();
+      body = await req.arrayBuffer();
     }
     
     const response = await fetch(destinationUrl, {
       method: req.method,
       headers,
       body: body || undefined,
+      cache: 'no-store', // Prevent Next.js from aggressively caching the backend response
     });
     
-    const responseText = await response.text();
+    const responseBuffer = await response.arrayBuffer();
     
-    const nextResponse = new NextResponse(responseText, {
+    const nextResponse = new NextResponse(responseBuffer, {
       status: response.status,
       headers: {
         'Content-Type': response.headers.get('content-type') || 'application/json',

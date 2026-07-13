@@ -40,7 +40,8 @@ const dashCode     = readFile('backend/routes/dashboard.js') +
                      readFile('backend/routes/dashboard/geo.js') +
                      readFile('backend/routes/dashboard/tls.js') +
                      readFile('backend/routes/dashboard/telemetry.js') +
-                     readFile('backend/routes/dashboard/events.js');
+                     readFile('backend/routes/dashboard/events.js') +
+                     readFile('backend/routes/dashboard/agents.js');
 const authCode     = readFile('backend/routes/auth.js');
 
 test('server.js tidak memanggil ingestionService',   !serverCode.includes('ingestionService'));
@@ -77,7 +78,7 @@ test("scheduler.js mendukung mode 'all'",               schedulerCode.includes("
 test('collector.js export collectAllAgents()',           collectorCode.includes('collectAllAgents'));
 test('collector.js export collectSpecificAgent()',       collectorCode.includes('collectSpecificAgent'));
 test('collector.js tag data dengan agent_uuid',          collectorCode.includes('agent_uuid: agentUuid'));
-test('collector.js tag data dengan site_uuid',           collectorCode.includes('site_uuid:  SITE_UUID') || collectorCode.includes('site_uuid: SITE_UUID'));
+test('collector.js tag data dengan site_uuid',           collectorCode.includes('site_uuid:  SITE_UUID') || collectorCode.includes('site_uuid: SITE_UUID') || collectorCode.includes('site_uuid: siteUuid'));
 console.log('');
 
 // ─── TEST GROUP 4: Docker Compose 2 Container Groups ─────────────────────

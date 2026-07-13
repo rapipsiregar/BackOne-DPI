@@ -87,7 +87,7 @@ const FlowSchema = new mongoose.Schema({
   dst_port:   Number,
   protocol:   String,
   app_label:  String,
-  domain:     String,
+  domain:     { type: String, index: true },
   download:   Number,
   upload:     Number,
   first_seen: String,
@@ -189,6 +189,7 @@ FlowSchema.index({ agent_uuid: 1, timestamp: -1 });
 FlowSchema.index({ agent_uuid: 1, flow_id: 1 });
 FlowSchema.index({ agent_uuid: 1, protocol: 1, timestamp: -1 });
 FlowSchema.index({ agent_uuid: 1, domain: 1, timestamp: -1 });
+FlowSchema.index({ site_uuid: 1, app_label: 1, timestamp: -1 });
 ThreatSchema.index({ agent_uuid: 1, timestamp: -1 });
 AppCategoryStatSchema.index({ agent_uuid: 1, timestamp: -1 });
 EventSchema.index({ agent_uuid: 1, timestamp: -1 });
@@ -217,6 +218,7 @@ const DeviceAppStatSchema = new mongoose.Schema({
 }, baseOptions);
 DeviceAppStatSchema.index({ agent_uuid: 1, ip_address: 1, timestamp: -1 });
 DeviceAppStatSchema.index({ ip_address: 1, app_label: 1, timestamp: -1 });
+DeviceAppStatSchema.index({ site_uuid: 1, app_label: 1, timestamp: -1 });
 
 // ─── View As Audit Logs ────────────────────────────────────────────────────────
 const ViewAsLogSchema = new mongoose.Schema({
@@ -230,26 +232,39 @@ const ViewAsLogSchema = new mongoose.Schema({
   duration:       Number, // duration in seconds
 }, baseOptions);
 
+// ─── Lookup App Dictionary ────────────────────────────────────────────────────
+const LookupAppSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true, index: true },
+  tag: String,
+  label: { type: String, index: true },
+  name: String,
+  full_name: String,
+  description: String,
+  favicon: String,
+  icon: String,
+  logo: String,
+  application_category: Object
+}, baseOptions);
+LookupAppSchema.index({ label: 1, tag: 1 });
 
-// ─── DPI Telemetry Property Schemas (SNI, SSL, QUIC, SSH, mDNS, DHCP, UA, BT)
-// Split into SchemasTelemetry.js to keep this file under 256 lines.
 const telemetrySchemas = require('./SchemasTelemetry');
 
 module.exports = {
-  Summary:      mongoose.model('Summary',      SummarySchema),
-  AppStat:      mongoose.model('AppStat',      AppStatSchema),
-  ProtocolStat: mongoose.model('ProtocolStat', ProtocolStatSchema),
-  DeviceStat:   mongoose.model('DeviceStat',   DeviceStatSchema),
+  Summary:       mongoose.model('Summary',       SummarySchema),
+  AppStat:       mongoose.model('AppStat',       AppStatSchema),
+  ProtocolStat:  mongoose.model('ProtocolStat',  ProtocolStatSchema),
+  DeviceStat:    mongoose.model('DeviceStat',    DeviceStatSchema),
   DeviceAppStat: mongoose.model('DeviceAppStat', DeviceAppStatSchema),
-  Flow:         mongoose.model('Flow',         FlowSchema),
-  Threat:       mongoose.model('Threat',       ThreatSchema),
+  Flow:          mongoose.model('Flow',          FlowSchema),
+  Threat:        mongoose.model('Threat',        ThreatSchema),
   CustomDeviceLabel: mongoose.model('CustomDeviceLabel', CustomDeviceLabelSchema),
   AppCategoryStat: mongoose.model('AppCategoryStat', AppCategoryStatSchema),
   Event:         mongoose.model('Event',         EventSchema),
   TlsVersionStat: mongoose.model('TlsVersionStat', TlsVersionStatSchema),
   TlsCipherStat: mongoose.model('TlsCipherStat', TlsCipherStatSchema),
   TlsSecurityStat: mongoose.model('TlsSecurityStat', TlsSecurityStatSchema),
-  CountryStat:     mongoose.model('CountryStat',     CountryStatSchema),
+  CountryStat:   mongoose.model('CountryStat',   CountryStatSchema),
+  LookupApp:     mongoose.model('LookupApp',     LookupAppSchema),
   ViewAsLog:     mongoose.model('ViewAsLog',     ViewAsLogSchema),
-  ...telemetrySchemas,
+  ...telemetrySchemas
 };

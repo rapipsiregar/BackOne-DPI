@@ -10,15 +10,13 @@ const axios = require('axios');
 
 const BASE_URL  = process.env.NETIFY_INFORMATICS_BASE_URL || 'https://informatics.netify.ai/api/v1';
 const JWT_TOKEN = process.env.NETIFY_TOKEN || process.env.NETIFY_JWT_TOKEN;
-const SITE_UUID = process.env.NETIFY_SITE_UUID;
-
 // In-memory map: agent_uuid -> numeric agent ID
 const agentMap = {};
 
-function getHeaders() {
+function getHeaders(siteUuid) {
   const token = process.env.NETIFY_API_KEY || JWT_TOKEN;
   const headers = { 'x-api-key': token, 'Accept': 'application/json' };
-  if (SITE_UUID) headers['x-net-site'] = SITE_UUID;
+  if (siteUuid) headers['x-net-site'] = siteUuid;
   return headers;
 }
 
@@ -38,7 +36,7 @@ function fixDates(obj) {
   }
 }
 
-async function netifyFetch(endpoint, params = {}, agentUuid = null) {
+async function netifyFetch(endpoint, params = {}, agentUuid = null, siteUuid = null) {
   if (agentUuid) {
     const agentId = agentMap[agentUuid];
     if (agentId) params.filter_agents = `[${agentId}]`;
@@ -46,18 +44,20 @@ async function netifyFetch(endpoint, params = {}, agentUuid = null) {
   }
 
   const token = process.env.NETIFY_API_KEY || JWT_TOKEN;
-  if (!token || !SITE_UUID) {
-    console.error('[DpiClient] Missing DPI_API_KEY or DPI_SITE_UUID');
+  if (!token || !siteUuid) {
+    console.error(`[DpiClient] Missing DPI_API_KEY or siteUuid for endpoint ${endpoint}`);
     return null;
   }
 
   try {
     const res = await axios.get(`${BASE_URL}${endpoint}`, {
-      headers: getHeaders(), params, timeout: 30000,
+      headers: getHeaders(siteUuid), params, timeout: 30000,
     });
     const json = res.data;
     if (json?.status_code !== 0) {
-      console.error(`[DpiClient] API Error ${json?.status_code} on ${endpoint}: ${json?.status_message}`);
+      // Netify returns 200 when there is simply no data in the requested timeframe
+      if (json?.status_code === 200) return [];
+      console.error(`[DpiClient] API Error ${json?.status_code} on ${endpoint}: ${json?.status_message || 'No message'}`);
       return null;
     }
     if (json && json.data) fixDates(json.data);
@@ -73,6 +73,5 @@ async function netifyFetch(endpoint, params = {}, agentUuid = null) {
 module.exports = {
   netifyFetch,
   agentMap,
-  BASE_URL,
-  SITE_UUID,
+  BASE_URL
 };

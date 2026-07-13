@@ -10,8 +10,11 @@ import {
   useFlowTypes, useFlowOrigins 
 } from "@/lib/api-advanced";
 import { IpDetails } from "@/components/ui/IpDetails";
+import { RemoteIpDetailModal } from "@/components/ui/RemoteIpDetailModal";
 
 export default function NetworkInfrastructurePage() {
+  const [selectedRemoteIp, setSelectedRemoteIp] = useState<string | null>(null);
+
   // Routing & Geography Tab
   const { data: regions, isLoading: loadingRegions } = useRegions(20);
   const { data: cities, isLoading: loadingCities } = useCities(20);
@@ -56,8 +59,8 @@ export default function NetworkInfrastructurePage() {
                   data={regions} 
                   isLoading={loadingRegions}
                   columns={[
-                    { header: "Region", accessor: (row: any) => row.region_name },
-                    { header: "Country", accessor: (row: any) => row.country_name },
+                    { header: "Region", accessor: (row: any) => <span title={row.region_name}>{row.region_name}</span> },
+                    { header: "Country", accessor: (row: any) => <span title={row.country_name}>{row.country_name}</span> },
                     { header: "Download", accessor: (row) => formatBytes(row.download) },
                   ]}
                 />
@@ -72,9 +75,9 @@ export default function NetworkInfrastructurePage() {
                   data={cities} 
                   isLoading={loadingCities}
                   columns={[
-                    { header: "City", accessor: (row: any) => row.city_name },
-                    { header: "Region", accessor: (row: any) => row.region_name },
-                    { header: "Country", accessor: (row: any) => row.country_name },
+                    { header: "City", accessor: (row: any) => <span title={row.city_name}>{row.city_name}</span> },
+                    { header: "Region", accessor: (row: any) => <span title={row.region_name}>{row.region_name}</span> },
+                    { header: "Country", accessor: (row: any) => <span title={row.country_name}>{row.country_name}</span> },
                     { header: "Download", accessor: (row) => formatBytes(row.download) },
                   ]}
                 />
@@ -135,6 +138,7 @@ export default function NetworkInfrastructurePage() {
                   <DataTable 
                     data={remoteIps} 
                     isLoading={loadingRemoteIps}
+                    onRowClick={(row) => setSelectedRemoteIp(row.remote_ip)}
                     columns={[
                       {
                         header: "IP Address",
@@ -179,8 +183,8 @@ export default function NetworkInfrastructurePage() {
                     data={macBandwidth} 
                     isLoading={loadingMacBandwidth}
                     columns={[
-                      { header: "MAC Address", accessor: (row: any) => row.mac_address },
-                      { header: "Manufacturer", accessor: (row: any) => row.manufacturer },
+                      { header: "MAC Address", accessor: (row: any) => <span title={row.mac_address}>{row.mac_address}</span> },
+                      { header: "Manufacturer", accessor: (row: any) => <span title={row.manufacturer}>{row.manufacturer}</span> },
                       { header: "Total", accessor: (row) => formatBytes(row.total) },
                     ]}
                   />
@@ -229,6 +233,13 @@ export default function NetworkInfrastructurePage() {
           </div>
         </Tab>
       </Tabs>
+      
+      {selectedRemoteIp && (
+        <RemoteIpDetailModal 
+          ip={selectedRemoteIp} 
+          onClose={() => setSelectedRemoteIp(null)} 
+        />
+      )}
     </div>
   );
 }

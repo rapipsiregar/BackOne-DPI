@@ -41,9 +41,28 @@ function buildBaseFilter(req) {
 }
 
 // ─── Helper: get per-device breakdown from Flow using a domain value ────────────
-async function deviceBreakdownByDomain(value, base) {
+async function deviceBreakdownByDomain(type, value, base) {
+  let matchQuery = { ...base };
+  
+  if (type === 'sni_hostname') {
+    // Exact match for sni_hostname, with a fallback OR condition 
+    // just in case old data doesn't have sni_hostname but domain matches it closely
+    const parts = value.split('.');
+    const baseDomain = parts.length > 2 ? parts.slice(-2).join('.') : value;
+    const baseDomain2 = parts.length > 3 ? parts.slice(-3).join('.') : value; // For co.uk etc
+    
+    matchQuery.$or = [
+      { sni_hostname: value },
+      { domain: value },
+      { domain: baseDomain },
+      { domain: baseDomain2 }
+    ];
+  } else {
+    matchQuery.domain = value;
+  }
+
   return Flow.aggregate([
-    { $match: { ...base, domain: value } },
+    { $match: matchQuery },
     { $group: {
         _id:        '$src_ip',
         download:   { $sum: '$download' },
@@ -101,7 +120,7 @@ router.get('/', async (req, res) => {
 
     // ── Domain-based types: cross-reference with Flow.domain ──────────────────
     if (['sni_hostname', 'ssl_server_cn', 'quic_hostname'].includes(type)) {
-      const ipRows = await deviceBreakdownByDomain(value, base);
+      const ipRows = await deviceBreakdownByDomain(type, value, base);
       data = await enrichWithDeviceStat(ipRows, agentFilter);
     }
 

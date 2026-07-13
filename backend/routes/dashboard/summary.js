@@ -29,7 +29,7 @@ router.get('/summary', async (req, res) => {
       activeFlowsCount   = summaries.reduce((s, r) => s + (r.active_flows ?? 0), 0);
     }
 
-    const [fallbackDevices, fallbackFlows, fallbackFlowBandwidth, realThreatsCount, realEventsCount] = await Promise.all([
+    const [fallbackDevices, fallbackFlows, fallbackFlowBandwidth, realThreatsCount, realEventsCount, fallbackThreatsCount] = await Promise.all([
       DeviceStat.distinct('ip_address', base).then(r => r.length),
       Flow.countDocuments(base),
       Flow.aggregate([
@@ -37,7 +37,14 @@ router.get('/summary', async (req, res) => {
         { $group: { _id: null, down: { $sum: '$download' }, up: { $sum: '$upload' } } }
       ]),
       Threat.countDocuments(base),
-      Event.countDocuments(base)
+      Event.countDocuments(base),
+      Event.countDocuments({
+        ...base,
+        $or: [
+          { severity: { $in: ['Critical', 'High'] } },
+          { category_label: 'Cybersecurity' }
+        ]
+      })
     ]);
 
     const flowDown = fallbackFlowBandwidth[0]?.down || 0;
@@ -45,7 +52,7 @@ router.get('/summary', async (req, res) => {
 
     let finalDown = bandwidthDown > 0 ? bandwidthDown : flowDown;
     let finalUp   = bandwidthUp > 0 ? bandwidthUp : flowUp;
-    let finalDevices = totalDevicesCount > 0 ? totalDevicesCount : fallbackDevices;
+    let finalDevices = fallbackDevices;
     let finalActiveFlows = activeFlowsCount > 0 ? activeFlowsCount : fallbackFlows;
 
     const range = req.query.timeRange || '1d';
@@ -67,7 +74,7 @@ router.get('/summary', async (req, res) => {
       ok: true,
       data: {
         total_devices:  finalDevices,
-        total_threats:  realThreatsCount,
+        total_threats:  realThreatsCount > 0 ? realThreatsCount : fallbackThreatsCount,
         total_events:   realEventsCount,
         last_fetch:     latestTime || new Date(),
         bandwidth_down: finalDown,

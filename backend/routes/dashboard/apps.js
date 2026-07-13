@@ -1,6 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const { AppStat, ProtocolStat, AppCategoryStat } = require('../../models/Schemas');
+const { AppStat, ProtocolStat, AppCategoryStat, LookupApp } = require('../../models/Schemas');
 const { getTimeFilter, getBaseFilter } = require('./helpers');
 
 // GET /api/dashboard/apps
@@ -102,16 +102,57 @@ router.get('/app-categories', async (req, res) => {
 // GET /api/dashboard/lookup/applications
 router.get('/lookup/applications', async (req, res) => {
   try {
-    const q = String(req.query.q || '').trim();
-    if (!q) return res.json({ ok: true, data: [] });
+    const search = String(req.query.search || req.query.q || '').trim();
+    const category = String(req.query.category || '').trim();
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 25);
+    const skip = (page - 1) * limit;
 
-    const baseFilter = getBaseFilter(req, null);
-    const apps = await AppStat.distinct('app_label', {
-      ...baseFilter,
-      app_label: { $regex: q, $options: 'i' }
+    let filter = {};
+    if (search) {
+      filter.$or = [
+        { label: { $regex: search, $options: 'i' } },
+        { name: { $regex: search, $options: 'i' } },
+        { tag: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    if (category) {
+      filter['application_category.label'] = category;
+    }
+
+    const [applications, total_records] = await Promise.all([
+      LookupApp.find(filter).sort({ label: 1 }).skip(skip).limit(limit).lean(),
+      LookupApp.countDocuments(filter)
+    ]);
+
+    const total_pages = Math.ceil(total_records / limit) || 1;
+
+    res.json({
+      ok: true,
+      data: {
+        applications,
+        pagination: {
+          total_records,
+          total_pages,
+          current_page: page,
+          start: skip,
+          length: applications.length,
+          limit
+        }
+      }
     });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
-    res.json({ ok: true, data: apps.map(name => ({ label: name, value: name })) });
+// GET /api/dashboard/lookup/categories
+router.get('/lookup/categories', async (req, res) => {
+  try {
+    const categories = await LookupApp.distinct('application_category.label');
+    const validCategories = categories.filter(c => c).sort();
+    res.json({ ok: true, data: validCategories });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }

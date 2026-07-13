@@ -134,24 +134,32 @@ router.get('/dns', async (req, res) => {
     const limit      = req.query.limit !== undefined ? parseInt(req.query.limit) : 0;
     const timeFilter = getTimeFilter(req);
     const matchBase  = getBaseFilter(req, timeFilter);
+    const { SniHostnameStat } = require('../../models/SchemasTelemetry');
 
     const pipeline = [
-      { $match: { ...matchBase, domain: { $ne: null } } },
+      { $match: { ...matchBase, sni_hostname: { $ne: null } } },
       { $group: {
-          _id:      '$domain',
+          _id:      '$sni_hostname',
           download: { $sum: '$download' },
           upload:   { $sum: '$upload' },
-          count:    { $sum: 1 },
-          app_label: { $last: '$app_label' },
+          count:    { $sum: '$flows' }
       }},
-      { $project: { domain: '$_id', query_count: '$count', download: 1, upload: 1, app_label: 1, category: { $literal: null }, _id: 0 } },
+      { $project: { 
+          domain: '$_id', 
+          query_count: '$count', 
+          download: 1, 
+          upload: 1, 
+          app_label: { $literal: null }, 
+          category: { $literal: null }, 
+          _id: 0 
+      }},
       { $sort: { query_count: -1 } },
     ];
     if (limit > 0) {
       pipeline.push({ $limit: limit });
     }
 
-    const data = await Flow.aggregate(pipeline);
+    const data = await SniHostnameStat.aggregate(pipeline);
     res.json({ ok: true, data });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });

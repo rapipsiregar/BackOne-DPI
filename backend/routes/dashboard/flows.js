@@ -217,7 +217,7 @@ router.get('/ip-versions', async (req, res) => {
     const timeFilter = getTimeFilter(req);
     const matchBase  = getBaseFilter(req, timeFilter);
 
-    const flows = await Flow.find({ ...matchBase, dst_ip: { $ne: null } }, { dst_ip: 1, download: 1, upload: 1 }).lean();
+    const flows = await Flow.find({ ...matchBase, dst_ip: { $ne: null } }, { dst_ip: 1, download: 1, upload: 1 }).limit(20000).lean();
     let ipv4Total = 0, ipv6Total = 0;
     for (const f of flows) {
       const size = (f.download || 0) + (f.upload || 0);

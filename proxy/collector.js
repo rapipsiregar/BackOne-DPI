@@ -20,15 +20,16 @@ const {
 const { Summary, AppStat } = require('./models/Schemas');
 const { pruneOldData } = require('./dataRetention');
 
-const SITE_UUID = process.env.NETIFY_SITE_UUID;
+const SITE_UUIDS_STR = process.env.NETIFY_SITE_UUIDS || process.env.NETIFY_SITE_UUID;
+const SITE_UUIDS = SITE_UUIDS_STR ? SITE_UUIDS_STR.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-async function collectForAgent(agentUuid, timestamp) {
+async function collectForAgent(agentUuid, timestamp, siteUuid) {
   const label = agentUuid || 'GLOBAL';
   console.log(`[Collector] → Fetching data for Agent: ${label}`);
 
   try {
     // 1. Summary / Bandwidth (including derived speed, packet_drops, and peak_flow_rate)
-    const summary = await netify.fetchBandwidthSummary(1440, agentUuid);
+    const summary = await netify.fetchBandwidthSummary(1440, agentUuid, siteUuid);
     if (summary) {
       let download_speed = 0;
       let upload_speed = 0;
@@ -63,7 +64,7 @@ async function collectForAgent(agentUuid, timestamp) {
       await new Summary({
         timestamp,
         agent_uuid: agentUuid,
-        site_uuid: SITE_UUID,
+        site_uuid: siteUuid,
         ...summary,
         download_speed,
         upload_speed,
@@ -77,10 +78,10 @@ async function collectForAgent(agentUuid, timestamp) {
     }
 
     // 2. Top Apps
-    const apps = await netify.fetchTopApps(1440, 200, agentUuid);
+    const apps = await netify.fetchTopApps(1440, 200, agentUuid, siteUuid);
     if (apps && apps.length > 0) {
       const appDocs = apps.map(app => ({
-        timestamp, agent_uuid: agentUuid, site_uuid: SITE_UUID,
+        timestamp, agent_uuid: agentUuid, site_uuid: siteUuid,
         app_label: app.application?.label || 'Unknown',
         download: app.download || 0, upload: app.upload || 0, flows: app.flows || 0,
       }));
@@ -89,19 +90,19 @@ async function collectForAgent(agentUuid, timestamp) {
     }
 
     // Collect Secondary Telemetry (categories, TLS, countries, DHCP, User Agents, BitTorrent)
-    await collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify, label);
+    await collectSecondaryTelemetry(agentUuid, timestamp, siteUuid, netify, label);
 
-    // 3. Devices & Apps
-    const ipToMacMap = await collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, netify, label);
+    // 2. Devices & App Records
+    const ipToMacMap = await collectDevicesAndApps(agentUuid, timestamp, siteUuid, netify, label);
 
-    // 4. Flows
-    await collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipToMacMap);
+    // 3. Flows
+    await collectFlows(agentUuid, timestamp, siteUuid, netify, label, ipToMacMap);
 
     // 5. Threats
-    await collectThreats(agentUuid, timestamp, SITE_UUID, netify, label);
+    await collectThreats(agentUuid, timestamp, siteUuid, netify, label);
 
     // 6. Events
-    await collectEvents(agentUuid, timestamp, SITE_UUID, netify, label);
+    await collectEvents(agentUuid, timestamp, siteUuid, netify, label);
 
     return { success: true, agent_uuid: agentUuid };
   } catch (err) {
@@ -114,37 +115,59 @@ async function collectAllAgents() {
   const timestamp = new Date();
   const timeString = timestamp.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
   console.log(`[Collector] === MODE: ALL AGENTS === Started at ${timeString}`);
-  const agents = await netify.fetchAgents();
-  if (!agents || agents.length === 0) {
-    console.warn('[Collector] No agents found from DPI API. Check credentials.');
-    return { success: false, mode: 'all', message: 'No agents found', results: [] };
-  }
-  console.log(`[Collector] Found ${agents.length} agents: ${agents.map(a => a.uuid).join(', ')}`);
+  
   const results = [];
-  for (const agent of agents) {
-    const result = await collectForAgent(agent.uuid, timestamp);
-    results.push({ ...result, agent_label: agent.label });
+  let totalAgents = 0;
+  
+  if (SITE_UUIDS.length === 0) {
+    console.warn('[Collector] No NETIFY_SITE_UUIDS configured.');
+    return { success: false, mode: 'all', message: 'No sites configured', results: [] };
   }
+
+  for (const siteUuid of SITE_UUIDS) {
+    console.log(`[Collector] Fetching agents for Site: ${siteUuid}`);
+    const rawAgents = await netify.fetchAgents(siteUuid);
+    if (!rawAgents || rawAgents.length === 0) {
+      console.warn(`[Collector] No agents found for site ${siteUuid}.`);
+      continue;
+    }
+    
+    let agents = rawAgents;
+
+    if (agents.length === 0) {
+      console.warn(`[Collector] No mapped agents matched for site ${siteUuid}. Skipping.`);
+      continue;
+    }
+
+    totalAgents += agents.length;
+    console.log(`[Collector] Processing ${agents.length} agents for site ${siteUuid}: ${agents.map(a => a.uuid).join(', ')}`);
+    
+    for (const agent of agents) {
+      const result = await collectForAgent(agent.uuid, timestamp, siteUuid);
+      results.push({ ...result, agent_label: agent.label, site_uuid: siteUuid });
+    }
+  }
+
   const successful = results.filter(r => r.success).length;
-  console.log(`[Collector] === ALL AGENTS DONE === ${successful}/${agents.length} successful`);
+  console.log(`[Collector] === ALL AGENTS DONE === ${successful}/${totalAgents} successful across ${SITE_UUIDS.length} sites`);
   
   await pruneOldData().catch(err => console.error('[Collector] [Retention] error:', err.message));
   
-  return { success: true, mode: 'all', agents_count: agents.length, successful };
+  return { success: true, mode: 'all', agents_count: totalAgents, successful };
 }
 
-async function collectSpecificAgent(agentUuid) {
+async function collectSpecificAgent(agentUuid, siteUuid = SITE_UUIDS[0]) {
   const timestamp = new Date();
   const timeString = timestamp.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
   console.log(`[Collector] === MODE: SPECIFIC AGENT ${agentUuid} === Started at ${timeString}`);
-  const result = await collectForAgent(agentUuid, timestamp);
+  const result = await collectForAgent(agentUuid, timestamp, siteUuid);
   
   await pruneOldData().catch(err => console.error('[Collector] [Retention] error:', err.message));
   
   return { success: result.success, mode: 'specific', agent_uuid: agentUuid };
 }
 
-async function collectSpecificAgents(agentUuids, delayMs = 5000) {
+async function collectSpecificAgents(agentUuids, siteUuid = SITE_UUIDS[0], delayMs = 5000) {
   const timestamp = new Date();
   const timeString = timestamp.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
   console.log(`[Collector] === MODE: SPECIFIC AGENTS [${agentUuids.join(', ')}] === Started at ${timeString}`);
@@ -154,7 +177,7 @@ async function collectSpecificAgents(agentUuids, delayMs = 5000) {
       console.log(`[Collector] Waiting ${delayMs}ms before next agent...`);
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
-    const result = await collectForAgent(agentUuids[i], timestamp);
+    const result = await collectForAgent(agentUuids[i], timestamp, siteUuid);
     results.push(result);
   }
   const successful = results.filter(r => r.success).length;

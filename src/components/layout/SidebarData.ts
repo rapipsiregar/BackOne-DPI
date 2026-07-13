@@ -13,35 +13,35 @@ export const NAVIGATION_GROUPS = [
   {
     title: "INFRASTRUCTURE",
     items: [
-      { name: "Devices", href: "/devices", icon: Router },
-      { name: "Agents", href: "/agents", icon: Server },
       { name: "Topology", href: "/network-infrastructure", icon: Globe },
+      { name: "Agents", href: "/agents", icon: Server },
+      { name: "Devices", href: "/devices", icon: Router },
     ]
   },
   {
-    title: "MONITORING",
+    title: "TRAFFIC & ANALYTICS",
     items: [
       { name: "Flows", href: "/flows", icon: Activity },
       { name: "Apps", href: "/apps", icon: AppWindow },
+      { name: "Traffic Categories", href: "/network-intelligence", icon: Activity },
       { name: "DNS", href: "/dns", icon: Radio },
-      { name: "Events", href: "/events", icon: Zap },
+      { name: "Geo Traffic", href: "/geography", icon: Globe },
+      { name: "BackOne Metadata", href: "/dpi-analytics", icon: Activity },
     ]
   },
   {
-    title: "MANAGEMENT",
+    title: "SECURITY & ALERTS",
+    items: [
+      { name: "Threat Intelligence Feeds", href: "/intelligence", icon: Shield },
+      { name: "Threats", href: "/threats", icon: ShieldAlert },
+      { name: "Events", href: "/events", icon: Zap },
+      { name: "Encryption Audit (TLS)", href: "/security-audit", icon: Lock },
+    ]
+  },
+  {
+    title: "TOOLS & MANAGEMENT",
     items: [
       { name: "Lookup", href: "/lookup", icon: Search },
-      { name: "Threats", href: "/threats", icon: ShieldAlert },
-    ]
-  },
-  {
-    title: "SYSTEM",
-    items: [
-      { name: "Geo Traffic", href: "/geography", icon: Globe },
-      { name: "Traffic Categories", href: "/network-intelligence", icon: Activity },
-      { name: "Encryption Audit (TLS)", href: "/security-audit", icon: Lock },
-      { name: "Threat Intelligence Feeds", href: "/intelligence", icon: Shield },
-      { name: "BackOne Metadata", href: "/dpi-analytics", icon: Activity },
     ]
   }
 ];

@@ -21,7 +21,7 @@ export default function AgentMacTab({ macBandwidth }: Props) {
     <div className="space-y-3">
       <div className="space-y-2">
         {paginated.map((m, i) => {
-          const maxTotal = Math.max(...macBandwidth.map(x => x.total ?? 0), 1);
+          const maxTotal = macBandwidth.reduce((max: number, x: any) => Math.max(max, x.total ?? 0), 1);
           const pct = ((m.total ?? 0) / maxTotal) * 100;
           return (
             <div key={i} className="p-3 bg-white/[0.03] hover:bg-white/[0.06] border border-border/50 rounded-xl transition-colors">

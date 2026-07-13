@@ -12,16 +12,23 @@ router.get('/devices', async (req, res) => {
     const timeFilter = getTimeFilter(req);
     const query      = getBaseFilter(req, timeFilter);
 
-    let dbQuery = DeviceStat.find(query).sort({ timestamp: -1, download: -1 }).skip(skip);
-    if (limit > 0) dbQuery = dbQuery.limit(limit);
+    const pipeline = [
+      { $match: query },
+      { $sort: { timestamp: -1 } },
+      { $group: { _id: "$ip_address", doc: { $first: "$$ROOT" } } },
+      { $replaceRoot: { newRoot: "$doc" } },
+      { $sort: { timestamp: -1, download: -1 } }
+    ];
+
+    if (skip > 0) pipeline.push({ $skip: skip });
+    if (limit > 0) pipeline.push({ $limit: limit });
 
     const [data, customLabelsMap] = await Promise.all([
-      dbQuery,
+      DeviceStat.aggregate(pipeline),
       getCustomLabelsMap()
     ]);
 
-    const mapped = data.map(d => {
-      const obj = d.toObject();
+    const mapped = data.map(obj => {
       const ip = obj.ip_address;
       
       const mac = obj.mac_address && obj.mac_address !== '-' ? obj.mac_address : generateMacFromIp(ip);
@@ -125,7 +132,7 @@ router.get('/security-devices', async (req, res) => {
     const baseFilter = getBaseFilter(req, timeFilter);
 
     const uniqueDevices = await DeviceStat.aggregate([
-      { $match: { site_uuid: baseFilter.site_uuid } },
+      { $match: baseFilter },
       { $sort: { timestamp: -1 } },
       { $group: {
           _id: '$ip_address',
@@ -173,6 +180,7 @@ router.get('/security-devices', async (req, res) => {
       const label = baseLabel && baseLabel !== '-' && baseLabel !== 'Unknown' && baseLabel !== 'Generic Client'
         ? baseLabel
         : generateAutoLabel(ip, mac, man, type);
+      const lastSeen = obj.last_seen || obj.timestamp || new Date().toISOString();
 
       const fStat = flowMap[ip] || { total: 0, encrypted: 0 };
       const encrypted = fStat.encrypted;
@@ -197,7 +205,8 @@ router.get('/security-devices', async (req, res) => {
         unencrypted,
         encrypted_pct,
         risk_level,
-        has_insecure: unencrypted > encrypted * 2
+        has_insecure: unencrypted > encrypted * 2,
+        timestamp: lastSeen
       };
     });
 

@@ -44,6 +44,8 @@ export interface DnsStat {
   query_count: number;
   app_label: string | null;
   category: string | null;
+  last_seen?: string;
+  timestamp?: string;
 }
 
 export interface EventStat {
@@ -62,6 +64,7 @@ export interface TlsVersionStat {
   download: number;
   upload: number;
   total: number;
+  timestamp?: string;
 }
 
 export interface TlsCipherStat {
@@ -70,6 +73,9 @@ export interface TlsCipherStat {
   download: number;
   upload: number;
   total: number;
+  timestamp?: string;
+  security_status?: 'Secure' | 'Weak' | 'Vulnerable' | 'Moderate' | 'Unknown';
+  description?: string;
 }
 
 export interface TlsSecurityStat {
@@ -79,6 +85,7 @@ export interface TlsSecurityStat {
   download: number;
   upload: number;
   total: number;
+  timestamp?: string;
 }
 
 export interface IntelligenceStats {
@@ -178,6 +185,7 @@ export interface SslSanStat {
   upload: number;
   flows: number;
   total: number;
+  timestamp?: string;
 }
 
 export interface ContinentStat {

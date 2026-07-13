@@ -57,7 +57,12 @@ module.exports = async function deviceDetailsHandler(req, res, helpers) {
 
     if (!ip && mac) {
       const dev = await DeviceStat.findOne({ mac_address: mac }).sort({ timestamp: -1 }).lean();
-      if (dev) ip = dev.ip_address;
+      if (dev) {
+        ip = dev.ip_address;
+      } else {
+        const flow = await Flow.findOne({ src_mac: mac }).sort({ timestamp: -1 }).lean();
+        if (flow) ip = flow.src_ip;
+      }
     }
     if (!ip) return res.status(400).json({ ok: false, message: 'ip or mac required' });
 
@@ -90,7 +95,7 @@ module.exports = async function deviceDetailsHandler(req, res, helpers) {
     const [deviceAppStats, flowsQuery, rawThreats] = await Promise.all([
       // PRIMARY: per-device per-app from DPI API (stored by proxy Step 3b)
       DeviceAppStat.find(appFilter).sort({ timestamp: -1 }).lean(),
-      Flow.find({ ...flowFilter, $or: [{ src_ip: ip }, { dst_ip: ip }] }).sort({ timestamp: -1 }).lean(),
+      Flow.find({ ...flowFilter, $or: [{ src_ip: ip }, { dst_ip: ip }] }).sort({ timestamp: -1 }).limit(2000).lean(),
       Threat.find({ ...(agentUuid ? { agent_uuid: agentUuid } : {}), ip_address: ip })
             .sort({ detected_at: -1 }).lean(),
     ]);
@@ -134,7 +139,9 @@ module.exports = async function deviceDetailsHandler(req, res, helpers) {
 
       if (f.app_label) bump(protocolsMap, f.app_label, down, up, ls);
       else if (f.protocol) bump(protocolsMap, f.protocol, down, up, ls);
-      if (f.domain) bump(domainsMap, f.domain, down, up, ls);
+      
+      const domainVal = f.sni_hostname || f.domain;
+      if (domainVal) bump(domainsMap, domainVal, down, up, ls);
       if (f.dst_ip) bump(destinationsMap, f.dst_ip, down, up, ls);
     }
 
@@ -178,8 +185,8 @@ module.exports = async function deviceDetailsHandler(req, res, helpers) {
         dst_ip:    f.dst_ip,
         dst_port:  f.dst_port,
         protocol:  f.protocol,
-        app_label: inferAppFromDomain(f.domain) || f.app_label || 'Other',
-        domain:    f.domain    || null,
+        app_label: inferAppFromDomain(f.sni_hostname || f.domain) || f.app_label || 'Other',
+        domain:    f.sni_hostname || f.domain || null,
         download:  f.download  || 0,
         upload:    f.upload    || 0,
         last_seen: f.last_seen || (f.timestamp ? new Date(f.timestamp).toISOString() : null),

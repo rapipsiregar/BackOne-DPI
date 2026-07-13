@@ -13,7 +13,7 @@ import {
 import { MetadataDetailPanel } from "@/components/dpi/MetadataDetailPanel";
 import { MetadataDetailType } from "@/lib/api-metadata-detail";
 import { useTimeFilter } from "@/contexts/TimeFilterContext";
-import { fmtBytes } from "@/lib/utils";
+import { fmtBytes, getKnownDomainService } from "@/lib/utils";
 
 // Clickable hint badge shown in table column headers when rows are interactive
 function ClickHint() {
@@ -80,7 +80,18 @@ export default function DpiAnalyticsPage() {
                   isLoading={loadingSni}
                   onRowClick={(row: any) => openDetail("sni_hostname", row.sni_hostname)}
                   columns={[
-                    { header: "Hostname", accessor: (row: any) => row.sni_hostname },
+                    { 
+                      header: "Hostname", 
+                      accessor: (row: any) => {
+                        const srv = getKnownDomainService(row.sni_hostname);
+                        return (
+                          <div className="flex flex-col items-center justify-center py-1 w-full overflow-hidden text-center">
+                            <span className="truncate w-full block" title={row.sni_hostname}>{row.sni_hostname}</span>
+                            {srv && <span className="text-[10px] font-medium text-indigo-400 mt-0.5 truncate w-full block" title={srv}>{srv}</span>}
+                          </div>
+                        );
+                      }
+                    },
                     { header: "Total",    accessor: (row: any) => fmtBytes(row.total) },
                   ]}
                 />
@@ -95,7 +106,18 @@ export default function DpiAnalyticsPage() {
                   isLoading={loadingSslCn}
                   onRowClick={(row: any) => openDetail("ssl_server_cn", row.ssl_server_cn)}
                   columns={[
-                    { header: "Common Name", accessor: (row: any) => row.ssl_server_cn },
+                    { 
+                      header: "Common Name", 
+                      accessor: (row: any) => {
+                        const srv = getKnownDomainService(row.ssl_server_cn);
+                        return (
+                          <div className="flex flex-col items-center justify-center py-1 w-full overflow-hidden text-center">
+                            <span className="truncate w-full block" title={row.ssl_server_cn}>{row.ssl_server_cn}</span>
+                            {srv && <span className="text-[10px] font-medium text-indigo-400 mt-0.5 truncate w-full block" title={srv}>{srv}</span>}
+                          </div>
+                        );
+                      }
+                    },
                     { header: "Total",       accessor: (row: any) => fmtBytes(row.total) },
                   ]}
                 />
@@ -110,7 +132,18 @@ export default function DpiAnalyticsPage() {
                   isLoading={loadingQuic}
                   onRowClick={(row: any) => openDetail("quic_hostname", row.quic_hostname)}
                   columns={[
-                    { header: "Hostname", accessor: (row: any) => row.quic_hostname },
+                    { 
+                      header: "Hostname", 
+                      accessor: (row: any) => {
+                        const srv = getKnownDomainService(row.quic_hostname);
+                        return (
+                          <div className="flex flex-col items-center justify-center py-1 w-full overflow-hidden text-center">
+                            <span className="truncate w-full block" title={row.quic_hostname}>{row.quic_hostname}</span>
+                            {srv && <span className="text-[10px] font-medium text-indigo-400 mt-0.5 truncate w-full block" title={srv}>{srv}</span>}
+                          </div>
+                        );
+                      }
+                    },
                     { header: "Total",    accessor: (row: any) => fmtBytes(row.total) },
                   ]}
                 />

@@ -123,7 +123,7 @@ export function DataTable<T>({
                 setQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full max-w-sm rounded-lg border border-border bg-card/30 backdrop-blur-sm pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-card/50 transition-all shadow-sm"
+              className="w-full max-w-sm rounded-lg border border-border bg-card/30 backdrop-blur-sm pl-9 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-card/50 transition-all shadow-sm"
             />
           </div>
         )}
@@ -138,16 +138,16 @@ export function DataTable<T>({
           </button>
         )}
       </div>
-      <div className="rounded-xl border border-border bg-card/50 backdrop-blur-xl shadow-sm overflow-visible">
-        <div className="w-full overflow-visible">
+      <div className="rounded-xl border border-border bg-card/50 backdrop-blur-xl shadow-sm overflow-hidden">
+        <div className="w-full max-h-[400px] overflow-y-auto custom-scrollbar [&::-webkit-scrollbar-track]:mt-[48px]">
           <table className="w-full text-sm text-left table-fixed">
-            <thead className="bg-secondary/30 text-muted-foreground border-b border-border/50 relative z-20">
+            <thead className="bg-slate-900 text-muted-foreground border-b border-border/50 sticky top-0 z-20">
               <tr>
                 {columns.map((col, i) => (
                   <th 
                     key={i} 
                     onClick={() => col.sortable && handleSort(i)}
-                    className={`px-4 py-3.5 h-[48px] font-medium tracking-wide whitespace-nowrap ${col.className?.includes("text-") ? "" : "text-center"} ${col.className || ""} ${col.sortable ? "cursor-pointer hover:bg-white/5 transition-colors group select-none" : ""}`}
+                    className={`px-4 py-3.5 h-[48px] font-medium tracking-wide whitespace-nowrap ${col.className?.includes("text-") ? "" : "text-center"} ${col.className || ""} ${col.sortable ? "cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors group select-none" : ""}`}
                   >
                     <div className={`flex items-center gap-1 ${col.className?.includes("text-") && !col.className?.includes("text-center") ? "" : "justify-center"}`}>
                       {col.header}
@@ -196,7 +196,7 @@ export function DataTable<T>({
                     className={`hover:bg-primary/5 border-b border-border/50 transition-colors duration-200 group h-[48px] ${onRowClick ? "cursor-pointer hover:bg-primary/10" : ""} ${getRowClassName ? getRowClassName(row) : ""}`}
                   >
                     {columns.map((col, j) => (
-                      <td key={j} className={`px-2 py-3 h-[48px] max-h-[48px] overflow-hidden text-foreground group-hover:text-white transition-colors truncate whitespace-nowrap ${col.className?.includes("text-") ? "" : "text-center"} ${col.className || ""}`}>
+                      <td key={j} className={`px-2 py-3 h-[48px] max-h-[48px] overflow-hidden text-foreground transition-colors truncate whitespace-nowrap ${col.className?.includes("text-") ? "" : "text-center"} ${col.className || ""}`}>
                         {col.accessor(row, i)}
                       </td>
                     ))}
@@ -210,17 +210,17 @@ export function DataTable<T>({
         {filteredData.length > pageSize && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-border/50 bg-card/30">
             <div className="text-sm text-muted-foreground">
-              Showing <span className="font-medium text-white">{startIndex + 1}</span> to{" "}
-              <span className="font-medium text-white">
+              Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+              <span className="font-medium text-foreground">
                 {Math.min(startIndex + pageSize, filteredData.length)}
               </span>{" "}
-              of <span className="font-medium text-white">{filteredData.length}</span> results
+              of <span className="font-medium text-foreground">{filteredData.length}</span> results
             </div>
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm font-medium rounded-md bg-secondary/80 text-white hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-border/50"
+                className="px-3 py-1.5 text-sm font-medium rounded-md bg-secondary/80 text-foreground hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-border/50"
               >
                 Previous
               </button>
@@ -230,7 +230,7 @@ export function DataTable<T>({
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm font-medium rounded-md bg-secondary/80 text-white hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-border/50"
+                className="px-3 py-1.5 text-sm font-medium rounded-md bg-secondary/80 text-foreground hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-border/50"
               >
                 Next
               </button>

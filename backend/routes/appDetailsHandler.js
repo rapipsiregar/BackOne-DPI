@@ -228,11 +228,8 @@ module.exports = async function appDetailsHandler(req, res, helpers) {
       // Enrich domain & protocol info from Flow if available
       const flows = await Flow.find({
         ...baseFilter,
-        $or: [
-          { app_label: label },
-          { domain: { $regex: label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }
-        ]
-      }).sort({ timestamp: -1 }).lean();
+        app_label: label
+      }).sort({ timestamp: -1 }).limit(100).lean();
 
       flows.forEach(f => {
         const ip = f.src_ip;

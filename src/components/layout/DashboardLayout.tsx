@@ -5,6 +5,7 @@ import { Sidebar } from "./Sidebar";
 import { getViewAsStatusSync, stopViewAs } from "@/lib/admin-api";
 import { AlertTriangle, LogOut, Clock, ShieldAlert, Loader2 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { HelpCenterFAB } from "@/components/ui/HelpCenterFAB";
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const [viewAs, setViewAs] = useState<{ active: boolean; agent_label?: string; agent_uuid?: string }>({ active: false });
@@ -160,6 +161,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
       </Modal>
+
+      {/* Global Help Center Drawer */}
+      <HelpCenterFAB />
     </div>
   );
 }

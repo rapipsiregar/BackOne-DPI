@@ -20,10 +20,10 @@ const PORT_SERVICE_MAP = {
   9993: 'ZeroTier VPN',
 };
 
-async function fetchAgents() {
+async function fetchAgents(siteUuid = null) {
   const data = await netifyFetch('/data/stats/top/agent/download', {
     filter_interval: 43200, settings_limit: 100
-  }, null);
+  }, null, siteUuid);
   if (!data || !Array.isArray(data)) return [];
   const list = data
     .map(r => ({ id: r.agent?.id, uuid: r.agent?.uuid, label: r.agent?.label }))
@@ -34,11 +34,11 @@ async function fetchAgents() {
   return list;
 }
 
-async function fetchBandwidthSummary(interval = 1440, agentUuid = null) {
+async function fetchBandwidthSummary(interval = 1440, agentUuid = null, siteUuid = null) {
   const [dlData, ulData, flowsData] = await Promise.all([
-    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: interval, settings_limit: 500 }, agentUuid),
-    netifyFetch('/data/stats/top/local_ip/upload', { filter_interval: interval, settings_limit: 500 }, agentUuid),
-    netifyFetch('/data/stats/top/local_ip/flow_count', { filter_interval: interval, settings_limit: 500 }, agentUuid),
+    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: interval, settings_limit: 500 }, agentUuid, siteUuid),
+    netifyFetch('/data/stats/top/local_ip/upload', { filter_interval: interval, settings_limit: 500 }, agentUuid, siteUuid),
+    netifyFetch('/data/stats/top/local_ip/flow_count', { filter_interval: interval, settings_limit: 500 }, agentUuid, siteUuid),
   ]);
   const bandwidth_down = dlData?.reduce((s, r) => s + (r.download ?? 0), 0) ?? 0;
   const bandwidth_up   = ulData?.reduce((s, r) => s + (r.upload ?? 0), 0) ?? 0;
@@ -47,10 +47,10 @@ async function fetchBandwidthSummary(interval = 1440, agentUuid = null) {
   return { bandwidth_down, bandwidth_up, total_devices, active_flows, total_threats: 0 };
 }
 
-async function fetchTopApps(interval = 1440, limit = 200, agentUuid = null) {
+async function fetchTopApps(interval = 1440, limit = 200, agentUuid = null, siteUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: limit }, agentUuid),
-    netifyFetch('/data/stats/top/application/upload', { filter_interval: interval, settings_limit: limit }, agentUuid),
+    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
+    netifyFetch('/data/stats/top/application/upload', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -72,10 +72,10 @@ async function fetchTopApps(interval = 1440, limit = 200, agentUuid = null) {
   }));
 }
 
-async function fetchDiscoveredDevices(interval = 1440, limit = 500, agentUuid = null) {
+async function fetchDiscoveredDevices(interval = 1440, limit = 500, agentUuid = null, siteUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: interval, settings_limit: limit }, agentUuid),
-    netifyFetch('/data/stats/top/local_ip/upload', { filter_interval: interval, settings_limit: limit }, agentUuid),
+    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
+    netifyFetch('/data/stats/top/local_ip/upload', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
   ]);
   if (!dlData) return null;
   const ulMap = {};
@@ -102,11 +102,11 @@ async function fetchDiscoveredDevices(interval = 1440, limit = 500, agentUuid = 
   }).filter(d => d.ip_address);
 }
 
-async function fetchDeviceApps(ipAddress, interval = 1440, limit = 50, agentUuid = null) {
+async function fetchDeviceApps(ipAddress, interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
   const ipFilter = JSON.stringify([ipAddress]);
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: limit, filter_local_ips: ipFilter }, agentUuid),
-    netifyFetch('/data/stats/top/application/upload', { filter_interval: interval, settings_limit: limit, filter_local_ips: ipFilter }, agentUuid),
+    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: limit, filter_local_ips: ipFilter }, agentUuid, siteUuid),
+    netifyFetch('/data/stats/top/application/upload', { filter_interval: interval, settings_limit: limit, filter_local_ips: ipFilter }, agentUuid, siteUuid),
   ]);
   if (!dlData || !Array.isArray(dlData)) return [];
   const ulMap = {};
@@ -125,10 +125,10 @@ async function fetchDeviceApps(ipAddress, interval = 1440, limit = 50, agentUuid
   })).filter(a => a.download > 0 || a.upload > 0);
 }
 
-async function fetchFlows(limit = 10000, agentUuid = null) {
+async function fetchFlows(limit = 10000, agentUuid = null, siteUuid = null) {
   const [raw, sniRaw] = await Promise.all([
-    netifyFetch('/data/flows', { settings_limit: limit }, agentUuid),
-    netifyFetch('/data/stats/top/tls_sni/download', { filter_interval: 1440, settings_limit: 50 }, agentUuid),
+    netifyFetch('/data/flows', { settings_limit: limit }, agentUuid, siteUuid),
+    netifyFetch('/data/stats/top/tls_sni/download', { filter_interval: 1440, settings_limit: 50 }, agentUuid, siteUuid),
   ]);
   if (!raw || !Array.isArray(raw)) return null;
   const sniList = [];
@@ -160,8 +160,8 @@ async function fetchFlows(limit = 10000, agentUuid = null) {
   }).filter(f => f.src_ip);
 }
 
-async function fetchCyberThreats(agentUuid = null) {
-  const ipRepData = await netifyFetch('/data/stats/top/remote_ip/download', { filter_interval: 1440, settings_limit: 50 }, agentUuid);
+async function fetchCyberThreats(agentUuid = null, siteUuid = null) {
+  const ipRepData = await netifyFetch('/data/stats/top/remote_ip/download', { filter_interval: 1440, settings_limit: 50 }, agentUuid, siteUuid);
   if (!ipRepData || !Array.isArray(ipRepData)) return [];
   const SUSPICIOUS_PORTS = new Set([23, 4444, 1337, 6667, 31337, 12345, 54321, 4899, 5554, 9999]);
   const threats = [];
@@ -184,8 +184,8 @@ async function fetchCyberThreats(agentUuid = null) {
   return threats;
 }
 
-async function fetchEvents(limit = 100, agentUuid = null) {
-  const raw = await netifyFetch('/event/events', { settings_limit: limit }, agentUuid);
+async function fetchEvents(limit = 100, agentUuid = null, siteUuid = null) {
+  const raw = await netifyFetch('/event/events', { settings_limit: limit }, agentUuid, siteUuid);
   if (!raw || !Array.isArray(raw)) return [];
   return raw.map(r => {
     let msg = r.label || '';

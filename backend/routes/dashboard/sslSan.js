@@ -24,6 +24,7 @@ router.get('/ssl-subject-alt-names', async (req, res) => {
           download: { $sum: '$download' },
           upload:   { $sum: '$upload' },
           flows:    { $sum: '$flows' },
+          timestamp: { $max: '$timestamp' },
       }},
       { $project: {
           alt_name: '$_id',
@@ -31,6 +32,7 @@ router.get('/ssl-subject-alt-names', async (req, res) => {
           upload:   1,
           flows:    1,
           total:    { $add: ['$download', '$upload'] },
+          timestamp: 1,
           _id:      0
       }},
       { $sort: { total: -1 } },
@@ -46,6 +48,7 @@ router.get('/ssl-subject-alt-names', async (req, res) => {
             download: { $sum: '$download' },
             upload:   { $sum: '$upload' },
             flows:    { $sum: '$flows' },
+            timestamp: { $max: '$timestamp' },
         }},
         { $project: {
             alt_name: '$_id',
@@ -53,6 +56,7 @@ router.get('/ssl-subject-alt-names', async (req, res) => {
             upload:   1,
             flows:    1,
             total:    { $add: ['$download', '$upload'] },
+            timestamp: 1,
             _id:      0
         }},
         { $sort: { total: -1 } },

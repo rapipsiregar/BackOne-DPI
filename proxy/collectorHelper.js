@@ -12,12 +12,15 @@ const {
   CountryStat,
   ProtocolStat,
   SslSubjectAltNameStat,
+  SniHostnameStat,
+  SslServerCnStat,
+  QuicHostnameStat,
 } = require('./models/Schemas');
 
 async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify, label) {
   try {
     // 2b. App Categories
-    const categories = await netify.fetchTopAppCategories(1440, 50, agentUuid);
+    const categories = await netify.fetchTopAppCategories(1440, 50, agentUuid, SITE_UUID);
     if (categories && categories.length > 0) {
       const catDocs = categories.map(c => ({
         timestamp,
@@ -33,7 +36,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2c. TLS Versions
-    const tlsVersions = await netify.fetchTlsVersions(1440, 50, agentUuid);
+    const tlsVersions = await netify.fetchTlsVersions(1440, 50, agentUuid, SITE_UUID);
     if (tlsVersions && tlsVersions.length > 0) {
       const tvDocs = tlsVersions.map(v => ({
         timestamp,
@@ -49,7 +52,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2d. TLS Ciphers
-    const tlsCiphers = await netify.fetchTlsCiphers(1440, 50, agentUuid);
+    const tlsCiphers = await netify.fetchTlsCiphers(1440, 50, agentUuid, SITE_UUID);
     if (tlsCiphers && tlsCiphers.length > 0) {
       const tcDocs = tlsCiphers.map(c => ({
         timestamp,
@@ -65,7 +68,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2e. TLS Security
-    const tlsSecurity = await netify.fetchTlsSecurity(1440, 50, agentUuid);
+    const tlsSecurity = await netify.fetchTlsSecurity(1440, 50, agentUuid, SITE_UUID);
     if (tlsSecurity && tlsSecurity.length > 0) {
       const tsDocs = tlsSecurity.map(s => ({
         timestamp,
@@ -81,7 +84,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2f. Top Countries
-    const countries = await netify.fetchTopCountries(1440, 100, agentUuid);
+    const countries = await netify.fetchTopCountries(1440, 100, agentUuid, SITE_UUID);
     if (countries && countries.length > 0) {
       const coDocs = countries.map(c => ({
         timestamp,
@@ -98,7 +101,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2g. Top Protocols
-    const protocols = await netify.fetchTopProtocols(1440, 50, agentUuid);
+    const protocols = await netify.fetchTopProtocols(1440, 50, agentUuid, SITE_UUID);
     if (protocols && protocols.length > 0) {
       const protoDocs = protocols.map(p => ({
         timestamp,
@@ -112,6 +115,42 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
       await ProtocolStat.insertMany(protoDocs);
       console.log(`[Collector]   ✓ ${protoDocs.length} protocols saved for ${label}`);
     }
+
+    // 2h. SNI Hostnames
+    const snis = await netify.fetchSniHostnames(1440, 10000, agentUuid, SITE_UUID);
+    if (snis && snis.length > 0) {
+      const sniDocs = snis.map(s => ({
+        timestamp, agent_uuid: agentUuid, site_uuid: SITE_UUID,
+        sni_hostname: (s.sni_hostname && String(s.sni_hostname).trim() !== '') ? s.sni_hostname : 'Unknown',
+        download: s.download || 0, upload: s.upload || 0, flows: s.flows || 0,
+      }));
+      await SniHostnameStat.insertMany(sniDocs);
+      console.log(`[Collector]   ✓ ${sniDocs.length} SNI hostnames saved for ${label}`);
+    }
+
+    /* -- COMMENTED OUT DUE TO NETIFY API HTTP 422 (UNSUPPORTED TIER) --
+    // 2i. SSL Server Common Names
+    const cns = await netify.fetchSslServerCn(1440, 50, agentUuid);
+    if (cns && cns.length > 0) {
+      const cnDocs = cns.map(c => ({
+        timestamp, agent_uuid: agentUuid, site_uuid: SITE_UUID,
+        ssl_server_cn: c.ssl_server_cn, download: c.download || 0, upload: c.upload || 0, flows: c.flows || 0,
+      }));
+      await SslServerCnStat.insertMany(cnDocs);
+      console.log(`[Collector]   ✓ ${cnDocs.length} SSL Server CNs saved for ${label}`);
+    }
+
+    // 2j. QUIC Hostnames
+    const quics = await netify.fetchQuicHostnames(1440, 50, agentUuid);
+    if (quics && quics.length > 0) {
+      const quicDocs = quics.map(q => ({
+        timestamp, agent_uuid: agentUuid, site_uuid: SITE_UUID,
+        quic_hostname: q.quic_hostname, download: q.download || 0, upload: q.upload || 0, flows: q.flows || 0,
+      }));
+      await QuicHostnameStat.insertMany(quicDocs);
+      console.log(`[Collector]   ✓ ${quicDocs.length} QUIC hostnames saved for ${label}`);
+    }
+    */
 
     // NOTE: The following API fields are not supported on this subscription (HTTP 422):
     //   dhcp_class, http_useragent, bittorrent_info_hash, ssl_subject_alt_name

@@ -7,8 +7,8 @@ import { fetcher } from './api';
 // Global memory cache to prevent UI reloading flicker when changing pages
 export const globalCache: Record<string, any> = {};
 
-// Auto-refresh interval: 5 minutes (matches proxy cron schedule)
-export const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+// Auto-refresh interval: 1 minute (as requested by user)
+export const REFRESH_INTERVAL_MS = 60 * 1000;
 
 /**
  * Generic hook factory with:

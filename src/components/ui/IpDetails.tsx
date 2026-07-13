@@ -54,7 +54,7 @@ export function IpDetails({ ip }: { ip: string }) {
   const isLocal = details.country === "Local";
 
   return (
-    <div className="text-[10px] leading-tight mt-0.5 max-w-[180px] truncate">
+    <div className="text-[10px] leading-tight mt-0.5 max-w-[180px] truncate" title={`${details.isp}${!isLocal ? ` • ${details.country}` : ''}`}>
       <span className={isLocal ? "text-emerald-500/90 font-medium" : "text-cyan-400/90 font-medium"}>
         {details.isp}
       </span>

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Calendar } from "lucide-react";
+import { ChevronDown, Calendar, Activity } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountSettingsModal } from "./AccountSettingsModal";
@@ -12,6 +12,7 @@ import { getViewAsHeaders } from "@/lib/admin-api";
 import { NAVIGATION_GROUPS, TIME_OPTIONS } from "./SidebarData";
 import SidebarProfile from "./SidebarProfile";
 import SidebarNotifications from "./SidebarNotifications";
+
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -24,6 +25,10 @@ export function Sidebar() {
 
   const timeDropdownRef = useRef<HTMLDivElement>(null);
   const selectedTimeOption = TIME_OPTIONS.find(opt => opt.value === timeRange) || TIME_OPTIONS[3];
+
+  const [selectedSite, setSelectedSite] = useState<string>("6681452d_9cae_4ff4_8ae8_0d504774265e");
+  const [isSiteDropdownOpen, setIsSiteDropdownOpen] = useState(false);
+  const siteDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch('/api/auth/me', { headers: getViewAsHeaders() })
@@ -50,15 +55,33 @@ export function Sidebar() {
         }
       })
       .catch(() => { });
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('backone_site_uuid');
+      if (stored) setSelectedSite(stored);
+    }
   }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (timeDropdownRef.current && !timeDropdownRef.current.contains(event.target as Node)) setIsTimeDropdownOpen(false);
+      if (siteDropdownRef.current && !siteDropdownRef.current.contains(event.target as Node)) setIsSiteDropdownOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const handleSiteSelect = (val: string) => {
+    setSelectedSite(val);
+    localStorage.setItem('backone_site_uuid', val);
+    setIsSiteDropdownOpen(false);
+    window.location.reload();
+  };
+
+  const getSiteLabel = (uuid: string) => {
+    if (uuid === 'd7902405_0dc2_458b_8584_ed4d24b64f24') return 'Nexus';
+    return 'SIAB';
+  };
 
   return (
     <div className="flex h-full max-h-screen flex-col border-r border-white/5 bg-black/20 backdrop-blur-3xl transition-all w-64 shrink-0 relative z-40 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)]">
@@ -73,8 +96,65 @@ export function Sidebar() {
             <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold mt-1">
               Deep Package Inspection
             </span>
+            <div className="flex items-center gap-1.5 mt-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold px-2 py-0.5 rounded-full w-fit">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              DPI ENGINE: ACTIVE
+            </div>
           </div>
         </div>
+
+        {/* Global Site Switcher Widget (Visible to SUPER_ADMIN, SOC_ANALYST, ENGINEER) */}
+        {user && ['SUPER_ADMIN', 'SOC_ANALYST', 'ENGINEER'].includes(user.role || '') && (
+          <div className="relative w-full px-2" ref={siteDropdownRef}>
+            <button
+              onClick={() => setIsSiteDropdownOpen(!isSiteDropdownOpen)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] p-2.5 text-xs text-slate-300 transition-colors"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Activity className="h-3.5 w-3.5 text-primary shrink-0" />
+                <div className="flex flex-col items-start truncate leading-normal">
+                  <span className="font-semibold text-[10px] text-primary uppercase tracking-wider">Active Site</span>
+                  <span className="truncate max-w-[130px]">{getSiteLabel(selectedSite)}</span>
+                </div>
+              </div>
+              <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-300", isSiteDropdownOpen && "rotate-180")} />
+            </button>
+
+            <div
+              className={cn(
+                "absolute top-full left-2 right-2 mt-1 rounded-xl border border-white/10 bg-slate-950 p-1.5 shadow-2xl z-50 origin-top transition-all duration-300 ease-out",
+                isSiteDropdownOpen
+                  ? "opacity-100 scale-100 pointer-events-auto translate-y-0"
+                  : "opacity-0 scale-95 pointer-events-none -translate-y-2"
+              )}
+            >
+              <div className="flex flex-col gap-0.5">
+                <button
+                  onClick={() => handleSiteSelect('6681452d_9cae_4ff4_8ae8_0d504774265e')}
+                  className={cn(
+                    "w-full rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors",
+                    selectedSite === '6681452d_9cae_4ff4_8ae8_0d504774265e'
+                      ? "bg-primary/20 text-white font-medium"
+                      : "text-slate-400 hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  SIAB
+                </button>
+                <button
+                  onClick={() => handleSiteSelect('d7902405_0dc2_458b_8584_ed4d24b64f24')}
+                  className={cn(
+                    "w-full rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors",
+                    selectedSite === 'd7902405_0dc2_458b_8584_ed4d24b64f24'
+                      ? "bg-primary/20 text-white font-medium"
+                      : "text-slate-400 hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  Nexus
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Global Time Filter Widget */}
         <div className="relative w-full px-2 pb-2" ref={timeDropdownRef}>
@@ -92,30 +172,36 @@ export function Sidebar() {
             <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-300", isTimeDropdownOpen && "rotate-180")} />
           </button>
 
-          {isTimeDropdownOpen && (
-            <div className="absolute top-full left-2 right-2 mt-1 rounded-xl border border-white/10 bg-slate-950 p-1.5 shadow-2xl z-50">
-              <div className="flex flex-col gap-0.5 max-h-60 overflow-y-auto custom-scrollbar">
-                {TIME_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => {
-                      setTimeRange(opt.value);
-                      setIsTimeDropdownOpen(false);
-                    }}
-                    className={cn(
-                      "w-full rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors",
-                      timeRange === opt.value
-                        ? "bg-primary/20 text-white font-medium"
-                        : "text-slate-400 hover:bg-white/5 hover:text-white"
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+          <div
+            className={cn(
+              "absolute top-full left-2 right-2 mt-1 rounded-xl border border-white/10 bg-slate-950 p-1.5 shadow-2xl z-50 origin-top transition-all duration-300 ease-out",
+              isTimeDropdownOpen
+                ? "opacity-100 scale-100 pointer-events-auto translate-y-0"
+                : "opacity-0 scale-95 pointer-events-none -translate-y-2"
+            )}
+          >
+            <div className="flex flex-col gap-0.5 max-h-60 overflow-y-auto custom-scrollbar">
+              {TIME_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => {
+                    setTimeRange(opt.value);
+                    setIsTimeDropdownOpen(false);
+                  }}
+                  className={cn(
+                    "w-full rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors",
+                    timeRange === opt.value
+                      ? "bg-primary/20 text-white font-medium"
+                      : "text-slate-400 hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
         </div>
+
       </div>
 
       {/* Navigation (Flexible Scrollable Container for Rule 9) */}

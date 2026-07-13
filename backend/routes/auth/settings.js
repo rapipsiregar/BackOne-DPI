@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 const User = require('../../models/User');
-const { requireAuth, makeToken, setCookieToken, upload } = require('./helpers');
+const { requireAuth, makeToken, setCookieToken, upload, getUploadsDir } = require('./helpers');
 
 const router = express.Router();
 
@@ -128,7 +128,7 @@ router.post('/remove-profile-picture', requireAuth, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     if (user.profile_picture) {
-      const filePath = path.join(__dirname, '..', '..', 'uploads', user.profile_picture);
+      const filePath = path.join(getUploadsDir(), user.profile_picture);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
 

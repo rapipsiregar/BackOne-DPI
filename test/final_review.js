@@ -18,11 +18,22 @@ console.log('\n╔════════════════════�
 console.log('║   FINAL REVIEW — Original Request Deliverables      ║');
 console.log('╚══════════════════════════════════════════════════════╝\n');
 
-const dash    = r('backend/routes/dashboard.js');
+const dash    = r('backend/routes/dashboard.js') +
+                 r('backend/routes/dashboard/helpers.js') +
+                 r('backend/routes/dashboard/summary.js') +
+                 r('backend/routes/dashboard/apps.js') +
+                 r('backend/routes/dashboard/devices.js') +
+                 r('backend/routes/dashboard/flows.js') +
+                 r('backend/routes/dashboard/threats.js') +
+                 r('backend/routes/dashboard/geo.js') +
+                 r('backend/routes/dashboard/tls.js') +
+                 r('backend/routes/dashboard/telemetry.js') +
+                 r('backend/routes/dashboard/events.js') +
+                 r('backend/routes/dashboard/agents.js');
 const auth    = r('backend/routes/auth.js');
 const server  = r('backend/server.js');
 const sched   = r('proxy/scheduler.js');
-const coll    = r('proxy/collector.js');
+const coll    = r('proxy/collector.js') + r('proxy/collectorHelperDpi2.js');
 const compose = r('docker-compose.yml');
 const envFile = r('.env.local');
 const proxyIdx = r('proxy/index.js');

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Shield } from "lucide-react";
 import { Pagination } from "./Pagination";
+import { UniversalFilters, useUniversalFilterState, FilterConfig } from "./UniversalFilters";
 
 interface Props {
   threats: any[];
@@ -17,15 +18,13 @@ interface ColDef {
 function TableWrap({ children, cols }: { children: React.ReactNode; cols: ColDef[] }) {
   return (
     <div className="overflow-x-auto overflow-y-auto max-h-[60vh] rounded-xl border border-border/50 bg-secondary/10 custom-scrollbar">
-      <table className="w-full text-xs text-left whitespace-nowrap min-w-[700px]">
+      <table className="w-full text-xs text-center table-fixed whitespace-nowrap min-w-[700px]">
         <thead className="sticky top-0 bg-[#111827] z-10">
           <tr className="border-b border-border">
             {cols.map((c) => (
               <th
                 key={c.header}
-                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] ${
-                  c.align === "center" ? "text-center" : c.align === "right" ? "text-right" : "text-left"
-                } ${c.width}`}
+                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] text-center ${c.width}`}
               >
                 {c.header}
               </th>
@@ -40,11 +39,11 @@ function TableWrap({ children, cols }: { children: React.ReactNode; cols: ColDef
   );
 }
 
-function Cell({ value, className = "", center = false, right = false }: { value: string | number; className?: string; center?: boolean; right?: boolean }) {
+function Cell({ value, className = "", center = true, right = false }: { value: string | number; className?: string; center?: boolean; right?: boolean }) {
   const str = String(value ?? "—");
-  const align = center ? "text-center" : right ? "text-right" : "";
+  const align = center ? "text-center" : right ? "text-right" : "text-center";
   return (
-    <div className={`truncate overflow-hidden text-ellipsis ${align} ${className}`} title={str}>
+    <div className={`truncate overflow-hidden text-ellipsis flex items-center justify-center w-full ${align} ${className}`} title={str}>
       {str || "—"}
     </div>
   );
@@ -54,9 +53,31 @@ export default function DeviceThreatsTab({ threats }: Props) {
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
-  const totalPages = Math.ceil(threats.length / pageSize);
+  const { 
+    filters,
+    handleFilterChange,
+    handleReset, activeCount 
+  } = useUniversalFilterState();
+
+  const opts = (key: string) => {
+    const raw = Array.from(new Set(threats.map((r: any) => String(r[key] || "")).filter(Boolean)));
+    return raw.sort();
+  };
+
+  const filterConfigs: FilterConfig[] = [
+    { id: "severity", label: "Severity", type: "select", value: filters.severity, options: opts("severity") },
+    { id: "threat_type", label: "Threat Type", type: "select", value: filters.threat_type, options: opts("threat_type") },
+  ];
+
+  const filteredData = threats.filter((row: any) => {
+    if (filters.severity && filters.severity !== "All" && row.severity !== filters.severity) return false;
+    if (filters.threat_type && filters.threat_type !== "All" && row.threat_type !== filters.threat_type) return false;
+    return true;
+  });
+
+  const totalPages = Math.ceil(filteredData.length / pageSize);
   const startIndex = (page - 1) * pageSize;
-  const paginated = threats.slice(startIndex, startIndex + pageSize);
+  const paginated = filteredData.slice(startIndex, startIndex + pageSize);
 
   if (threats.length === 0) {
     return (
@@ -71,14 +92,22 @@ export default function DeviceThreatsTab({ threats }: Props) {
   }
 
   const COLS: ColDef[] = [
-    { header: "Time",      width: "w-[150px]", align: "center" },
-    { header: "Type",      width: "min-w-[150px] w-full" },
-    { header: "Severity",  width: "w-[100px]", align: "center" },
-    { header: "Target IP", width: "min-w-[120px]" },
+    { header: "#",         width: "w-[5%]", align: "center" },
+    { header: "Time",      width: "w-[25%]", align: "center" },
+    { header: "Type",      width: "w-[40%]", align: "center" },
+    { header: "Severity",  width: "w-[15%]", align: "center" },
+    { header: "Target IP", width: "w-[15%]", align: "center" },
   ];
 
   return (
     <div className="space-y-3">
+      <UniversalFilters
+        filters={filterConfigs}
+        onChange={(id, val) => { handleFilterChange(id, val); setPage(1); }}
+        showDateRange={false}
+        activeFilterCount={activeCount}
+        onReset={() => { handleReset(); setPage(1); }}
+      />
       <TableWrap cols={COLS}>
         {paginated.map((t: any, i: number) => {
           const sev = (t.severity || '').toLowerCase();
@@ -89,13 +118,16 @@ export default function DeviceThreatsTab({ threats }: Props) {
           const timeStr = t.detected_at ? new Date(t.detected_at).toLocaleString() : '-';
           return (
             <tr key={i} className="hover:bg-red-500/5 transition-colors duration-150">
+              <td className="px-3 py-2.5"><Cell value={startIndex + i + 1} center /></td>
               <td className="px-3 py-2.5"><Cell value={timeStr} className="text-muted-foreground" center /></td>
               <td className="px-3 py-2.5">
-                <div
-                  title={t.description || t.threat_type || "-"}
-                  className="font-semibold text-card-foreground text-xs truncate max-w-full cursor-help hover:text-primary transition-colors block"
-                >
-                  {t.threat_type || "-"}
+                <div className="flex items-center justify-center w-full">
+                  <div
+                    title={t.description || t.threat_type || "-"}
+                    className="font-semibold text-card-foreground text-xs truncate max-w-full cursor-help hover:text-primary transition-colors block text-center"
+                  >
+                    {t.threat_type || "-"}
+                  </div>
                 </div>
               </td>
               <td className="px-3 py-2.5 text-center">
@@ -103,20 +135,22 @@ export default function DeviceThreatsTab({ threats }: Props) {
                   {t.severity || "Unknown"}
                 </span>
               </td>
-              <td className="px-3 py-2.5"><Cell value={t.dst_ip || t.ip_address || "-"} className="font-mono text-muted-foreground" /></td>
+              <td className="px-3 py-2.5"><Cell value={t.dst_ip || t.ip_address || "-"} className="font-mono text-muted-foreground" center /></td>
             </tr>
           );
         })}
       </TableWrap>
-      {totalPages > 0 && (
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          onPageChange={setPage}
-          totalResults={threats.length}
-          startIndex={startIndex}
-          endIndex={startIndex + pageSize}
-        />
+      {totalPages > 1 && (
+        <div className="pt-2">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            totalResults={filteredData.length}
+            startIndex={startIndex}
+            endIndex={startIndex + pageSize}
+          />
+        </div>
       )}
     </div>
   );

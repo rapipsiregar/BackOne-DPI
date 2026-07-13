@@ -183,6 +183,7 @@ AppStatSchema.index({ agent_uuid: 1, timestamp: -1, download: -1 });
 DeviceStatSchema.index({ agent_uuid: 1, ip_address: 1 }, { unique: true });
 FlowSchema.index({ agent_uuid: 1, timestamp: -1 });
 FlowSchema.index({ agent_uuid: 1, flow_id: 1 });
+FlowSchema.index({ site_uuid: 1, app_label: 1, timestamp: -1 });
 ThreatSchema.index({ agent_uuid: 1, timestamp: -1 });
 AppCategoryStatSchema.index({ agent_uuid: 1, timestamp: -1 });
 EventSchema.index({ agent_uuid: 1, timestamp: -1 });
@@ -213,6 +214,22 @@ const DeviceAppStatSchema = new mongoose.Schema({
 }, baseOptions);
 DeviceAppStatSchema.index({ agent_uuid: 1, ip_address: 1, timestamp: -1 });
 DeviceAppStatSchema.index({ ip_address: 1, app_label: 1, timestamp: -1 });
+DeviceAppStatSchema.index({ site_uuid: 1, app_label: 1, timestamp: -1 });
+
+// ─── Lookup App Dictionary ────────────────────────────────────────────────────
+const LookupAppSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true, index: true },
+  tag: String,
+  label: { type: String, index: true },
+  name: String,
+  full_name: String,
+  description: String,
+  favicon: String,
+  icon: String,
+  logo: String,
+  application_category: Object
+}, baseOptions);
+LookupAppSchema.index({ label: 1, tag: 1 });
 
 
 // ─── DPI Telemetry Property Schemas (SNI, SSL, QUIC, SSH, mDNS, DHCP, UA, BT)
@@ -234,6 +251,7 @@ module.exports = {
   TlsCipherStat: mongoose.model('TlsCipherStat', TlsCipherStatSchema),
   TlsSecurityStat: mongoose.model('TlsSecurityStat', TlsSecurityStatSchema),
   CountryStat:     mongoose.model('CountryStat',     CountryStatSchema),
+  LookupApp:       mongoose.model('LookupApp',       LookupAppSchema),
   ...telemetrySchemas,
 };
 

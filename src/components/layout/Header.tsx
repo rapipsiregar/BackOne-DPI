@@ -1,10 +1,22 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import ViewAsAgentBanner from "@/components/admin/ViewAsAgentBanner";
+
 
 export function Header() {
   const pathname = usePathname();
+  const [userRole, setUserRole] = useState<string>("");
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => {
+        if (d.user?.role) setUserRole(d.user.role);
+      })
+      .catch(console.error);
+  }, []);
 
   const getPageTitle = () => {
     if (pathname === "/apps") return "Applications";
@@ -34,9 +46,9 @@ export function Header() {
           </h1>
         </div>
         
-        {/* Right Side: Empty for extreme minimalist look */}
+        {/* Right Side */}
         <div className="flex items-center">
-          {/* Ornamen lain bisa ditambahkan di masa depan jika diperlukan */}
+          {/* Site switcher moved to Sidebar */}
         </div>
       </div>
     </div>

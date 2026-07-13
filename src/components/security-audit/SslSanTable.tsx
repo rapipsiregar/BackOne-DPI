@@ -6,11 +6,17 @@ import { DataTable, Column } from "@/components/ui/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Loader2, Info } from "lucide-react";
 import { fmtBytes } from "@/lib/utils";
+import { TimestampCell } from "@/components/ui/TimestampCell";
 
 export default function SslSanTable() {
   const { data, isLoading } = useSslSans(100);
 
   const columns: Column<SslSanStat>[] = [
+    {
+      header: "Timestamp",
+      className: "w-[150px] min-w-[150px] max-w-[150px] text-center",
+      accessor: (row) => <TimestampCell timestamp={row.timestamp} showActiveStatus={false} />
+    },
     { 
       header: "#", 
       accessor: (_, i) => i + 1, 

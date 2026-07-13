@@ -163,11 +163,69 @@ app.post('/collect/agents', async (req, res) => {
 app.get('/agents', async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {
-      return res.json({ ok: false, agents: [], count: 0, error: 'MongoDB not connected' });
+      return res.status(503).json({ ok: false, error: 'MongoDB not connected.' });
     }
-    const { Summary } = require('./models/Schemas');
-    const agents = await Summary.distinct('agent_uuid');
-    res.json({ ok: true, count: agents.length, agents });
+    const { DashboardSummary } = require('../backend/models/Schemas');
+    const agents = await DashboardSummary.distinct('agent_uuid');
+    res.json({ ok: true, data: agents });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * GET /domain-details
+ * Fetch live IP/MAC details for a specific domain from Netify API
+ * Fetch live IP/MAC details for a specific domain from MongoDB
+ */
+app.get('/domain-details', async (req, res) => {
+  const { domain, agentUuid } = req.query;
+  if (!domain) return res.status(400).json({ ok: false, error: 'domain is required' });
+  
+  try {
+    const { Flow, DeviceStat } = require('../backend/models/Schemas');
+    
+    const filter = { domain: domain };
+    if (agentUuid) {
+      filter.agent_uuid = agentUuid;
+    }
+    
+    const raw = await Flow.find(filter).sort({ timestamp: -1 }).limit(100).lean();
+    if (!raw || !Array.isArray(raw)) {
+      return res.json({ ok: true, data: [] });
+    }
+
+    const results = [];
+    const seen = new Set();
+    
+    for (const r of raw) {
+      const ip = r.src_ip;
+      const mac = r.src_mac;
+      if (!ip || !mac) continue;
+      
+      const key = `${ip}-${mac}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      let deviceName = 'Unknown Device';
+      try {
+        const dev = await DeviceStat.findOne({ mac_address: mac }).sort({ timestamp: -1 });
+        if (dev && dev.name && dev.name !== 'Unknown Device') {
+          deviceName = dev.name;
+        }
+      } catch (e) {
+        // ignore timeout errors
+      }
+
+      results.push({
+        ip,
+        mac,
+        deviceName,
+        lastSeen: r.timestamp || r.last_seen || r.first_seen,
+      });
+    }
+
+    res.json({ ok: true, data: results });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }

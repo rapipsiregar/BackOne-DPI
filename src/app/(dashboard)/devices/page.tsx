@@ -4,74 +4,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
 import { useState, useEffect, useRef } from "react";
+import { TimestampCell } from "@/components/ui/TimestampCell";
 import { DeviceStat } from "@/lib/api";
 import { useDevices } from "@/lib/api-with-context";
 import { fmtBytes } from "@/lib/utils";
 import { Loader2, ChevronRight, ChevronDown } from "lucide-react";
 
-const FilterSelect = ({ value, onChange, options, placeholder }: { value: string; onChange: (val: string) => void; options: string[]; placeholder: string }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const isActive = value !== "All";
-  const displayValue = placeholder;
-
-  return (
-    <div className="relative w-full max-w-[140px] mx-auto flex justify-center" ref={dropdownRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center justify-center gap-1.5 w-full py-1 font-medium text-sm transition-colors outline-none ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-white'}`}
-      >
-        <span className="truncate max-w-[110px]">{displayValue}</span>
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-500 flex-shrink-0 ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-
-      {/* Animated Dropdown Menu */}
-      <div 
-        className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-[200px] max-h-[300px] overflow-y-auto bg-slate-900 border border-border/50 rounded-lg shadow-xl z-50 flex flex-col py-1 transition-all duration-500 ease-in-out origin-top ${isOpen ? "opacity-100 scale-y-100 translate-y-0 pointer-events-auto" : "opacity-0 scale-y-90 -translate-y-2 pointer-events-none"}`}
-      >
-        <button
-          onClick={() => { onChange("All"); setIsOpen(false); }}
-          className={`px-3 py-2 text-sm text-left whitespace-normal break-words transition-colors w-full ${value === "All" ? "bg-primary/20 text-white font-medium" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}
-        >
-          Default
-        </button>
-        {options.map((opt) => (
-          <button
-            key={opt}
-            onClick={() => { onChange(opt); setIsOpen(false); }}
-            className={`px-3 py-2 text-sm text-left whitespace-normal break-words transition-colors w-full ${value === opt ? "bg-primary/20 text-white font-medium" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}
-            title={opt}
-          >
-            {opt}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
+import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
 
 export default function DevicesPage() {
   const [mounted, setMounted] = useState(false);
   const devices = useDevices(5000);
   const [selectedDevice, setSelectedDevice] = useState<DeviceStat | null>(null);
 
-  const [filterMan, setFilterMan] = useState<string>("All");
-  const [filterType, setFilterType] = useState<string>("All");
-  const [filterOS, setFilterOS] = useState<string>("All");
-  
-  const [sortDownload, setSortDownload] = useState<string>("All");
-  const [sortUpload, setSortUpload] = useState<string>("All");
+  const { 
+    filters, dateFrom, dateTo, 
+    handleFilterChange, setDateFrom, setDateTo, 
+    handleReset, activeCount 
+  } = useUniversalFilterState();
 
   useEffect(() => {
     setMounted(true);
@@ -79,24 +29,26 @@ export default function DevicesPage() {
 
   if (!mounted) return null;
 
-  const manufacturers = Array.from(new Set(devices.data?.map(d => d.manufacturer).filter(Boolean) || [])).filter(v => v !== "-").sort() as string[];
-  const deviceTypes = Array.from(new Set(devices.data?.map(d => d.device_type).filter(Boolean) || [])).filter(v => v !== "-").sort() as string[];
-  const osLabels = Array.from(new Set(devices.data?.map(d => d.os_label).filter(Boolean) || [])).filter(v => v !== "-").sort() as string[];
+  const all = devices.data || [];
+
+  const opts = (key: string) => {
+    const raw = Array.from(new Set(all.map((r: any) => String(r[key] || "")).filter(Boolean)));
+    return raw.sort();
+  };
+
+  const filterConfigs: FilterConfig[] = [
+    { id: "device_type", label: "Device Type", type: "select", value: filters.device_type, options: opts("device_type") },
+    { id: "os_label", label: "OS", type: "select", value: filters.os_label, options: opts("os_label") },
+    { id: "manufacturer", label: "Manufacturer", type: "select", value: filters.manufacturer, options: opts("manufacturer") },
+    { id: "sort_download", label: "Sort Download", type: "select", value: filters.sort_download, options: ["Descending", "Ascending"] },
+    { id: "sort_upload", label: "Sort Upload", type: "select", value: filters.sort_upload, options: ["Descending", "Ascending"] },
+  ];
 
   const columns: Column<DeviceStat>[] = [
     { 
       header: "Last Seen", 
       className: "w-[13%]",
-      accessor: (row) => {
-        const dateStr = row.last_seen ? new Date(row.last_seen) : null;
-        if (!dateStr) return "-";
-        return (
-          <div className="flex flex-col items-center justify-center gap-0.5">
-            <span className="text-sm font-medium">{dateStr.toLocaleDateString()}</span>
-            <span className="text-[10px] text-muted-foreground">{dateStr.toLocaleTimeString()}</span>
-          </div>
-        );
-      }
+      accessor: (row) => <TimestampCell timestamp={row.last_seen} showActiveStatus={true} />
     },
     { header: "#", accessor: (row, i) => i + 1, className: "w-[4%]" },
     {
@@ -148,38 +100,63 @@ export default function DevicesPage() {
       },
     },
     { 
-      header: <FilterSelect value={filterType} onChange={setFilterType} options={deviceTypes} placeholder="Type" />, 
+      header: "Type", 
       accessor: (row) => row.device_type || "-", 
       className: "w-[11%]" 
     },
     { 
-      header: <FilterSelect value={filterOS} onChange={setFilterOS} options={osLabels} placeholder="OS" />, 
+      header: "OS", 
       accessor: (row) => row.os_label || "-", 
       className: "w-[11%]" 
     },
     { 
-      header: <FilterSelect value={filterMan} onChange={setFilterMan} options={manufacturers} placeholder="Manufacturer" />, 
+      header: "Manufacturer", 
       accessor: (row) => row.manufacturer || "-", 
       className: "w-[14%]" 
     },
     {
-      header: <FilterSelect value={sortDownload} onChange={(val) => { setSortDownload(val); setSortUpload("All"); }} options={["Descending", "Ascending"]} placeholder="Download" />,
+      header: "Download",
       accessor: (row) => <span className="text-cyan-400">{fmtBytes(row.download)}</span>,
       className: "w-[9%]",
     },
     {
-      header: <FilterSelect value={sortUpload} onChange={(val) => { setSortUpload(val); setSortDownload("All"); }} options={["Descending", "Ascending"]} placeholder="Upload" />,
+      header: "Upload",
       accessor: (row) => <span className="text-green-400">{fmtBytes(row.upload)}</span>,
       className: "w-[9%]",
     },
   ];
 
-  let processedData = [...(devices.data || [])];
+  const filteredData = all.filter((row: any) => {
+    if (filters.device_type && filters.device_type !== "All" && row.device_type !== filters.device_type) return false;
+    if (filters.os_label && filters.os_label !== "All" && row.os_label !== filters.os_label) return false;
+    if (filters.manufacturer && filters.manufacturer !== "All" && row.manufacturer !== filters.manufacturer) return false;
+    
+    if (dateFrom || dateTo) {
+      const d = row.last_seen ? new Date(row.last_seen).toISOString().slice(0, 10) : "";
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo && d > dateTo) return false;
+    }
+    return true;
+  });
+
+  let processedData = [...filteredData];
+  const sortUpload = filters.sort_upload || "All";
+  const sortDownload = filters.sort_download || "All";
+  
   if (sortUpload !== "All") {
     processedData.sort((a, b) => sortUpload === "Descending" ? b.upload - a.upload : a.upload - b.upload);
   } else if (sortDownload !== "All") {
     processedData.sort((a, b) => sortDownload === "Descending" ? b.download - a.download : a.download - b.download);
   }
+
+  const minTime = all.reduce((min: number, r: any) => {
+    if (r.last_seen) {
+      const time = new Date(r.last_seen).getTime();
+      if (isFinite(time) && time < min) return time;
+    }
+    return min;
+  }, Infinity);
+  const minDate = minTime !== Infinity ? new Date(minTime).toISOString().slice(0, 10) : "2024-01-01";
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
@@ -196,11 +173,31 @@ export default function DevicesPage() {
         </div>
       </div>
 
+      <UniversalFilters
+        filters={filterConfigs}
+        onChange={(id, val) => {
+          if (id === 'sort_download') {
+            handleFilterChange('sort_download', val);
+            handleFilterChange('sort_upload', 'All');
+          } else if (id === 'sort_upload') {
+            handleFilterChange('sort_upload', val);
+            handleFilterChange('sort_download', 'All');
+          } else {
+            handleFilterChange(id, val);
+          }
+        }}
+        showDateRange={true}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        minDate={minDate}
+        onDateChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+        activeFilterCount={activeCount}
+        onReset={handleReset}
+      />
+
       <Card className="bg-card/80 backdrop-blur-xl border-border/50 animate-slide-up" style={{ animationDelay: "100ms" }}>
         <CardHeader className="border-b border-border/50 pb-4 mb-4">
-          <CardTitle className="text-lg text-white">
-            Active Devices {devices.data ? `(${devices.data.length})` : ""}
-          </CardTitle>
+          <CardTitle className="text-white">Active Devices ({processedData.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -216,11 +213,7 @@ export default function DevicesPage() {
                 (row.device_type || "").toLowerCase().includes(q)
               );
 
-              const matchesMan = filterMan === "All" || row.manufacturer === filterMan;
-              const matchesType = filterType === "All" || row.device_type === filterType;
-              const matchesOS = filterOS === "All" || row.os_label === filterOS;
-
-              return matchesSearch && matchesMan && matchesType && matchesOS;
+              return matchesSearch;
             }}
             csvExport={{
               filename: `devices-${new Date().toISOString().slice(0,10)}.csv`,

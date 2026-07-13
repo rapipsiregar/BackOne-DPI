@@ -14,7 +14,7 @@ const {
 } = require('./deviceResolver');
 
 async function collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, netify, label) {
-  const devices = await netify.fetchDiscoveredDevices(1440, 500, agentUuid);
+  const devices = await netify.fetchDiscoveredDevices(1440, 500, agentUuid, SITE_UUID);
   const ipToMacMap = {};
   
   if (devices && devices.length > 0) {
@@ -56,7 +56,7 @@ async function collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, netify, la
       let deviceAppCount = 0;
       for (let i = 0; i < topDevices.length; i += 5) {
         const batch = topDevices.slice(i, i + 5);
-        const results = await Promise.allSettled(batch.map(d => netify.fetchDeviceApps(d.ip_address, 1440, 50, agentUuid)));
+        const results = await Promise.allSettled(batch.map(d => netify.fetchDeviceApps(d.ip_address, 1440, 50, agentUuid, SITE_UUID)));
         const appDocs = [];
         results.forEach((res, idx) => {
           if (res.status === 'fulfilled' && Array.isArray(res.value)) {
@@ -81,8 +81,9 @@ async function collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, netify, la
 }
 
 async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipToMacMap) {
-  const flowLimit = parseInt(process.env.PROXY_FLOW_LIMIT || '10000');
-  const flows = await netify.fetchFlows(flowLimit, agentUuid);
+  // Netify API has a hard limit of 1,000,000 for settings_limit.
+  const flowLimit = parseInt(process.env.PROXY_FLOW_LIMIT || '1000000');
+  const flows = await netify.fetchFlows(flowLimit, agentUuid, SITE_UUID);
   if (flows && flows.length > 0) {
     const flowDocs = flows.map(f => {
       const mac = f.src_mac || ipToMacMap[f.src_ip] || generateMacFromIp(f.src_ip);
@@ -91,6 +92,7 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
         flow_id: f.flow_id, src_ip: f.src_ip, src_mac: mac,
         dst_ip: f.dst_ip, dst_port: f.dst_port, protocol: f.protocol,
         app_label: f.app_label, domain: f.domain,
+        sni_hostname: f.tls?.sni || f.tls_sni || f.metadata?.tls_sni || (f.tls_server_name_indication || ''),
         download: f.download || 0, upload: f.upload || 0,
         first_seen: f.first_seen, last_seen: f.last_seen,
       };
@@ -106,17 +108,13 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
       await Flow.bulkWrite(operations);
       console.log(`[Collector]   ✓ ${flowDocs.length} flows upserted for ${label}`);
 
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      const pruned = await Flow.deleteMany({ agent_uuid: agentUuid, timestamp: { $lt: oneHourAgo } });
-      if (pruned.deletedCount > 0) {
-        console.log(`[Collector]   ✓ Pruned ${pruned.deletedCount} inactive flows for ${label}`);
-      }
+      // Removed 1-hour pruning to comply with Rule 19 (7-day global retention)
     }
   }
 }
 
 async function collectThreats(agentUuid, timestamp, SITE_UUID, netify, label) {
-  const threats = await netify.fetchCyberThreats(agentUuid);
+  const threats = await netify.fetchCyberThreats(agentUuid, SITE_UUID);
   if (threats && threats.length > 0) {
     const threatDocs = threats.map(t => ({
       timestamp, agent_uuid: agentUuid, site_uuid: SITE_UUID,
@@ -130,7 +128,7 @@ async function collectThreats(agentUuid, timestamp, SITE_UUID, netify, label) {
 }
 
 async function collectEvents(agentUuid, timestamp, SITE_UUID, netify, label) {
-  const events = await netify.fetchEvents(100, agentUuid);
+  const events = await netify.fetchEvents(100, agentUuid, SITE_UUID);
   if (events && events.length > 0) {
     const eventIds = events.map(e => e.event_id).filter(id => id !== null);
     const existing = await Event.find({ site_uuid: SITE_UUID, event_id: { $in: eventIds } }).distinct('event_id');

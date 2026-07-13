@@ -52,7 +52,7 @@ export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) 
 
   useEffect(() => {
     loadData(false);
-  }, [ip]);
+  }, [ip, mac]);
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: "info", label: "Overview", icon: Monitor },
@@ -83,13 +83,15 @@ export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) 
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h3 className="text-xl font-bold text-card-foreground tracking-tight">{ip}</h3>
+                <h3 className="text-xl font-bold text-card-foreground tracking-tight">
+                  {ip || data?.ip_address || 'Resolving IP...'}
+                </h3>
                 {isRefreshing && <RefreshCcw className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 animate-spin" />}
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {data?.device_label || deviceData?.device_label || 'Unknown Device'} 
                 <span className="text-border mx-2">•</span> 
-                <span className="font-mono text-xs">{data?.mac_address || deviceData?.mac_address || 'No MAC'}</span>
+                <span className="font-mono text-xs">{mac || data?.mac_address || deviceData?.mac_address || 'No MAC'}</span>
               </p>
               {data?.agent_label && (
                 <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">

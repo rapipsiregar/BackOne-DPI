@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { User as UserIcon, Sun, Moon, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { SafeImage } from "../ui/SafeImage";
 
 const ROLE_DISPLAY_NAMES: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
@@ -51,7 +52,7 @@ export default function SidebarProfile({ user, onOpenSettings }: ProfileProps) {
       >
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-primary to-blue-400 overflow-hidden">
           {user?.profile_picture ? (
-            <img src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
+            <SafeImage src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
           ) : (
             <span className="font-bold text-white uppercase text-xs">
               {initial}
@@ -69,7 +70,7 @@ export default function SidebarProfile({ user, onOpenSettings }: ProfileProps) {
           <div className="flex flex-col items-center justify-center p-3 mb-2 border-b border-border/50">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-primary to-blue-400 overflow-hidden mb-2">
               {user?.profile_picture ? (
-                <img src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
+                <SafeImage src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <span className="font-bold text-white uppercase text-lg">
                   {initial}

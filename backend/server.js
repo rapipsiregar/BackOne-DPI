@@ -50,8 +50,9 @@ app.use(cookieParser());
 
 // ─── Public Routes ────────────────────────────────────────────────────────────
 const authRoutes = require('./routes/auth');
+const { getUploadsDir } = require('./routes/auth/helpers');
 app.use('/api/auth', authRoutes);
-app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api/uploads', express.static(getUploadsDir()));
 
 // ─── Auth Middleware ──────────────────────────────────────────────────────────
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-backone-key';
@@ -209,8 +210,30 @@ app.get('/api/dashboard/device-details', requireAuth, (req, res) => {
   });
 });
 
+app.get('/api/dashboard/remote-ip-details', requireAuth, async (req, res) => {
+  require('./routes/remoteIpDetailsHandler')(req, res, {
+    getTimeFilter: (req) => {
+      const range = req.query.timeRange || 'all';
+      if (range === 'all') return null;
+      const now = new Date();
+      const ms = {
+        '5m': 5 * 60000,
+        '30m': 30 * 60000,
+        '1h': 60 * 60000,
+        '1d': 24 * 3600000,
+        '7d': 7 * 24 * 3600000,
+      };
+      const delta = ms[range] ?? ms['1h'];
+      return { $gte: new Date(now.getTime() - delta) };
+    }
+  });
+});
+
 const metadataDetailRoutes = require('./routes/metadataDetail');
 app.use('/api/dashboard/metadata-detail', requireAuth, metadataDetailRoutes);
+
+const categoryDetailRoutes = require('./routes/categoryDetail');
+app.use('/api/dashboard/category-detail', requireAuth, categoryDetailRoutes);
 
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 

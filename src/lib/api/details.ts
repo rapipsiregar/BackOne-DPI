@@ -2,7 +2,7 @@
 "use client";
 
 import { fetcher } from "./core";
-import { AgentDetails, DeviceDetails, AppDetails, SecurityDevice } from "../api-detail-types";
+import { AgentDetails, DeviceDetails, AppDetails, SecurityDevice, RemoteIpDetails } from "../api-detail-types";
 
 export async function fetchAgentDetails(uuid: string): Promise<AgentDetails> {
   return fetcher<AgentDetails>(`/agent-details?uuid=${encodeURIComponent(uuid)}`);
@@ -15,6 +15,13 @@ export async function fetchDeviceDetails(ip: string, timeRange: string = 'all', 
   if (agentUuid) query.push(`agent_uuid=${encodeURIComponent(agentUuid)}`);
   query.push(`timeRange=${timeRange}`);
   return fetcher<DeviceDetails>(`/device-details?${query.join('&')}`);
+}
+
+export async function fetchRemoteIpDetails(ip: string, timeRange: string = 'all'): Promise<RemoteIpDetails> {
+  const query = [];
+  if (ip) query.push(`ip=${encodeURIComponent(ip)}`);
+  query.push(`timeRange=${timeRange}`);
+  return fetcher<RemoteIpDetails>(`/remote-ip-details?${query.join('&')}`);
 }
 
 export async function fetchAppDetails(label: string, timeRange: string = '1h', agentUuid?: string | null): Promise<AppDetails> {

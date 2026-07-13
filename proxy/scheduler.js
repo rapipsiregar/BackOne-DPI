@@ -49,7 +49,7 @@ async function runCollection() {
       result = await collectAllAgents();
     }
     lastRunResult = { ...result, run_count: runCount };
-
+    
     // Log MongoDB database capacity usage (expensive full-scan aggregation).
     // Only run periodically (default: every 24h) to avoid high CPU/DB load each cycle.
     const now = Date.now();
@@ -58,7 +58,7 @@ async function runCollection() {
       const { logCapacityStats } = require('../backend/db/capacityTracker');
       await logCapacityStats(`[PROXY] [MongoDB] Capacity Used after Run #${runCount}:`);
     }
-
+    
     return lastRunResult;
   } catch (err) {
     console.error('[Scheduler] Unhandled error during collection:', err.message);
@@ -95,7 +95,11 @@ function startScheduler() {
   console.log('[Scheduler] Cron job registered. Starting initial collection...');
   
   // Initial run immediately on startup (async, do not block server start)
-  setTimeout(() => {
+  setTimeout(async () => {
+    // 1. Sync dictionary first
+    // await netifyClient.syncApplicationDictionary();
+    
+    // 2. Start normal telemetry collection
     runCollection().catch(err => console.error('[Scheduler] Initial run error:', err.message));
   }, 2000);
 }

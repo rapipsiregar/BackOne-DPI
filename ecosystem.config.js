@@ -2,11 +2,10 @@ module.exports = {
   apps: [
     {
       name: "backone-frontend",
-      script: "npm",
-      args: "start",
+      script: "./.next/standalone/server.js",
       env: {
         NODE_ENV: "production",
-        PORT: 3000
+        PORT: 8009
       }
     },
     {

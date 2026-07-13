@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Globe } from "lucide-react";
 import { fmtBytes } from "@/lib/utils";
 import { Pagination } from "./Pagination";
+import { UniversalFilters, useUniversalFilterState, FilterConfig } from "./UniversalFilters";
 
 interface Props {
   domains: any[];
@@ -15,9 +16,41 @@ export default function DeviceDomainsTab({ domains, totalDownload, totalUpload }
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
-  const totalPages = Math.ceil(domains.length / pageSize);
+  const { 
+    filters,
+    handleFilterChange,
+    handleReset, activeCount 
+  } = useUniversalFilterState();
+
+  const opts = (key: string) => {
+    const raw = Array.from(new Set(domains.map((r: any) => String(r[key] || "")).filter(Boolean)));
+    return raw.sort();
+  };
+
+  const filterConfigs: FilterConfig[] = [
+    { id: "app_label", label: "Domain", type: "select", value: filters.app_label, options: opts("app_label") },
+    { id: "sort_download", label: "Sort Download", type: "select", value: filters.sort_download, options: ["Descending", "Ascending"] },
+    { id: "sort_upload", label: "Sort Upload", type: "select", value: filters.sort_upload, options: ["Descending", "Ascending"] },
+  ];
+
+  const filteredData = domains.filter((row: any) => {
+    if (filters.app_label && filters.app_label !== "All" && row.app_label !== filters.app_label) return false;
+    return true;
+  });
+
+  let processedData = [...filteredData];
+  const sortUpload = filters.sort_upload || "All";
+  const sortDownload = filters.sort_download || "All";
+  
+  if (sortUpload !== "All") {
+    processedData.sort((a, b) => sortUpload === "Descending" ? b.upload - a.upload : a.upload - b.upload);
+  } else if (sortDownload !== "All") {
+    processedData.sort((a, b) => sortDownload === "Descending" ? b.download - a.download : a.download - b.download);
+  }
+
+  const totalPages = Math.ceil(processedData.length / pageSize);
   const startIndex = (page - 1) * pageSize;
-  const paginated = domains.slice(startIndex, startIndex + pageSize);
+  const paginated = processedData.slice(startIndex, startIndex + pageSize);
 
   const totalBytes = totalDownload + totalUpload;
 
@@ -35,6 +68,24 @@ export default function DeviceDomainsTab({ domains, totalDownload, totalUpload }
 
   return (
     <div className="space-y-3">
+      <UniversalFilters
+        filters={filterConfigs}
+        onChange={(id, val) => {
+          if (id === 'sort_download') {
+            handleFilterChange('sort_download', val);
+            handleFilterChange('sort_upload', 'All');
+          } else if (id === 'sort_upload') {
+            handleFilterChange('sort_upload', val);
+            handleFilterChange('sort_download', 'All');
+          } else {
+            handleFilterChange(id, val);
+          }
+          setPage(1);
+        }}
+        showDateRange={false}
+        activeFilterCount={activeCount}
+        onReset={() => { handleReset(); setPage(1); }}
+      />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {paginated.map((dom: any, i: number) => {
           const appBytes = dom.download + dom.upload;
@@ -55,19 +106,27 @@ export default function DeviceDomainsTab({ domains, totalDownload, totalUpload }
                   <span className="text-muted-foreground">Upload</span>
                   <span className="text-emerald-600 dark:text-emerald-400 font-mono font-medium">{fmtBytes(dom.upload)}</span>
                 </div>
+                {dom.last_seen && (
+                  <div className="flex justify-between mt-2 pt-2 border-t border-border/50">
+                    <span className="text-muted-foreground">Last Seen</span>
+                    <span className="text-muted-foreground font-medium">{new Date(dom.last_seen).toLocaleString()}</span>
+                  </div>
+                )}
               </div>
             </div>
           );
         })}
       </div>
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        totalResults={domains.length}
-        startIndex={startIndex}
-        endIndex={startIndex + pageSize}
-      />
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalResults={processedData.length}
+          startIndex={startIndex}
+          endIndex={startIndex + pageSize}
+        />
+      )}
     </div>
   );
 }

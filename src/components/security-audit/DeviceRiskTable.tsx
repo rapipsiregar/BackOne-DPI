@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
 import { ShieldCheck, ShieldAlert, Loader2, Info, ChevronDown } from "lucide-react";
 import { fmtBytes } from "@/lib/utils";
+import { TimestampCell } from "@/components/ui/TimestampCell";
 
 const RISK_CONFIG: Record<string, any> = {
   Vulnerable: { color: "text-red-400", bg: "bg-red-500/20 ring-red-500/40", icon: <ShieldAlert className="w-3.5 h-3.5" />, dot: "bg-red-500" },
@@ -74,6 +75,11 @@ export default function DeviceRiskTable({ secDevices, secDevicesLoading }: Props
   const [filterRisk, setFilterRisk] = useState<string>("All");
 
   const secDeviceColumns: Column<SecurityDevice>[] = [
+    {
+      header: "Timestamp",
+      className: "w-[150px] min-w-[150px] max-w-[150px] text-center",
+      accessor: (row) => <TimestampCell timestamp={row.timestamp} showActiveStatus={false} />
+    },
     { header: "#", accessor: (_, i) => i + 1, className: "w-[60px] min-w-[60px] max-w-[60px]" },
     {
       header: "IP Address",

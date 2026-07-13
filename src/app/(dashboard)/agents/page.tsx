@@ -6,12 +6,14 @@ import { getAgents, Agent } from "@/lib/actions/agents";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DataTable } from "@/components/ui/DataTable";
-import { Loader2, Plus, Server, CheckCircle2, XCircle, Activity } from "lucide-react";
+import { Cpu, History, Radio, Server, Activity, Plus, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 import { getAdminUsers, startViewAs, resolveAgentLabel, getViewAsHeaders, type ManagedUser } from "@/lib/admin-api";
 import { useTimeFilter } from "@/contexts/TimeFilterContext";
+import { usePollingKey } from "@/lib/usePolling";
 import { AgentModals } from "@/components/admin/AgentModals";
-import { getAgentColumns } from "./columns";
+import ExternalAccountModal from "@/components/admin/ExternalAccountModal";
+import { getAgentColumns, getExternalAccountColumns } from "./columns";
 
 export default function AgentsPage() {
   const router = useRouter();
@@ -29,9 +31,13 @@ export default function AgentsPage() {
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [accountModalAgent, setAccountModalAgent] = useState<{ uuid: string; label: string } | null>(null);
 
+  const [externalModalOpen, setExternalModalOpen] = useState(false);
+  const [externalModalUser, setExternalModalUser] = useState<ManagedUser | null>(null);
+
   const [viewAsLoading, setViewAsLoading] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const { timeRange } = useTimeFilter();
+  const refreshKey = usePollingKey(60000); // Auto-refresh every 60 seconds (1 minute)
 
   const loadUptime = async () => {
     try {
@@ -64,8 +70,9 @@ export default function AgentsPage() {
   const loadAgents = async () => {
     setIsLoading(true);
     try {
+      const siteUuid = localStorage.getItem("backone_site_uuid") || undefined;
       const [agentData, userData] = await Promise.allSettled([
-        getAgents(),
+        getAgents(siteUuid),
         getAdminUsers(),
       ]);
       if (agentData.status === 'fulfilled') setAgents(agentData.value);
@@ -122,6 +129,19 @@ export default function AgentsPage() {
     }
   }, [role]);
 
+  useEffect(() => {
+    if (role && role !== 'AGENT_VIEWER' && refreshKey > 0) {
+      const siteUuid = localStorage.getItem("backone_site_uuid") || undefined;
+      getAgents(siteUuid)
+        .then(data => setAgents(data))
+        .catch(err => console.warn("Failed to auto-refresh agents:", err));
+      loadUptime();
+      if (role === 'SUPER_ADMIN') {
+        loadStorage();
+      }
+    }
+  }, [refreshKey, role]);
+
   const openDelete = (agent: Agent) => {
     setSelectedAgent(agent);
     setIsDeleteOpen(true);
@@ -145,6 +165,12 @@ export default function AgentsPage() {
   const offlineAgents = totalAgents - onlineAgents;
   const uptimeValues = agents.map(a => uptimeMap[a.uuid || a.serial] ?? 100);
   const avgUptime = uptimeValues.length > 0 ? uptimeValues.reduce((s, v) => s + v, 0) / uptimeValues.length : 100;
+
+  const externalUsers = managedUsers.filter(u => u.role !== 'AGENT_VIEWER');
+  const externalColumns = getExternalAccountColumns((user) => {
+    setExternalModalUser(user);
+    setExternalModalOpen(true);
+  });
 
   return (
     <div className="space-y-6">
@@ -230,6 +256,45 @@ export default function AgentsPage() {
         </CardContent>
       </Card>
 
+      {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
+        <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-white">External Accounts Inventory ({externalUsers.length})</CardTitle>
+            <button
+              onClick={() => {
+                setExternalModalUser(null); // Mode Create
+                setExternalModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 rounded-lg transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add External Account
+            </button>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <DataTable
+                data={externalUsers}
+                columns={externalColumns}
+                searchPlaceholder="Search accounts..."
+                searchFilter={(row, query) => {
+                  const q = query.toLowerCase();
+                  return (
+                    (row.username || "").toLowerCase().includes(q) ||
+                    (row.account_name || "").toLowerCase().includes(q) ||
+                    (row.role || "").toLowerCase().includes(q)
+                  );
+                }}
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <AgentModals
         isCreateOpen={isCreateOpen}
         setIsCreateOpen={setIsCreateOpen}
@@ -244,6 +309,13 @@ export default function AgentsPage() {
         accountModalAgent={accountModalAgent}
         setAccountModalAgent={setAccountModalAgent}
         managedUsers={managedUsers}
+      />
+
+      <ExternalAccountModal
+        isOpen={externalModalOpen}
+        onClose={() => { setExternalModalOpen(false); setExternalModalUser(null); }}
+        onSuccess={loadAgents}
+        user={externalModalUser}
       />
     </div>
   );

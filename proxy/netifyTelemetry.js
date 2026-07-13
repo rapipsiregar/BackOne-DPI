@@ -6,10 +6,10 @@
 
 const { netifyFetch } = require('./netifyClientCore');
 
-async function fetchTopAppCategories(interval = 1440, limit = 15, agentUuid = null) {
+async function fetchTopAppCategories(interval = 1440, limit = 15, agentUuid = null, siteUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/application_category/download', { filter_interval: interval, settings_limit: limit }, agentUuid),
-    netifyFetch('/data/stats/top/application_category/upload', { filter_interval: interval, settings_limit: limit }, agentUuid),
+    netifyFetch('/data/stats/top/application_category/download', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
+    netifyFetch('/data/stats/top/application_category/upload', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
   ]);
   if (!dlData) return [];
   const ulMap = {};
@@ -30,10 +30,10 @@ async function fetchTopAppCategories(interval = 1440, limit = 15, agentUuid = nu
   });
 }
 
-async function fetchTlsVersions(interval = 1440, limit = 15, agentUuid = null) {
+async function fetchTlsVersions(interval = 1440, limit = 15, agentUuid = null, siteUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/tls_version/download', { filter_interval: interval, settings_limit: limit }, agentUuid),
-    netifyFetch('/data/stats/top/tls_version/upload', { filter_interval: interval, settings_limit: limit }, agentUuid),
+    netifyFetch('/data/stats/top/tls_version/download', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
+    netifyFetch('/data/stats/top/tls_version/upload', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
   ]);
   if (!dlData) return [];
   const ulMap = {};
@@ -54,10 +54,10 @@ async function fetchTlsVersions(interval = 1440, limit = 15, agentUuid = null) {
   });
 }
 
-async function fetchTlsCiphers(interval = 1440, limit = 15, agentUuid = null) {
+async function fetchTlsCiphers(interval = 1440, limit = 15, agentUuid = null, siteUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/tls_cipher/download', { filter_interval: interval, settings_limit: limit }, agentUuid),
-    netifyFetch('/data/stats/top/tls_cipher/upload', { filter_interval: interval, settings_limit: limit }, agentUuid),
+    netifyFetch('/data/stats/top/tls_cipher/download', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
+    netifyFetch('/data/stats/top/tls_cipher/upload', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
   ]);
   if (!dlData) return [];
   const ulMap = {};
@@ -78,10 +78,10 @@ async function fetchTlsCiphers(interval = 1440, limit = 15, agentUuid = null) {
   });
 }
 
-async function fetchTlsSecurity(interval = 1440, limit = 15, agentUuid = null) {
+async function fetchTlsSecurity(interval = 1440, limit = 15, agentUuid = null, siteUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/tls_security/download', { filter_interval: interval, settings_limit: limit }, agentUuid),
-    netifyFetch('/data/stats/top/tls_security/upload', { filter_interval: interval, settings_limit: limit }, agentUuid),
+    netifyFetch('/data/stats/top/tls_security/download', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
+    netifyFetch('/data/stats/top/tls_security/upload', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
   ]);
   if (!dlData) return [];
   const ulMap = {};
@@ -102,10 +102,10 @@ async function fetchTlsSecurity(interval = 1440, limit = 15, agentUuid = null) {
   });
 }
 
-async function fetchTopCountries(interval = 1440, limit = 100, agentUuid = null) {
+async function fetchTopCountries(interval = 1440, limit = 100, agentUuid = null, siteUuid = null) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch('/data/stats/top/country/download', { filter_interval: interval, settings_limit: limit }, agentUuid),
-    netifyFetch('/data/stats/top/country/upload', { filter_interval: interval, settings_limit: limit }, agentUuid),
+    netifyFetch('/data/stats/top/country/download', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
+    netifyFetch('/data/stats/top/country/upload', { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
   ]);
   if (!dlData) return [];
   const ulMap = {};
@@ -126,10 +126,10 @@ async function fetchTopCountries(interval = 1440, limit = 100, agentUuid = null)
   }).filter(r => r.country_code);
 }
 
-async function fetchTopProperty(fieldName, interval, limit, agentUuid) {
+async function fetchTopProperty(fieldName, interval, limit, agentUuid, siteUuid) {
   const [dlData, ulData] = await Promise.all([
-    netifyFetch(`/data/stats/top/${fieldName}/download`, { filter_interval: interval, settings_limit: limit }, agentUuid),
-    netifyFetch(`/data/stats/top/${fieldName}/upload`,   { filter_interval: interval, settings_limit: limit }, agentUuid),
+    netifyFetch(`/data/stats/top/${fieldName}/download`, { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
+    netifyFetch(`/data/stats/top/${fieldName}/upload`,   { filter_interval: interval, settings_limit: limit }, agentUuid, siteUuid),
   ]);
   if (!dlData) return [];
   const ulMap = {};
@@ -142,7 +142,7 @@ async function fetchTopProperty(fieldName, interval, limit, agentUuid) {
   }
   return dlData.map(r => {
     const item = r[fieldName];
-    const key = item?.hash ?? item?.name ?? item?.label ?? String(item ?? 'Unknown');
+    const key = item?.hash ?? item?.name ?? item?.label ?? String(item || 'Unknown');
     const label = item?.label ?? key;
     return {
       key,
@@ -163,16 +163,16 @@ function mapProp(data, keyName) {
   }));
 }
 
-async function fetchDhcpFingerprints(interval = 1440, limit = 50, agentUuid = null) {
-  return mapProp(await fetchTopProperty('dhcp_class', interval, limit, agentUuid), 'fingerprint');
+async function fetchDhcpFingerprints(interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
+  return mapProp(await fetchTopProperty('dhcp_class', interval, limit, agentUuid, siteUuid), 'fingerprint');
 }
 
-async function fetchHttpUserAgents(interval = 1440, limit = 50, agentUuid = null) {
-  return mapProp(await fetchTopProperty('http_useragent', interval, limit, agentUuid), 'user_agent');
+async function fetchHttpUserAgents(interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
+  return mapProp(await fetchTopProperty('http_useragent', interval, limit, agentUuid, siteUuid), 'user_agent');
 }
 
-async function fetchBittorrentHashes(interval = 1440, limit = 50, agentUuid = null) {
-  const data = await fetchTopProperty('bittorrent_info_hash', interval, limit, agentUuid);
+async function fetchBittorrentHashes(interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
+  const data = await fetchTopProperty('bittorrent_info_hash', interval, limit, agentUuid, siteUuid);
   return data.map(d => ({
     info_hash: d.key,
     label:     d.label,
@@ -182,36 +182,36 @@ async function fetchBittorrentHashes(interval = 1440, limit = 50, agentUuid = nu
   }));
 }
 
-async function fetchSniHostnames(interval = 1440, limit = 50, agentUuid = null) {
-  return mapProp(await fetchTopProperty('https_sni_hostname', interval, limit, agentUuid), 'sni_hostname');
+async function fetchSniHostnames(interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
+  return mapProp(await fetchTopProperty('tls_sni', interval, limit, agentUuid, siteUuid), 'sni_hostname');
 }
 
-async function fetchSslServerCn(interval = 1440, limit = 50, agentUuid = null) {
-  return mapProp(await fetchTopProperty('ssl_server_cn', interval, limit, agentUuid), 'ssl_server_cn');
+async function fetchSslServerCn(interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
+  return mapProp(await fetchTopProperty('ssl_server_cn', interval, limit, agentUuid, siteUuid), 'ssl_server_cn');
 }
 
-async function fetchQuicHostnames(interval = 1440, limit = 50, agentUuid = null) {
-  return mapProp(await fetchTopProperty('quic_hostname', interval, limit, agentUuid), 'quic_hostname');
+async function fetchQuicHostnames(interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
+  return mapProp(await fetchTopProperty('quic_hostname', interval, limit, agentUuid, siteUuid), 'quic_hostname');
 }
 
-async function fetchSshClients(interval = 1440, limit = 50, agentUuid = null) {
-  return mapProp(await fetchTopProperty('ssh_client', interval, limit, agentUuid), 'ssh_client');
+async function fetchSshClients(interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
+  return mapProp(await fetchTopProperty('ssh_client', interval, limit, agentUuid, siteUuid), 'ssh_client');
 }
 
-async function fetchSshServers(interval = 1440, limit = 50, agentUuid = null) {
-  return mapProp(await fetchTopProperty('ssh_server', interval, limit, agentUuid), 'ssh_server');
+async function fetchSshServers(interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
+  return mapProp(await fetchTopProperty('ssh_server', interval, limit, agentUuid, siteUuid), 'ssh_server');
 }
 
-async function fetchMdnsHostnames(interval = 1440, limit = 50, agentUuid = null) {
-  return mapProp(await fetchTopProperty('mdns_hostname', interval, limit, agentUuid), 'mdns_hostname');
+async function fetchMdnsHostnames(interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
+  return mapProp(await fetchTopProperty('mdns_hostname', interval, limit, agentUuid, siteUuid), 'mdns_hostname');
 }
 
-async function fetchTopProtocols(interval = 1440, limit = 50, agentUuid = null) {
-  return mapProp(await fetchTopProperty('ip_protocol', interval, limit, agentUuid), 'protocol_label');
+async function fetchTopProtocols(interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
+  return mapProp(await fetchTopProperty('ip_protocol', interval, limit, agentUuid, siteUuid), 'protocol_label');
 }
 
-async function fetchSslSubjectAltNames(interval = 1440, limit = 50, agentUuid = null) {
-  return mapProp(await fetchTopProperty('ssl_subject_alt_name', interval, limit, agentUuid), 'alt_name');
+async function fetchSslSubjectAltNames(interval = 1440, limit = 50, agentUuid = null, siteUuid = null) {
+  return mapProp(await fetchTopProperty('ssl_subject_alt_name', interval, limit, agentUuid, siteUuid), 'alt_name');
 }
 
 module.exports = {

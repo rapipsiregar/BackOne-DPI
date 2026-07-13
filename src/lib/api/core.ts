@@ -80,18 +80,38 @@ export interface LookupApplicationsResponse {
   };
 }
 
-export function useLookupApplications(page: number = 1, limit: number = 25, search: string = '') {
+export function useLookupApplications(page: number = 1, limit: number = 25, search: string = '', category: string = '') {
   const [data, setData] = useState<LookupApplicationsResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setIsLoading(true);
-    fetcher<LookupApplicationsResponse>(`/lookup/applications?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`)
+    let endpoint = `/lookup/applications?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+    if (category) {
+      endpoint += `&category=${encodeURIComponent(category)}`;
+    }
+    fetcher<LookupApplicationsResponse>(endpoint)
       .then(setData)
       .catch(setError)
       .finally(() => setIsLoading(false));
-  }, [page, limit, search]);
+  }, [page, limit, search, category]);
+
+  return { data, error, isLoading };
+}
+
+export function useLookupCategories() {
+  const [data, setData] = useState<string[]>([]);
+  const [error, setError] = useState<Error | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setIsLoading(true);
+    fetcher<string[]>(`/lookup/categories`)
+      .then(setData)
+      .catch(setError)
+      .finally(() => setIsLoading(false));
+  }, []);
 
   return { data, error, isLoading };
 }

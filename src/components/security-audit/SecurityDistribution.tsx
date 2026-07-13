@@ -49,19 +49,12 @@ export default function SecurityDistribution({ securityData }: Props) {
           </ResponsiveContainer>
           <div className="flex flex-col justify-center ml-4 space-y-3">
             {securityData.map((entry, index) => {
-              const TLS_VER: Record<string, string> = {
-                Recommended: "TLS 1.3",
-                Secure: "TLS 1.2",
-                Weak: "TLS 1.0 / 1.1",
-                Insecure: "SSL 2.0 / 3.0",
-              };
               const dotColor = COLORS[entry.tls_security as keyof typeof COLORS] || "#8884d8";
               return (
                 <div key={`${entry.tls_security}-${index}`} className="flex items-start gap-2 whitespace-nowrap">
                   <div className="w-3 h-3 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: dotColor }} />
-                  <div className="flex flex-col">
+                  <div className="flex flex-col justify-center h-4">
                     <span className="text-xs text-white font-medium">{entry.tls_security}</span>
-                    <span className="text-[10px] font-mono" style={{ color: dotColor }}>{TLS_VER[entry.tls_security] || ""}</span>
                   </div>
                 </div>
               );

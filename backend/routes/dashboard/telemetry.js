@@ -126,7 +126,7 @@ router.get('/sni-hostnames', async (req, res) => {
       { $group: { _id: '$sni_hostname', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
       { $project: { sni_hostname: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
       { $sort: { total: -1 } },
-      { $limit: limit },
+      
     ]);
 
     if (raw.length === 0) {
@@ -137,7 +137,7 @@ router.get('/sni-hostnames', async (req, res) => {
         { $group: { _id: '$domain', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: 1 } } },
         { $project: { sni_hostname: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
         { $sort: { total: -1 } },
-        { $limit: limit },
+        
       ]);
       raw = raw.filter(r => r.sni_hostname && !String(r.sni_hostname).startsWith('Port '));
     }
@@ -160,7 +160,7 @@ router.get('/ssl-server-cn', async (req, res) => {
       { $group: { _id: '$ssl_server_cn', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
       { $project: { ssl_server_cn: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
       { $sort: { total: -1 } },
-      { $limit: limit },
+      
     ]);
 
     if (raw.length === 0) {
@@ -171,7 +171,7 @@ router.get('/ssl-server-cn', async (req, res) => {
         { $group: { _id: '$domain', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: 1 } } },
         { $project: { ssl_server_cn: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
         { $sort: { total: -1 } },
-        { $limit: limit },
+        
       ]);
       raw = flowRaw.filter(r => r.ssl_server_cn && !String(r.ssl_server_cn).startsWith('Port '));
     }
@@ -194,7 +194,7 @@ router.get('/quic-hostnames', async (req, res) => {
       { $group: { _id: '$quic_hostname', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
       { $project: { quic_hostname: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
       { $sort: { total: -1 } },
-      { $limit: limit },
+      
     ]);
 
     if (raw.length === 0) {
@@ -205,7 +205,7 @@ router.get('/quic-hostnames', async (req, res) => {
         { $group: { _id: '$domain', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: 1 } } },
         { $project: { quic_hostname: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
         { $sort: { total: -1 } },
-        { $limit: limit },
+        
       ]);
       raw = flowRaw.filter(r => r.quic_hostname && !String(r.quic_hostname).startsWith('Port '));
     }
@@ -255,14 +255,14 @@ router.get('/ssh-versions', async (req, res) => {
         { $group: { _id: '$ssh_client', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
         { $project: { ssh_version: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
         { $sort: { total: -1 } },
-        { $limit: limit },
+        
       ]),
       SshServerStat.aggregate([
         { $match: matchBase },
         { $group: { _id: '$ssh_server', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
         { $project: { ssh_version: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
         { $sort: { total: -1 } },
-        { $limit: limit },
+        
       ]),
     ]);
 
@@ -294,7 +294,7 @@ router.get('/mdns-hostnames', async (req, res) => {
       { $group: { _id: '$mdns_hostname', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
       { $project: { mdns_hostname: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
       { $sort: { total: -1 } },
-      { $limit: limit },
+      
     ]);
     res.json({ ok: true, data: raw });
   } catch (err) {

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { useState, useEffect, useMemo, Suspense } from "react";
+import { TimestampCell } from "@/components/ui/TimestampCell";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { ThreatStat } from "@/lib/api";
 import { useThreats } from "@/lib/api-with-context";
@@ -89,11 +90,7 @@ function ThreatsContent() {
     {
       header: "Timestamp",
       className: "w-[155px] min-w-[155px] max-w-[155px] text-center",
-      accessor: (row) =>
-        row.detected_at ? new Date(row.detected_at).toLocaleString("id-ID", {
-          day: "2-digit", month: "2-digit", year: "numeric",
-          hour: "2-digit", minute: "2-digit", second: "2-digit"
-        }) : "-",
+      accessor: (row) => <TimestampCell timestamp={row.detected_at} showActiveStatus={false} />
     },
     { header: "#", className: "w-[40px] min-w-[40px] max-w-[40px] text-center", accessor: (_row, i) => i + 1 },
     {

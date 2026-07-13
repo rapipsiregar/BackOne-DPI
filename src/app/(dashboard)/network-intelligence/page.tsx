@@ -11,6 +11,8 @@ import { Activity, Loader2 } from "lucide-react";
 import { AppCategoryStat } from "@/lib/api";
 import { useAppCategories, useContinents } from "@/lib/api-with-context";
 import { fmtBytes } from "@/lib/utils";
+import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
+import { CategoryDetailPanel } from "@/components/network/CategoryDetailPanel";
 
 const COLORS = ['#58a6ff', '#3fb950', '#f0883e', '#bc8cff', '#f85149'];
 
@@ -18,6 +20,13 @@ export default function NetworkIntelligencePage() {
   const [mounted, setMounted] = useState(false);
   const appCategories = useAppCategories();
   const continents = useContinents();
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const { 
+    filters,
+    handleFilterChange,
+    handleReset, activeCount 
+  } = useUniversalFilterState();
 
   useEffect(() => {
     setMounted(true);
@@ -25,13 +34,41 @@ export default function NetworkIntelligencePage() {
 
   if (!mounted) return null;
 
+  const allCategories = appCategories.data || [];
+
+  const opts = (key: string) => {
+    const raw = Array.from(new Set(allCategories.map((r: any) => String(r[key] || "")).filter(Boolean)));
+    return raw.sort();
+  };
+
+  const filterConfigs: FilterConfig[] = [
+    { id: "category_label", label: "Category", type: "select", value: filters.category_label, options: opts("category_label") },
+    { id: "sort_download", label: "Sort Download", type: "select", value: filters.sort_download, options: ["Descending", "Ascending"] },
+    { id: "sort_upload", label: "Sort Upload", type: "select", value: filters.sort_upload, options: ["Descending", "Ascending"] },
+  ];
+
+  const filteredData = allCategories.filter((row: any) => {
+    if (filters.category_label && filters.category_label !== "All" && row.category_label !== filters.category_label) return false;
+    return true;
+  });
+
+  let processedData = [...filteredData];
+  const sortUpload = filters.sort_upload || "All";
+  const sortDownload = filters.sort_download || "All";
+  
+  if (sortUpload !== "All") {
+    processedData.sort((a, b) => sortUpload === "Descending" ? b.upload - a.upload : a.upload - b.upload);
+  } else if (sortDownload !== "All") {
+    processedData.sort((a, b) => sortDownload === "Descending" ? b.download - a.download : a.download - b.download);
+  }
+
   const appCols: Column<AppCategoryStat>[] = [
     { header: "#", accessor: (row, i) => i + 1, className: "w-[60px] min-w-[60px] max-w-[60px]" },
     { 
       header: "Category", 
       accessor: (row) => (
         <div title={row.category_label || '-'} className="font-semibold text-white truncate w-full block text-center cursor-help">
-          {row.category_label || '-'}
+          <span className="border-b border-dashed border-white/30 pb-0.5">{row.category_label || '-'}</span>
         </div>
       ),
       className: "w-[180px] min-w-[180px] max-w-[180px]"
@@ -53,12 +90,25 @@ export default function NetworkIntelligencePage() {
           </h2>
           <p className="text-muted-foreground mt-1">Deep packet inspection analytics and geography.</p>
         </div>
-        <div className="flex items-center gap-2 text-sm font-medium text-blue-400 bg-blue-500/10 border border-blue-500/20 px-4 py-2 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.1)]">
-          <Activity className="h-4 w-4" />
-          <span>DPI Engine Active</span>
-        </div>
       </div>
       
+      <UniversalFilters
+        filters={filterConfigs}
+        onChange={(id, val) => {
+          if (id === 'sort_download') {
+            handleFilterChange('sort_download', val);
+            handleFilterChange('sort_upload', 'All');
+          } else if (id === 'sort_upload') {
+            handleFilterChange('sort_upload', val);
+            handleFilterChange('sort_download', 'All');
+          } else {
+            handleFilterChange(id, val);
+          }
+        }}
+        showDateRange={false}
+        activeFilterCount={activeCount}
+        onReset={handleReset}
+      />
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Left Column: App Categories List */}
@@ -67,7 +117,12 @@ export default function NetworkIntelligencePage() {
             <CardTitle className="text-lg text-white">App Categories List</CardTitle>
           </CardHeader>
           <CardContent>
-            <DataTable data={appCategories.data || []} columns={appCols} pageSize={50} />
+            <DataTable 
+              data={processedData} 
+              columns={appCols} 
+              pageSize={50} 
+              onRowClick={(row) => setSelectedCategory(row.category_label)}
+            />
           </CardContent>
         </Card>
 
@@ -83,7 +138,7 @@ export default function NetworkIntelligencePage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={appCategories.data || []}
+                      data={processedData}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
@@ -92,7 +147,7 @@ export default function NetworkIntelligencePage() {
                       dataKey="download"
                       nameKey="category_label"
                     >
-                      {(appCategories.data || []).map((entry, index) => (
+                      {processedData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -136,6 +191,13 @@ export default function NetworkIntelligencePage() {
           </Card>
         </div>
       </div>
+      
+      {selectedCategory && (
+        <CategoryDetailPanel
+          category={selectedCategory}
+          onClose={() => setSelectedCategory(null)}
+        />
+      )}
     </div>
   );
 }

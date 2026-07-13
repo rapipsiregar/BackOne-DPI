@@ -18,15 +18,13 @@ interface ColDef {
 function TableWrap({ children, cols }: { children: React.ReactNode; cols: ColDef[] }) {
   return (
     <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-border/50 bg-secondary/10 custom-scrollbar">
-      <table className="w-full text-xs text-left whitespace-nowrap min-w-[700px]">
+      <table className="w-full text-xs text-center table-fixed whitespace-nowrap min-w-[700px]">
         <thead>
           <tr className="border-b border-border bg-muted/50">
             {cols.map((c) => (
               <th
                 key={c.header}
-                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] ${
-                  c.align === "center" ? "text-center" : c.align === "right" ? "text-right" : "text-left"
-                } ${c.width}`}
+                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] text-center ${c.width}`}
               >
                 {c.header}
               </th>
@@ -41,11 +39,11 @@ function TableWrap({ children, cols }: { children: React.ReactNode; cols: ColDef
   );
 }
 
-function Cell({ value, className = "", center = false, right = false }: { value: string | number; className?: string; center?: boolean; right?: boolean }) {
+function Cell({ value, className = "", center = true, right = false }: { value: string | number; className?: string; center?: boolean; right?: boolean }) {
   const str = String(value ?? "—");
-  const align = center ? "text-center" : right ? "text-right" : "";
+  const align = center ? "text-center" : right ? "text-right" : "text-center";
   return (
-    <div className={`truncate overflow-hidden text-ellipsis ${align} ${className}`} title={str}>
+    <div className={`truncate overflow-hidden text-ellipsis flex items-center justify-center w-full ${align} ${className}`} title={str}>
       {str || "—"}
     </div>
   );
@@ -155,38 +153,36 @@ export function AppDetailModal({ appLabel, favicon, category, agentUuid, onClose
                   ) : (
                     <div className="space-y-3">
                       <TableWrap cols={[
-                        { header: "Status / Last Seen", width: "w-[150px]", align: "center" },
-                        { header: "IP Address",         width: "min-w-[120px]" },
-                        { header: "Domain",             width: "min-w-[160px] w-full" },
-                        { header: "Protocol",           width: "w-[80px]", align: "center" },
-                        { header: "Download",           width: "w-[100px]", align: "right" },
-                        { header: "Upload",             width: "w-[100px]", align: "right" }
+                        { header: "#",                  width: "w-[5%]", align: "center" },
+                        { header: "Status / Last Seen", width: "w-[20%]", align: "center" },
+                        { header: "IP Address",         width: "w-[20%]", align: "center" },
+                        { header: "Domain",             width: "w-[25%]", align: "center" },
+                        { header: "Download",           width: "w-[15%]", align: "center" },
+                        { header: "Upload",             width: "w-[15%]", align: "center" },
                       ]}>
-                        {paginatedIps.map((dev: any, i: number) => (
+                        {paginatedIps.map((row: any, i: number) => (
                           <tr key={i} className="hover:bg-white/[0.04] transition-colors duration-150">
-                            <td className="px-3 py-2.5 text-center">
-                              <ActiveDurationDisplay firstSeen={dev.first_seen} lastSeen={dev.last_seen} className="border-0 bg-transparent p-0 mb-0 flex justify-center" />
+                            <td className="px-3 py-2.5"><Cell value={startIndex + i + 1} center /></td>
+                            <td className="px-3 py-2.5">
+                              <ActiveDurationDisplay firstSeen={row.first_seen} lastSeen={row.last_seen} className="border-0 bg-transparent p-0 mb-0 flex justify-center" />
                             </td>
                             <td className="px-3 py-2.5">
                               <button
-                                onClick={() => setSelectedIp(dev.ip_address || dev.dst_ip)}
-                                className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs focus:outline-none truncate text-left"
-                                title={dev.ip_address || dev.dst_ip || '-'}
+                                onClick={() => setSelectedIp(row.ip_address || row.dst_ip)}
+                                className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs focus:outline-none w-full block text-center"
+                                title={row.ip_address || row.dst_ip || '-'}
                               >
-                                {dev.ip_address || dev.dst_ip || '-'}
+                                {row.ip_address || row.dst_ip || '-'}
                               </button>
                             </td>
                             <td className="px-3 py-2.5">
-                              <Cell value={dev.domain || '-'} className="text-slate-300" />
+                              <Cell value={row.domain || '-'} className="text-slate-300" center />
                             </td>
                             <td className="px-3 py-2.5">
-                              <Cell value={dev.protocol || '-'} className="text-slate-400 font-mono uppercase text-[10px]" center />
+                              <Cell value={fmtBytes(row.download)} className="text-cyan-400 font-mono" center />
                             </td>
                             <td className="px-3 py-2.5">
-                              <Cell value={fmtBytes(dev.download)} className="text-cyan-400 font-mono" right />
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <Cell value={fmtBytes(dev.upload)} className="text-green-400 font-mono" right />
+                              <Cell value={fmtBytes(row.upload)} className="text-green-400 font-mono" center />
                             </td>
                           </tr>
                         ))}
