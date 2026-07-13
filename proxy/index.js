@@ -10,8 +10,10 @@
 //
 // Environment Variables:
 //   MONGODB_URI          - MongoDB connection string (default: localhost:27017)
-//   PROXY_COLLECT_MODE   - 'all' (default) | 'agent'
+//   PROXY_COLLECT_MODE   - 'all' (default) | 'agent' | 'agents'
 //   PROXY_AGENT_UUID     - Required if PROXY_COLLECT_MODE=agent
+//   PROXY_AGENT_UUIDS    - Comma-separated list of agent UUIDs, required if PROXY_COLLECT_MODE=agents
+//   PROXY_AGENT_DELAY_MS - Delay between agent collections in ms (default: 5000)
 //   PROXY_CRON_SCHEDULE  - Default: '*/5 * * * *' (setiap 5 menit)
 //   PROXY_PORT           - Port untuk REST API (default: 4000)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -132,6 +134,29 @@ app.post('/collect/:agentUuid', async (req, res) => {
 });
 
 /**
+ * POST /collect/agents
+ * Manual trigger — collect multiple specific agents
+ * Body: { "uuids": ["uuid1", "uuid2", ...], "delay_ms": 5000 }
+ */
+app.post('/collect/agents', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ ok: false, error: 'MongoDB not connected. Cannot collect.' });
+  }
+  const { uuids, delay_ms } = req.body;
+  if (!uuids || !Array.isArray(uuids) || uuids.length === 0) {
+    return res.status(400).json({ ok: false, error: 'Body must include "uuids" as a non-empty array of agent UUIDs.' });
+  }
+  const { collectSpecificAgents } = require('./collector');
+  console.log(`[Proxy API] Manual trigger: collect agents ${uuids.join(', ')}`);
+  try {
+    const result = await collectSpecificAgents(uuids, delay_ms || 5000);
+    res.json({ ok: result.success, ...result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
  * GET /agents
  * List all agent UUIDs yang sudah tersimpan di MongoDB
  */
@@ -179,6 +204,11 @@ async function main() {
   if (process.env.PROXY_COLLECT_MODE === 'agent') {
     console.log(`[Proxy] Agent UUID: ${process.env.PROXY_AGENT_UUID || '(not set!)'}`);
   }
+  if (process.env.PROXY_COLLECT_MODE === 'agents') {
+    const agents = (process.env.PROXY_AGENT_UUIDS || '').split(',').map(s => s.trim()).filter(Boolean);
+    console.log(`[Proxy] Agent UUIDs: ${agents.length > 0 ? agents.join(', ') : '(not set!)'}`);
+    console.log(`[Proxy] Agent delay: ${parseInt(process.env.PROXY_AGENT_DELAY_MS || '5000')}ms`);
+  }
 
   // 1. Start REST API server FIRST (so /health is always available)
   app.listen(PORT, '0.0.0.0', () => {
@@ -187,7 +217,8 @@ async function main() {
     console.log(`   GET  /status   → scheduler + DB status`);
     console.log(`   GET  /agents   → list agent UUIDs in MongoDB`);
     console.log(`   POST /collect/all        → trigger manual collect all`);
-    console.log(`   POST /collect/:agentUuid → trigger manual collect specific\n`);
+    console.log(`   POST /collect/:agentUuid → trigger manual collect specific`);
+    console.log(`   POST /collect/agents     → trigger manual collect multiple\n`);
   });
 
   // 2. Connect to MongoDB (retry in background)
