@@ -134,8 +134,9 @@ async function fetchFlows(limit = 10000, agentUuid = null, siteUuid = null) {
   const sniList = [];
   if (sniRaw && Array.isArray(sniRaw)) {
     for (const r of sniRaw) {
-      const sni = r.tls_sni;
-      if (sni && sni.trim() !== '') sniList.push(sni.replace(/^\*\./, '').trim());
+      const sni = r.tls_sni ?? r.label;
+      const sniStr = (sni === null || sni === undefined) ? '' : String(sni);
+      if (sniStr.trim() !== '') sniList.push(sniStr.replace(/^\*\./, '').trim());
     }
   }
   return raw.map(r => {
