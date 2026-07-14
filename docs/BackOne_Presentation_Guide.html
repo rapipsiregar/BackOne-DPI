@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panduan Presentasi Project BackOne DPI Dashboard</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background-color: #f9fafb;
+        }
+
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-top: 8px solid #dc2626;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #f3f4f6;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .logo-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #111827;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .logo-title span {
+            color: #dc2626;
+        }
+
+        .company-subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        h2 {
+            color: #1e3a8a;
+            font-size: 20px;
+            font-weight: 600;
+            margin-top: 30px;
+            border-left: 4px solid #3b82f6;
+            padding-left: 10px;
+        }
+
+        p {
+            font-size: 15px;
+            color: #4b5563;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+            font-size: 15px;
+            color: #4b5563;
+        }
+
+        .highlight-box {
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+
+        .highlight-box p {
+            margin: 0;
+            font-weight: 600;
+            color: #1e40af;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+        }
+
+        th {
+            background-color: #f3f4f6;
+            color: #374151;
+            font-weight: 600;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 12px;
+            color: #9ca3af;
+            border-top: 1px solid #f3f4f6;
+            padding-top: 20px;
+        }
+
+        @media print {
+            body {
+                background-color: white;
+                padding: 0;
+            }
+            .card {
+                box-shadow: none;
+                padding: 0;
+                border-top: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="header">
+        <h1 class="logo-title">BackOne <span>DPI Dashboard</span></h1>
+        <div class="company-subtitle">PT. Data Bisnis Solusi</div>
+        <p style="font-weight: 600; margin-top: 15px; color: #374151;">Bahan Presentasi Manajemen Eksekutif</p>
+    </div>
+
+    <h2>1. Latar Belakang & Tujuan Proyek</h2>
+    <p>
+        <strong>BackOne Deep Package Inspection (DPI) Dashboard</strong> adalah platform pemantauan keamanan dan analisis lalu lintas jaringan tingkat lanjut. Platform ini dirancang untuk mendeteksi ancaman, memetakan distribusi perangkat, dan memberikan wawasan realtime mengenai penggunaan bandwidth jaringan organisasi secara multi-tenant.
+    </p>
+
+    <h2>2. Arsitektur Sistem (Three-Tier Architecture)</h2>
+    <p>Aplikasi ini dibangun menggunakan arsitektur tiga lapis yang andal dan aman:</p>
+    <ul>
+        <li><strong>Proxy Server (Collector)</strong>: Berfungsi mengumpulkan telemetri jaringan mentah secara berkala (setiap 5 menit), melakukan deduplikasi data, menerapkan aturan retensi, dan menyimpannya langsung ke database.</li>
+        <li><strong>MongoDB Database</strong>: Bertindak sebagai <em>Single Source of Truth</em> (satu-satunya sumber data valid) untuk memastikan konsistensi informasi yang disajikan di seluruh halaman.</li>
+        <li><strong>Backend Server (Express) & Frontend (Next.js Standalone)</strong>: Menyajikan REST API berkecepatan tinggi dengan isolasi ketat antar-penyewa (multi-tenant) dan hak akses pengguna (RBAC).</li>
+    </ul>
+
+    <h2>3. Fitur Utama Dashboard</h2>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 30%;">Fitur Utama</th>
+                <th>Deskripsi & Nilai Bisnis</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Multi-Tenancy & RBAC</strong></td>
+                <td>Isolasi data yang aman antar-site (seperti SIAB dan Nexus) serta pembatasan fitur berdasarkan peran pengguna (Admin, SOC Analyst, Engineer).</td>
+            </tr>
+            <tr>
+                <td><strong>Peta Interaktif Geografis</strong></td>
+                <td>Visualisasi sebaran letak fisik sensor jaringan (agents) di seluruh wilayah Indonesia beserta metrik performa masing-masing secara realtime.</td>
+            </tr>
+            <tr>
+                <td><strong>Threat Intelligence & Audit</strong></td>
+                <td>Deteksi ancaman keamanan (seperti cryptomining, port scanning) dan pembuatan aturan pencegahan (*Blacklist Policy*) secara terisolasi per agent.</td>
+            </tr>
+            <tr>
+                <td><strong>Kapasitas DB Realtime</strong></td>
+                <td>Perhitungan otomatis ukuran data (*Data Size*) per agent di database dengan efisiensi tinggi tanpa membebani kinerja server.</td>
+            </tr>
+            <tr>
+                <td><strong>Analisis lalu lintas jaringan</strong></td>
+                <td>Visualisasi performa enkripsi TLS, pembagian kategori lalu lintas aplikasi (seperti streaming, hosting), dan detail perangkat aktif.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="highlight-box">
+        <p>Catatan Keamanan Produksi:</p>
+        <p style="font-weight: 400; font-size: 14px; color: #1e3a8a; margin-top: 5px;">
+            Seluruh data kredensial, kunci JWT, dan konfigurasi API disimpan dengan aman di sisi server (Server-Side). Browser pengguna tidak memiliki akses langsung ke kredensial tersebut, sehingga sistem aman dari serangan melalui inspeksi browser (*inspect element*).
+        </p>
+    </div>
+
+    <h2>4. Status Deployment & Kebijakan Data Saat Ini</h2>
+    <ul>
+        <li><strong>Domain Produksi</strong>: Aplikasi telah live 100% pada domain <a href="https://demoplace.my.id" target="_blank">https://demoplace.my.id</a> menggunakan Node.js v20 di bawah pengelolaan PM2.</li>
+        <li><strong>Kebijakan Retensi Data</strong>: MongoDB hanya menyimpan data maksimal hingga 7 hari ke belakang secara otomatis (rolling 7 days) untuk menjaga kestabilan ruang penyimpanan server.</li>
+        <li><strong>Zona Waktu Indonesia</strong>: Seluruh format penanggalan dan jam telah disesuaikan dengan zona waktu lokal Indonesia (WIB).</li>
+    </ul>
+
+    <div class="footer">
+        <p>&copy; 2026 PT. Data Bisnis Solusi. Seluruh hak cipta dilindungi undang-undang.</p>
+        <p style="font-size: 10px; color: #d1d5db; margin-top: 5px;">Dokumen ini diproduksi secara otomatis untuk kebutuhan presentasi internal.</p>
+    </div>
+</div>
+
+</body>
+</html>
