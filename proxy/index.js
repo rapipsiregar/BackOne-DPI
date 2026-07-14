@@ -30,7 +30,7 @@ async function connectDB() {
       });
       console.log('[MongoDB] ✓ Connected successfully to', MONGODB_URI);
       const { logCapacityStats } = require('./db/capacityTracker');
-      logCapacityStats('[MongoDB]').catch(err => console.warn('[MongoDB] Capacity log failed:', err.message));
+      await logCapacityStats('[MongoDB]');
       return true;
     } catch (err) {
       console.error(`[MongoDB] ✗ Attempt ${attempt} failed: ${err.message}`);
