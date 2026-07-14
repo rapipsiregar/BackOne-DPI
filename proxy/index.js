@@ -43,7 +43,7 @@ async function connectDB() {
         socketTimeoutMS:          30000,
       });
       console.log('[MongoDB] ✓ Connected successfully to', MONGODB_URI);
-      const { logCapacityStats } = require('../backend/db/capacityTracker');
+      const { logCapacityStats } = require('./db/capacityTracker');
       await logCapacityStats('[MongoDB]');
       return true;
     } catch (err) {
@@ -165,8 +165,8 @@ app.get('/agents', async (req, res) => {
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({ ok: false, error: 'MongoDB not connected.' });
     }
-    const { DashboardSummary } = require('../backend/models/Schemas');
-    const agents = await DashboardSummary.distinct('agent_uuid');
+    const { Summary } = require('./models/Schemas');
+    const agents = await Summary.distinct('agent_uuid');
     res.json({ ok: true, data: agents });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -183,7 +183,7 @@ app.get('/domain-details', async (req, res) => {
   if (!domain) return res.status(400).json({ ok: false, error: 'domain is required' });
   
   try {
-    const { Flow, DeviceStat } = require('../backend/models/Schemas');
+    const { Flow, DeviceStat } = require('./models/Schemas');
     
     const filter = { domain: domain };
     if (agentUuid) {
