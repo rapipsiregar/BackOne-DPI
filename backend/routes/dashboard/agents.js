@@ -53,10 +53,20 @@ router.get('/agents/uptime', async (req, res) => {
 // GET /api/dashboard/agents
 router.get('/agents', async (req, res) => {
   try {
-    if (req.user?.role !== 'SUPER_ADMIN' && req.user?._originalRole !== 'SUPER_ADMIN') {
-      return res.status(403).json({ ok: false, error: 'Forbidden: SUPER_ADMIN only' });
+    const isAuthorized = req.user?.role === 'SUPER_ADMIN' ||
+      req.user?.role === 'TENANT_ADMIN' ||
+      req.user?._originalRole === 'SUPER_ADMIN' ||
+      req.user?._originalRole === 'TENANT_ADMIN';
+
+    if (!isAuthorized) {
+      return res.status(403).json({ ok: false, error: 'Forbidden: Admin access only' });
     }
-    const agents = await Summary.distinct('agent_uuid');
+    const query = {};
+    const effectiveRole = req.user?._originalRole || req.user?.role;
+    if (effectiveRole === 'TENANT_ADMIN') {
+      query.site_uuid = req.user.site_uuid;
+    }
+    const agents = await Summary.distinct('agent_uuid', query);
     res.json({ ok: true, count: agents.length, agents });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -64,49 +74,29 @@ router.get('/agents', async (req, res) => {
 });
 
 // GET /api/dashboard/agents/storage
+// Returns per-agent total data size from in-memory cache (capacityTracker).
+// Cache is computed once at startup and refreshed every 5-minute collection cycle.
+// Values represent total MongoDB storage footprint per agent (across 7-day retention window).
 router.get('/agents/storage', async (req, res) => {
   try {
-    if (req.user?.role !== 'SUPER_ADMIN' && req.user?._originalRole !== 'SUPER_ADMIN') {
-      return res.status(403).json({ ok: false, error: 'Forbidden: SUPER_ADMIN only' });
+    const isAuthorized = req.user?.role === 'SUPER_ADMIN' ||
+      req.user?.role === 'TENANT_ADMIN' ||
+      req.user?._originalRole === 'SUPER_ADMIN' ||
+      req.user?._originalRole === 'TENANT_ADMIN';
+
+    if (!isAuthorized) {
+      return res.status(403).json({ ok: false, error: 'Forbidden: Admin access only' });
     }
 
-    const db = mongoose.connection.db;
-    if (!db) {
-      return res.json({ ok: true, storage: {} });
-    }
+    const { agentSizesCache, lastCacheUpdate } = require('../../db/capacityTracker');
+    const storage  = agentSizesCache();
+    const cachedAt = lastCacheUpdate();
 
-    const agentSizes = {};
-    const collections = await db.listCollections().toArray();
-
-    for (const colInfo of collections) {
-      const colName = colInfo.name;
-      if (colName.startsWith('system.')) continue;
-      const col = db.collection(colName);
-
-      const sampleDoc = await col.findOne({ agent_uuid: { $ne: null } });
-      if (!sampleDoc) continue;
-
-      const pipeline = [
-        { $project: { agent_uuid: 1, docSize: { $bsonSize: "$$ROOT" } } },
-        { $group: { _id: "$agent_uuid", totalBytes: { $sum: "$docSize" } } }
-      ];
-
-      const results = await col.aggregate(pipeline).toArray();
-      for (const res of results) {
-        const agent = res._id || 'Unknown';
-        agentSizes[agent] = (agentSizes[agent] || 0) + res.totalBytes;
-      }
-    }
-
-    const storageMap = {};
-    for (const [agent, bytes] of Object.entries(agentSizes)) {
-      storageMap[agent] = parseFloat((bytes / (1024 * 1024)).toFixed(2));
-    }
-
-    res.json({ ok: true, storage: storageMap });
+    res.json({ ok: true, storage, cached_at: cachedAt });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
 
 module.exports = router;

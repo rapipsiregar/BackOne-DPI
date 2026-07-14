@@ -102,9 +102,21 @@ export function useTimeline(points: number = 60, agentUuid?: string) {
   return { data, error, isLoading };
 }
 
-export function useTopApps(limit: number = 10) {
+/** Build extra query params for explicit date range filtering (overrides sidebar timeRange). */
+function buildDateParams(dateFrom?: string, dateTo?: string): Record<string, string> | undefined {
+  const from = dateFrom?.trim();
+  const to   = dateTo?.trim();
+  if (!from && !to) return undefined;
+  const params: Record<string, string> = {};
+  if (from) params.date_from = from;
+  if (to)   params.date_to   = to;
+  return params;
+}
+
+export function useTopApps(limit: number = 10, dateFrom?: string, dateTo?: string) {
   const { timeRange } = useTimeFilter();
-  return useCtxFetch<AppStat[]>(`/apps?limit=${limit}`, timeRange, []);
+  const extraParams = buildDateParams(dateFrom, dateTo);
+  return useCtxFetch<AppStat[]>(`/apps?limit=${limit}`, timeRange, [], extraParams);
 }
 
 export function useTopProtocols() {
@@ -117,14 +129,16 @@ export function useSslSans(limit: number = 50) {
   return useCtxFetch<SslSanStat[]>(`/ssl-subject-alt-names?limit=${limit}`, timeRange, []);
 }
 
-export function useDevices(limit: number = 0) {
+export function useDevices(limit: number = 0, dateFrom?: string, dateTo?: string) {
   const { timeRange } = useTimeFilter();
-  return useCtxFetch<DeviceStat[]>(`/devices?limit=${limit}`, timeRange, []);
+  const extraParams = buildDateParams(dateFrom, dateTo);
+  return useCtxFetch<DeviceStat[]>(`/devices?limit=${limit}`, timeRange, [], extraParams);
 }
 
-export function useThreats(limit: number = 0) {
+export function useThreats(limit: number = 0, dateFrom?: string, dateTo?: string) {
   const { timeRange } = useTimeFilter();
-  return useCtxFetch<ThreatStat[]>(`/threats?limit=${limit}`, timeRange, []);
+  const extraParams = buildDateParams(dateFrom, dateTo);
+  return useCtxFetch<ThreatStat[]>(`/threats?limit=${limit}`, timeRange, [], extraParams);
 }
 
 export function useAppCategories() {
@@ -137,9 +151,10 @@ export function useContinents() {
   return useCtxFetch<ContinentStat[]>('/continents', timeRange, []);
 }
 
-export function useFlows(limit: number = 0) {
+export function useFlows(limit: number = 5000, dateFrom?: string, dateTo?: string) {
   const { timeRange } = useTimeFilter();
-  return useCtxFetch<FlowStat[]>(`/flows?limit=${limit}`, timeRange, []);
+  const extraParams = buildDateParams(dateFrom, dateTo);
+  return useCtxFetch<FlowStat[]>(`/flows?limit=${limit}`, timeRange, [], extraParams);
 }
 
 export function useCountries(limit: number = 0) {
@@ -152,9 +167,10 @@ export function useDNS(limit: number = 0) {
   return useCtxFetch<DnsStat[]>(`/dns?limit=${limit}`, timeRange, []);
 }
 
-export function useEvents(limit: number = 0) {
+export function useEvents(limit: number = 0, dateFrom?: string, dateTo?: string) {
   const { timeRange } = useTimeFilter();
-  return useCtxFetch<EventStat[]>(`/events?limit=${limit}`, timeRange, []);
+  const extraParams = buildDateParams(dateFrom, dateTo);
+  return useCtxFetch<EventStat[]>(`/events?limit=${limit}`, timeRange, [], extraParams);
 }
 
 export function useTlsVersions(limit: number = 10) {

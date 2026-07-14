@@ -1,10 +1,9 @@
 // proxy/netifyClient.js
 // ─────────────────────────────────────────────────────────────────────────────
-// Clean DPI API wrapper for the BackOne Proxy Server
-// Re-exports modules split into logical units to satisfy the 256-line limit.
+// DPI API wrapper for the BackOne Proxy Server targeting original Netify API.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { netifyFetch, agentMap } = require('./netifyClientCore');
+const { netifyFetch, BASE_URL, agentMap } = require('./netifyClientCore');
 const telemetry = require('./netifyTelemetry');
 
 const PORT_SERVICE_MAP = {
@@ -21,18 +20,47 @@ const PORT_SERVICE_MAP = {
 };
 
 async function fetchAgents(siteUuid = null) {
-  const data = await netifyFetch('/data/stats/top/agent/download', {
-    filter_interval: 43200, settings_limit: 100
-  }, null, siteUuid);
+  const data = await netifyFetch('/data/stats/top/agent/download', { filter_interval: 43200, settings_limit: 100 }, null, siteUuid);
   if (!data || !Array.isArray(data)) return [];
-  const list = data
-    .map(r => ({ id: r.agent?.id, uuid: r.agent?.uuid, label: r.agent?.label }))
-    .filter(a => a.uuid);
+  const list = data.map(r => ({
+    id:    r.agent?.id,
+    uuid:  r.agent?.uuid,
+    label: r.agent?.label,
+  })).filter(a => a.uuid);
+
   for (const a of list) {
     if (a.uuid && a.id) agentMap[a.uuid] = a.id;
   }
+
+  // Secondary validation: if this site already has data in MongoDB, only return agents
+  // that have at least one summary record for THIS site_uuid. This prevents the
+  // org-level stats endpoint from cross-contaminating agents across sites.
+  if (siteUuid) {
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        const db = mongoose.connection.db;
+        const knownAgents = await db.collection('summaries').distinct('agent_uuid', {
+          site_uuid:  siteUuid,
+          agent_uuid: { $ne: null },
+        });
+
+        if (knownAgents.length > 0) {
+          const knownSet = new Set(knownAgents);
+          const validated = list.filter(a => knownSet.has(a.uuid));
+          // If MongoDB cross-check yields results, use the validated list.
+          // On first boot (no DB data yet), fall through and use the full API list.
+          if (validated.length > 0) return validated;
+        }
+      }
+    } catch (err) {
+      console.warn('[Collector] fetchAgents DB cross-check failed:', err.message);
+    }
+  }
+
   return list;
 }
+
 
 async function fetchBandwidthSummary(interval = 1440, agentUuid = null, siteUuid = null) {
   const [dlData, ulData, flowsData] = await Promise.all([
@@ -237,5 +265,7 @@ module.exports = {
   fetchFlows,
   fetchCyberThreats,
   fetchEvents,
+  BASE_URL,
+  PORT_SERVICE_MAP,
   ...telemetry,
 };

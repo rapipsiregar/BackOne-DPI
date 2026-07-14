@@ -14,6 +14,7 @@ import { MetadataDetailPanel } from "@/components/dpi/MetadataDetailPanel";
 import { MetadataDetailType } from "@/lib/api-metadata-detail";
 import { useTimeFilter } from "@/contexts/TimeFilterContext";
 import { fmtBytes, getKnownDomainService } from "@/lib/utils";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 // Clickable hint badge shown in table column headers when rows are interactive
 function ClickHint() {
@@ -59,12 +60,15 @@ export default function DpiAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">BackOne Metadata</h1>
-        <p className="text-slate-400 mt-2">
-          Deep Packet Inspection metadata and fingerprinting.{" "}
-          <span className="text-blue-400 text-sm">Click any row to view device-level detail.</span>
-        </p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight">DPI MetaData</h1>
+          <p className="text-slate-400 mt-2">
+            Deep Packet Inspection metadata and fingerprinting.{" "}
+            <span className="text-blue-400 text-sm">Click any row to view device-level detail.</span>
+          </p>
+        </div>
+        <HelpTrigger pageId="dpi-analytics" />
       </div>
 
       <Tabs>

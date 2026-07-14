@@ -11,77 +11,94 @@ router.get('/summary', async (req, res) => {
     const base = getBaseFilter(req, timeFilter);
     const baseWithoutTime = getBaseFilter(req, null);
 
-    const latestDoc = await Summary.findOne(baseWithoutTime).sort({ timestamp: -1 });
-
-    let latestTime = null;
     let bandwidthDown = 0;
     let bandwidthUp = 0;
-    let totalDevicesCount = 0;
     let activeFlowsCount = 0;
+    let downloadSpeed = 0;
+    let uploadSpeed = 0;
+    let latestTime = null;
 
-    if (latestDoc) {
-      latestTime = latestDoc.timestamp;
-      const summaries = await Summary.find({ ...baseWithoutTime, timestamp: latestTime }).lean();
-      
-      bandwidthDown = summaries.reduce((s, r) => s + (r.bandwidth_down ?? 0), 0);
-      bandwidthUp   = summaries.reduce((s, r) => s + (r.bandwidth_up ?? 0), 0);
-      totalDevicesCount  = summaries.reduce((s, r) => s + (r.total_devices ?? 0), 0);
-      activeFlowsCount   = summaries.reduce((s, r) => s + (r.active_flows ?? 0), 0);
+    if (base.agent_uuid) {
+      // ── Agent-Level Summary (View As Agent mode) ─────────────────────────────
+      // The proxy saves per-agent summaries with agent_uuid = <uuid>.
+      // Use the latest one for the scoped agent instead of site aggregates.
+      const latestAgentSummary = await Summary
+        .findOne(baseWithoutTime)
+        .sort({ timestamp: -1 })
+        .lean();
+
+      if (latestAgentSummary) {
+        bandwidthDown    = latestAgentSummary.bandwidth_down  || 0;
+        bandwidthUp      = latestAgentSummary.bandwidth_up    || 0;
+        activeFlowsCount = latestAgentSummary.active_flows    || 0;
+        downloadSpeed    = latestAgentSummary.download_speed  || 0;
+        uploadSpeed      = latestAgentSummary.upload_speed    || 0;
+        latestTime       = latestAgentSummary.timestamp;
+      }
+    } else {
+      // ── Site-Level Summary (default) ─────────────────────────────────────────
+      // Use site-level snapshots (agent_uuid=null) to avoid double-counting
+      // across agents when no specific agent scope is active.
+      const siteIds = baseWithoutTime.site_uuid
+        ? [baseWithoutTime.site_uuid]
+        : await Summary.distinct('site_uuid', { agent_uuid: null });
+
+      for (const siteId of siteIds) {
+        const latestSiteSummary = await Summary
+          .findOne({ agent_uuid: null, site_uuid: siteId })
+          .sort({ timestamp: -1 })
+          .lean();
+
+        if (latestSiteSummary) {
+          // Apply time filter: only use if within the requested time range
+          if (timeFilter && latestSiteSummary.timestamp < timeFilter) continue;
+
+          bandwidthDown    += latestSiteSummary.bandwidth_down  || 0;
+          bandwidthUp      += latestSiteSummary.bandwidth_up    || 0;
+          activeFlowsCount += latestSiteSummary.active_flows    || 0;
+          downloadSpeed    += latestSiteSummary.download_speed  || 0;
+          uploadSpeed      += latestSiteSummary.upload_speed    || 0;
+          if (!latestTime || latestSiteSummary.timestamp > latestTime) {
+            latestTime = latestSiteSummary.timestamp;
+          }
+        }
+      }
+
+      // Fallback: if no site-level summaries exist yet, aggregate from per-agent summaries
+      if (bandwidthDown === 0 && bandwidthUp === 0) {
+        const latestAgentDoc = await Summary.findOne(baseWithoutTime).sort({ timestamp: -1 });
+        if (latestAgentDoc) {
+          latestTime = latestAgentDoc.timestamp;
+          const agentSummaries = await Summary.find({ ...baseWithoutTime, timestamp: latestAgentDoc.timestamp }).lean();
+          bandwidthDown    = agentSummaries.reduce((s, r) => s + (r.bandwidth_down ?? 0), 0);
+          bandwidthUp      = agentSummaries.reduce((s, r) => s + (r.bandwidth_up ?? 0), 0);
+          activeFlowsCount = agentSummaries.reduce((s, r) => s + (r.active_flows ?? 0), 0);
+          downloadSpeed    = agentSummaries.reduce((s, r) => s + (r.download_speed ?? 0), 0);
+          uploadSpeed      = agentSummaries.reduce((s, r) => s + (r.upload_speed ?? 0), 0);
+        }
+      }
     }
 
-    const [fallbackDevices, fallbackFlows, fallbackFlowBandwidth, realThreatsCount, realEventsCount, fallbackThreatsCount] = await Promise.all([
+    // Device count, Threats, Events — always use the scoped base filter
+    // (already contains agent_uuid when in AGENT_VIEWER mode)
+    const [uniqueDevices, realThreatsCount, realEventsCount] = await Promise.all([
       DeviceStat.distinct('ip_address', base).then(r => r.length),
-      Flow.countDocuments(base),
-      Flow.aggregate([
-        { $match: base },
-        { $group: { _id: null, down: { $sum: '$download' }, up: { $sum: '$upload' } } }
-      ]),
       Threat.countDocuments(base),
       Event.countDocuments(base),
-      Event.countDocuments({
-        ...base,
-        $or: [
-          { severity: { $in: ['Critical', 'High'] } },
-          { category_label: 'Cybersecurity' }
-        ]
-      })
     ]);
-
-    const flowDown = fallbackFlowBandwidth[0]?.down || 0;
-    const flowUp = fallbackFlowBandwidth[0]?.up || 0;
-
-    let finalDown = bandwidthDown > 0 ? bandwidthDown : flowDown;
-    let finalUp   = bandwidthUp > 0 ? bandwidthUp : flowUp;
-    let finalDevices = fallbackDevices;
-    let finalActiveFlows = activeFlowsCount > 0 ? activeFlowsCount : fallbackFlows;
-
-    const range = req.query.timeRange || '1d';
-    if (range !== 'all' && range !== '1d') {
-      const scaleMap = {
-        '5m':  1 / (24 * 12),
-        '10m': 1 / (24 * 6),
-        '30m': 1 / 48,
-        '1h':  1 / 24,
-        '7d':  7,
-      };
-      const multiplier = scaleMap[range] ?? 1;
-      finalDown = Math.round(finalDown * multiplier);
-      finalUp   = Math.round(finalUp * multiplier);
-      finalActiveFlows = Math.round(finalActiveFlows * multiplier);
-    }
 
     res.json({
       ok: true,
       data: {
-        total_devices:  finalDevices,
-        total_threats:  realThreatsCount > 0 ? realThreatsCount : fallbackThreatsCount,
+        total_devices:  uniqueDevices,
+        total_threats:  realThreatsCount,
         total_events:   realEventsCount,
         last_fetch:     latestTime || new Date(),
-        bandwidth_down: finalDown,
-        bandwidth_up:   finalUp,
-        active_flows:   finalActiveFlows,
-        download_speed: latestDoc?.download_speed  ?? 0,
-        upload_speed:   latestDoc?.upload_speed    ?? 0,
+        bandwidth_down: bandwidthDown,
+        bandwidth_up:   bandwidthUp,
+        active_flows:   activeFlowsCount,
+        download_speed: downloadSpeed,
+        upload_speed:   uploadSpeed,
         flow_speed:     0,
       }
     });
@@ -90,6 +107,9 @@ router.get('/summary', async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+
+
 
 // GET /api/dashboard/timeline
 router.get('/timeline', async (req, res) => {

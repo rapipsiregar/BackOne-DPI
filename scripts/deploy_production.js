@@ -11,7 +11,7 @@ const config = {
   password: 'htEo7x6LsBQiEHHH'
 };
 
-const DEPLOY_DIR = 'backone-production';
+const DEPLOY_DIR = 'web/demoplace.my.id/public_html';
 
 async function createZip() {
   console.log("Packaging application...");
@@ -30,10 +30,14 @@ async function createZip() {
     // Add static assets (Next.js standalone requires these copied over)
     archive.directory(path.join(__dirname, '../.next/static'), '.next/static');
     archive.directory(path.join(__dirname, '../public'), 'public');
+    archive.directory(path.join(__dirname, '../public'), false);
     
     // Add backend and proxy
     archive.directory(path.join(__dirname, '../backend'), 'backend');
     archive.directory(path.join(__dirname, '../proxy'), 'proxy');
+    
+    // Add PM2 ecosystem config
+    archive.file(path.join(__dirname, '../ecosystem.config.js'), { name: 'ecosystem.config.js' });
     
     // Add production env
     archive.file(path.join(__dirname, '../.env.production'), { name: '.env.production' });
@@ -81,26 +85,24 @@ async function deploy() {
     await sftp.put(zipPath, `${targetDir}/deploy.zip`);
     
     console.log("Extracting package on server...");
-    await runSSH(`cd ${targetDir} && unzip -o deploy.zip && rm deploy.zip`);
+    await runSSH(`cd ${targetDir} && rm -rf .next && unzip -o deploy.zip && rm deploy.zip`);
     
-    console.log("Installing production dependencies for backend & proxy...");
-    await runSSH(`cd ${targetDir}/backend && npm install --production`);
-    await runSSH(`cd ${targetDir}/proxy && npm install --production`);
+    console.log("Creating symlink for static files...");
+    await runSSH(`cd ${targetDir} && rm -rf _next && ln -s .next _next`);
+    
+    console.log("Installing production dependencies for root, backend & proxy...");
+    await runSSH(`. ~/.nvm/nvm.sh && nvm use 20 && cd ${targetDir} && npm install --production`);
+    await runSSH(`. ~/.nvm/nvm.sh && nvm use 20 && cd ${targetDir}/backend && npm install --production`);
+    await runSSH(`. ~/.nvm/nvm.sh && nvm use 20 && cd ${targetDir}/proxy && npm install --production`);
 
     console.log("Configuring PM2...");
-    // Create ecosystem file for PM2
-    const ecosystem = `
-module.exports = {
-  apps: [
-    { name: 'backone-proxy', script: './proxy/index.js', env_file: '.env.production' },
-    { name: 'backone-backend', script: './backend/server.js', env_file: '.env.production' },
-    { name: 'backone-frontend', script: 'server.js', env_file: '.env.production' }
-  ]
-};`;
-    await runSSH(`cd ${targetDir} && echo "${ecosystem.replace(/\n/g, '\\n')}" > ecosystem.config.js`);
+    // PM2 ecosystem is now packaged in deploy.zip directly, no need to generate via bash echo.
+    
     
     console.log("Restarting PM2 processes...");
-    const pm2Result = await runSSH(`cd ${targetDir} && pm2 start ecosystem.config.js || pm2 restart ecosystem.config.js`);
+    // Clean delete old PM2 processes if they exist to apply new paths, then start fresh
+    await runSSH(`. ~/.nvm/nvm.sh && nvm use 20 && npx pm2 delete backone-frontend backone-backend backone-proxy || true`);
+    const pm2Result = await runSSH(`. ~/.nvm/nvm.sh && nvm use 20 && cd ${targetDir} && npx pm2 start ecosystem.config.js`);
     console.log(pm2Result);
     
     console.log("Deployment completed successfully!");

@@ -1,7 +1,6 @@
 // proxy/netifyClientCore.js
 // ─────────────────────────────────────────────────────────────────────────────
 // Core fetch and authentication helpers for Netify DPI API.
-// Split from netifyClient.js to keep file sizes under 256 lines.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const path = require('path');
@@ -10,7 +9,6 @@ const axios = require('axios');
 
 const BASE_URL  = process.env.NETIFY_INFORMATICS_BASE_URL || 'https://informatics.netify.ai/api/v1';
 const JWT_TOKEN = process.env.NETIFY_TOKEN || process.env.NETIFY_JWT_TOKEN;
-// In-memory map: agent_uuid -> numeric agent ID
 const agentMap = {};
 
 function getHeaders(siteUuid) {
@@ -39,13 +37,16 @@ function fixDates(obj) {
 async function netifyFetch(endpoint, params = {}, agentUuid = null, siteUuid = null) {
   if (agentUuid) {
     const agentId = agentMap[agentUuid];
-    if (agentId) params.filter_agents = `[${agentId}]`;
-    else params.settings_agent = agentUuid;
+    if (agentId) {
+      params.filter_agents = `[${agentId}]`;
+    } else {
+      params.settings_agent = agentUuid;
+    }
   }
 
   const token = process.env.NETIFY_API_KEY || JWT_TOKEN;
-  if (!token || !siteUuid) {
-    console.error(`[DpiClient] Missing DPI_API_KEY or siteUuid for endpoint ${endpoint}`);
+  if (!token) {
+    console.error(`[DpiClient] Missing DPI_API_KEY for endpoint ${endpoint}`);
     return null;
   }
 
@@ -54,9 +55,8 @@ async function netifyFetch(endpoint, params = {}, agentUuid = null, siteUuid = n
       headers: getHeaders(siteUuid), params, timeout: 30000,
     });
     const json = res.data;
+
     if (json?.status_code !== 0) {
-      // Netify returns 200 when there is simply no data in the requested timeframe
-      if (json?.status_code === 200) return [];
       console.error(`[DpiClient] API Error ${json?.status_code} on ${endpoint}: ${json?.status_message || 'No message'}`);
       return null;
     }

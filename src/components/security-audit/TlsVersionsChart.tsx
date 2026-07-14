@@ -89,12 +89,7 @@ export default function TlsVersionsChart({ versionsData }: Props) {
                 scale="log"
                 domain={[1, 'auto']}
                 allowDataOverflow
-                tickFormatter={(value) => {
-                  if (value >= 1073741824) return `${(value / 1073741824).toFixed(0)}GB`;
-                  if (value >= 1048576)    return `${(value / 1048576).toFixed(0)}MB`;
-                  if (value >= 1024)       return `${(value / 1024).toFixed(0)}KB`;
-                  return `${value}B`;
-                }}
+                tickFormatter={(value) => fmtBytes(value)}
               />
               <RechartsTooltip content={<TlsVersionTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
               <Bar dataKey="total" radius={[4, 4, 0, 0]} minPointSize={6}>

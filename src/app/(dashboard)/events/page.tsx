@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Loader2, AlertCircle, Info, AlertTriangle } from "lucide-react";
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
 import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
@@ -18,7 +19,6 @@ function EventsContent() {
   const [mounted, setMounted] = useState(false);
   const [selectedIp, setSelectedIp] = useState<string | null>(null);
   const [selectedMac, setSelectedMac] = useState<string | null>(null);
-  const { data, isLoading } = useEvents();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
 
@@ -27,6 +27,9 @@ function EventsContent() {
     handleFilterChange, setDateFrom, setDateTo, 
     handleReset, activeCount 
   } = useUniversalFilterState();
+
+  // Pass dateFrom/dateTo so the backend filters by the exact calendar date range
+  const { data, isLoading } = useEvents(0, dateFrom, dateTo);
 
   useEffect(() => {
     setMounted(true);
@@ -62,14 +65,10 @@ function EventsContent() {
     return true;
   });
 
-  const minTime = all.reduce((min: number, r: any) => {
-    if (r.timestamp) {
-      const time = new Date(r.timestamp).getTime();
-      if (isFinite(time) && time < min) return time;
-    }
-    return min;
-  }, Infinity);
-  const minDate = minTime !== Infinity ? new Date(minTime).toISOString().slice(0, 10) : "2024-01-01";
+  // Use the data retention window (7 days) as the minimum selectable date.
+  // Dynamic computation from loaded data causes a circular dependency where
+  // the sidebar time filter (e.g., Last 24h) restricts the date picker range.
+  const minDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const getSeverityIcon = (severity: string) => {
     switch (severity.toLowerCase()) {
@@ -157,11 +156,12 @@ function EventsContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
           Network Events
           {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
         </h2>
+        <HelpTrigger pageId="events" />
       </div>
       
       <UniversalFilters
@@ -223,4 +223,3 @@ export default function EventsPage() {
     </Suspense>
   );
 }
-export { EventsContent };

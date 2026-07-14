@@ -41,10 +41,7 @@ export function TopWidgets({ topApps, topProtocols }: TopWidgetsProps) {
                     fontSize={11} 
                     tickLine={false} 
                     axisLine={false}
-                    tickFormatter={(value) => {
-                      const mb = value / 1048576;
-                      return `${mb.toFixed(0)}M`;
-                    }}
+                    tickFormatter={(value) => fmtBytes(value)}
                   />
                   <RechartsTooltip 
                     cursor={{fill: 'rgba(255,255,255,0.05)'}}

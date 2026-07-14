@@ -84,7 +84,7 @@ export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) 
             <div>
               <div className="flex items-center gap-3">
                 <h3 className="text-xl font-bold text-card-foreground tracking-tight">
-                  {ip || data?.ip_address || 'Resolving IP...'}
+                  {ip || data?.ip_address || (isLoading ? 'Resolving IP...' : 'No IP Address')}
                 </h3>
                 {isRefreshing && <RefreshCcw className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 animate-spin" />}
               </div>

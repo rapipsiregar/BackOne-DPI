@@ -7,6 +7,7 @@ import { DataTable, Column } from "@/components/ui/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Loader2 } from "lucide-react";
 import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 export default function DNSPage() {
   const [mounted, setMounted] = useState(false);
@@ -95,11 +96,12 @@ export default function DNSPage() {
 
   return (
     <div className="space-y-6">
-<div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
           DNS Intelligence
           {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
         </h2>
+        <HelpTrigger pageId="dns" />
       </div>
       
       <UniversalFilters

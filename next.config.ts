@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["mongoose"],
   experimental: {
     serverActions: {
       allowedOrigins: ["demoplace.my.id", "www.demoplace.my.id"],

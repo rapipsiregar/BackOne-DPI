@@ -55,7 +55,7 @@ async function runCollection() {
     const now = Date.now();
     if (now - lastCapacityLogAt >= CAPACITY_LOG_INTERVAL_MS) {
       lastCapacityLogAt = now;
-      const { logCapacityStats } = require('../backend/db/capacityTracker');
+      const { logCapacityStats } = require('./db/capacityTracker');
       await logCapacityStats(`[PROXY] [MongoDB] Capacity Used after Run #${runCount}:`);
     }
     

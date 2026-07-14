@@ -10,20 +10,55 @@ const axios   = require('axios');
 
 const PROXY_URL = process.env.PROXY_URL || 'http://localhost:4000';
 
+// ─── Rebranding Helper (Memory Safe & Fast) ──────────────────────────────────
+function rebrandString(str) {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/netify\.unclassified/gi, 'backone.unclassified')
+    .replace(/netify\.(?!ai)/gi, 'backone.')
+    .replace(/Netify's/g, "BackOne's")
+    .replace(/netify's/g, "backone's")
+    .replace(/Netify(?!(\.ai))/g, 'BackOne')
+    .replace(/netify(?!(\.ai))/g, 'backone');
+}
+
+function rebrandObj(obj) {
+  if (obj === null || obj === undefined) return obj;
+
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      obj[i] = rebrandObj(obj[i]);
+    }
+    return obj;
+  }
+
+  if (typeof obj === 'object') {
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        if (typeof obj[key] === 'string') {
+          obj[key] = rebrandString(obj[key]);
+        } else if (typeof obj[key] === 'object') {
+          obj[key] = rebrandObj(obj[key]);
+        }
+      }
+    }
+    return obj;
+  }
+
+  if (typeof obj === 'string') {
+    return rebrandString(obj);
+  }
+
+  return obj;
+}
+
 // ─── Rebranding Middleware ────────────────────────────────────────────────────
 router.use((req, res, next) => {
   const originalJson = res.json.bind(res);
   res.json = function (body) {
     if (body) {
       try {
-        const sanitized = JSON.stringify(body)
-          .replace(/netify\.unclassified/gi, 'backone.unclassified')
-          .replace(/netify\.(?!ai)/gi, 'backone.')
-          .replace(/Netify's/g, "BackOne's")
-          .replace(/netify's/g, "backone's")
-          .replace(/Netify(?!(\.ai))/g, 'BackOne')
-          .replace(/netify(?!(\.ai))/g, 'backone');
-        body = JSON.parse(sanitized);
+        body = rebrandObj(body);
       } catch (err) {
         console.error('[Dashboard] Rebrand error:', err.message);
       }
@@ -56,5 +91,8 @@ router.use(require('./dashboard/tls'));
 router.use(require('./dashboard/telemetry'));
 router.use(require('./dashboard/events'));
 router.use(require('./dashboard/sslSan'));
+router.use(require('./dashboard/tenantConfig'));
+router.use(require('./dashboard/agentLocations'));
+router.use(require('./dashboard/blacklist'));
 
 module.exports = router;

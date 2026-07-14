@@ -1,13 +1,26 @@
 const { CustomDeviceLabel, Flow } = require('../../models/Schemas');
 
 function getTimeFilter(req) {
+  // Explicit calendar date range (from the per-page date picker) takes priority
+  // over the global sidebar time range. Both dates are interpreted as WIB (UTC+7)
+  // to match the dashboard's display timezone (Rule 20).
+  const dateFrom = req.query.date_from;
+  const dateTo   = req.query.date_to;
+  if (dateFrom || dateTo) {
+    const filter = {};
+    if (dateFrom) filter.$gte = new Date(`${dateFrom}T00:00:00.000+07:00`);
+    if (dateTo)   filter.$lte = new Date(`${dateTo}T23:59:59.999+07:00`);
+    return filter;
+  }
+
+  // Fall back to sidebar global time range
   const range = req.query.timeRange || '1d';
   if (range === 'all') return null;
   const now = new Date();
   const ms = {
     '5m':  5    * 60000,
     '30m': 30   * 60000,
-    '1h':  60   * 60000,
+    '1h':  60   * 3600000,
     '1d':  24   * 3600000,
     '7d':  7    * 24 * 3600000,
   };
@@ -15,16 +28,17 @@ function getTimeFilter(req) {
   return { $gte: new Date(now.getTime() - delta) };
 }
 
+
 function getBaseFilter(req, timeFilter = null) {
   const filter = {};
   if (timeFilter) filter.timestamp = timeFilter;
   
   const requestedSiteUuid = req.headers['x-backone-site-uuid'];
-  console.log('[DEBUG] getBaseFilter headers:', Object.keys(req.headers), 'x-backone-site-uuid:', requestedSiteUuid, 'role:', req.user?.role);
   
-  const hasSwitcherRole = ['SUPER_ADMIN', 'SOC_ANALYST', 'ENGINEER'].includes(req.user?.role);
+  const isGlobalUser = req.user?.role === 'SUPER_ADMIN' ||
+    ((!req.user?.site_uuid || req.user?.site_uuid === 'default') && ['SOC_ANALYST', 'ENGINEER'].includes(req.user?.role));
   
-  if (hasSwitcherRole && requestedSiteUuid) {
+  if (isGlobalUser && requestedSiteUuid) {
     filter.site_uuid = requestedSiteUuid;
   } else if (req.user?.site_uuid) {
     filter.site_uuid = req.user.site_uuid;

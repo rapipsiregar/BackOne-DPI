@@ -11,6 +11,7 @@ import {
 } from "@/lib/api-advanced";
 import { IpDetails } from "@/components/ui/IpDetails";
 import { RemoteIpDetailModal } from "@/components/ui/RemoteIpDetailModal";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 export default function NetworkInfrastructurePage() {
   const [selectedRemoteIp, setSelectedRemoteIp] = useState<string | null>(null);
@@ -42,9 +43,12 @@ export default function NetworkInfrastructurePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">Network Infrastructure</h1>
-        <p className="text-slate-400 mt-2">Physical, logical, and geographic network topologies.</p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Network Infrastructure</h1>
+          <p className="text-slate-400 mt-2">Physical, logical, and geographic network topologies.</p>
+        </div>
+        <HelpTrigger pageId="network-infrastructure" />
       </div>
 
       <Tabs>

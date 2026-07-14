@@ -26,7 +26,7 @@ export const NAVIGATION_GROUPS = [
       { name: "Traffic Categories", href: "/network-intelligence", icon: Activity },
       { name: "DNS", href: "/dns", icon: Radio },
       { name: "Geo Traffic", href: "/geography", icon: Globe },
-      { name: "BackOne Metadata", href: "/dpi-analytics", icon: Activity },
+      { name: "DPI MetaData", href: "/dpi-analytics", icon: Activity },
     ]
   },
   {

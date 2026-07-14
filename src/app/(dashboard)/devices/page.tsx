@@ -11,10 +11,10 @@ import { fmtBytes } from "@/lib/utils";
 import { Loader2, ChevronRight, ChevronDown } from "lucide-react";
 
 import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 export default function DevicesPage() {
   const [mounted, setMounted] = useState(false);
-  const devices = useDevices(5000);
   const [selectedDevice, setSelectedDevice] = useState<DeviceStat | null>(null);
 
   const { 
@@ -22,6 +22,9 @@ export default function DevicesPage() {
     handleFilterChange, setDateFrom, setDateTo, 
     handleReset, activeCount 
   } = useUniversalFilterState();
+
+  // Pass dateFrom/dateTo so the backend filters by the exact calendar date range
+  const devices = useDevices(5000, dateFrom, dateTo);
 
   useEffect(() => {
     setMounted(true);
@@ -130,14 +133,12 @@ export default function DevicesPage() {
     if (filters.device_type && filters.device_type !== "All" && row.device_type !== filters.device_type) return false;
     if (filters.os_label && filters.os_label !== "All" && row.os_label !== filters.os_label) return false;
     if (filters.manufacturer && filters.manufacturer !== "All" && row.manufacturer !== filters.manufacturer) return false;
-    
-    if (dateFrom || dateTo) {
-      const d = row.last_seen ? new Date(row.last_seen).toISOString().slice(0, 10) : "";
-      if (dateFrom && d < dateFrom) return false;
-      if (dateTo && d > dateTo) return false;
-    }
+    // Date filtering is handled server-side via date_from/date_to on timestamp.
+    // last_seen (DPI network activity time) != timestamp (collection cycle time),
+    // so client-side date filtering would incorrectly exclude valid records.
     return true;
   });
+
 
   let processedData = [...filteredData];
   const sortUpload = filters.sort_upload || "All";
@@ -149,18 +150,15 @@ export default function DevicesPage() {
     processedData.sort((a, b) => sortDownload === "Descending" ? b.download - a.download : a.download - b.download);
   }
 
-  const minTime = all.reduce((min: number, r: any) => {
-    if (r.last_seen) {
-      const time = new Date(r.last_seen).getTime();
-      if (isFinite(time) && time < min) return time;
-    }
-    return min;
-  }, Infinity);
-  const minDate = minTime !== Infinity ? new Date(minTime).toISOString().slice(0, 10) : "2024-01-01";
+  // Use the data retention window (7 days) as the minimum selectable date.
+  // Do NOT compute minDate from loaded data — the loaded data is already filtered
+  // by the sidebar time range (e.g., last 24h), which would incorrectly restrict
+  // the calendar to only dates within the current filter window.
+  const minDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Devices
@@ -171,6 +169,7 @@ export default function DevicesPage() {
             <span className="text-slate-500 text-xs">Click an IP to see app usage &amp; flows.</span>
           </p>
         </div>
+        <HelpTrigger pageId="devices" />
       </div>
 
       <UniversalFilters

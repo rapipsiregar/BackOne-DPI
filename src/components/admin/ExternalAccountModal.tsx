@@ -11,6 +11,8 @@ interface ExternalAccountModalProps {
   onClose: () => void;
   onSuccess: () => void;
   user?: ManagedUser | null;
+  targetSiteUuid?: string | null;
+  targetCreatedBy?: string | null;
 }
 
 export default function ExternalAccountModal({
@@ -18,6 +20,8 @@ export default function ExternalAccountModal({
   onClose,
   onSuccess,
   user,
+  targetSiteUuid,
+  targetCreatedBy,
 }: ExternalAccountModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -84,6 +88,8 @@ export default function ExternalAccountModal({
         setSuccess(password ? "Password successfully reset & Account updated!" : "Account successfully updated!");
       } else {
         fd.append("role", role);
+        if (targetSiteUuid) fd.append("site_uuid", targetSiteUuid);
+        if (targetCreatedBy) fd.append("created_by", targetCreatedBy);
         await createAdminExternalUser(fd);
         setSuccess("External account successfully created!");
       }

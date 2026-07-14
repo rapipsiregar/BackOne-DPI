@@ -2,7 +2,7 @@
 
 import { ReactNode, useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
-import { getViewAsStatusSync, stopViewAs } from "@/lib/admin-api";
+import { getViewAsStatusSync, stopViewAs, getViewAsHeaders } from "@/lib/admin-api";
 import { AlertTriangle, LogOut, Clock, ShieldAlert, Loader2 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { HelpCenterFAB } from "@/components/ui/HelpCenterFAB";
@@ -20,7 +20,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
     setViewAs(getViewAsStatusSync());
     
     // Fetch initial user session to get token exp time
-    fetch('/api/auth/me')
+    fetch('/api/auth/me', { headers: getViewAsHeaders() })
       .then(res => res.json())
       .then(data => {
         if (data.user) setUser(data.user);
@@ -43,6 +43,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         // Session expired, force logout immediately
         clearInterval(timer);
         setShowTimeoutWarning(false);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('backone_view_as');
+        }
         fetch('/api/auth/logout', { method: 'POST' })
           .then(() => {
             window.location.href = '/login';
@@ -75,6 +78,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
   const handleLogout = async () => {
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('backone_view_as');
+      }
       await fetch('/api/auth/logout', { method: 'POST' });
       window.location.href = '/login';
     } catch (err) {

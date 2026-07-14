@@ -6,11 +6,9 @@ const { getTimeFilter, getBaseFilter } = require('./helpers');
 // GET /api/dashboard/events
 router.get('/events', async (req, res) => {
   try {
-    console.log('[/events] Request received. Query:', req.query);
     const limit = parseInt(req.query.limit ?? 0);
     const timeFilter = getTimeFilter(req);
     const base = getBaseFilter(req, timeFilter);
-    console.log('[/events] Event base filter:', base);
 
     let query = Event.find(base).sort({ timestamp: -1 });
     if (limit > 0) {
@@ -26,13 +24,10 @@ router.get('/events', async (req, res) => {
     let macToIpMap = {};
     if (missingIpMacs.length > 0) {
       const baseFilterNull = getBaseFilter(req, null);
-      console.log('[/events] getBaseFilter(req, null) returned:', baseFilterNull);
-      
       const filterForDevices = { 
         mac_address: { $in: missingIpMacs }, 
         ...baseFilterNull 
       };
-      console.log('[/events] DEBUG filterForDevices:', filterForDevices);
       const devices = await DeviceStat.find(filterForDevices).lean();
       for (const d of devices) {
         macToIpMap[d.mac_address] = d.ip_address;

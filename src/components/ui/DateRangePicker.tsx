@@ -68,7 +68,7 @@ export function DateRangePicker({
       {open && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-border/50 rounded-xl shadow-2xl z-50 p-4 min-w-[260px]">
           <p className="text-xs text-muted-foreground mb-3 font-medium">
-            Filter Threats by Date
+            Filter by Date Range
           </p>
           <div className="space-y-3">
             <div>

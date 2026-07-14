@@ -10,9 +10,11 @@ module.exports = async function remoteIpDetailsHandler(req, res, helpers) {
     const flowFilter = {};
     if (req.user?.site_uuid) flowFilter.site_uuid = req.user.site_uuid;
     
-    // Agent scope if viewer
+    // Agent scope if viewer or query param
     if (req.user?.role === 'AGENT_VIEWER' && req.user?.agent_uuid) {
       flowFilter.agent_uuid = req.user.agent_uuid;
+    } else if (req.query?.agent_uuid) {
+      flowFilter.agent_uuid = req.query.agent_uuid;
     }
 
     const rawTimeRange = String(req.query.timeRange ?? 'all');

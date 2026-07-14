@@ -17,6 +17,7 @@ const UserSchema = new mongoose.Schema({
   role:            { type: String, enum: ['SUPER_ADMIN', 'TENANT_ADMIN', 'SOC_ANALYST', 'ENGINEER', 'AGENT_VIEWER'], default: 'AGENT_VIEWER' },
   site_uuid:       { type: String, default: null, index: true },
   agent_uuid:      { type: String, default: null },
+  created_by:      { type: String, default: null, index: true },
   is_active:       { type: Boolean, default: true },
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }

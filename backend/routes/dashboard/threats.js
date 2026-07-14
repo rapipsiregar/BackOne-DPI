@@ -281,7 +281,10 @@ router.get('/intelligence/server-discovery', async (req, res) => {
     
     // Resolve IPs using DeviceStat
     const macs = events.map(e => e.mac_address).filter(Boolean);
-    const devices = await DeviceStat.find({ mac_address: { $in: macs } }).lean();
+    const agentFilter = {};
+    if (query.agent_uuid) agentFilter.agent_uuid = query.agent_uuid;
+    if (query.site_uuid)  agentFilter.site_uuid  = query.site_uuid;
+    const devices = await DeviceStat.find({ mac_address: { $in: macs }, ...agentFilter }).lean();
     const macMap = {};
     devices.forEach(d => {
       macMap[d.mac_address] = d;

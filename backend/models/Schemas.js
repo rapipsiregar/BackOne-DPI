@@ -136,52 +136,6 @@ const EventSchema = new mongoose.Schema({
 }, baseOptions);
 
 // ─── Compound Indexes for common dashboard queries ─────────────────────────────
-// ─── TLS Versions (per agent) ──────────────────────────────────────────────────
-const TlsVersionStatSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
-  agent_uuid:     { type: String, index: true },
-  site_uuid:      { type: String, index: true },
-  tls_version:    { type: String, required: true },
-  download:       Number,
-  upload:         Number,
-  flows:          Number,
-}, baseOptions);
-
-// ─── TLS Ciphers (per agent) ───────────────────────────────────────────────────
-const TlsCipherStatSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
-  agent_uuid:     { type: String, index: true },
-  site_uuid:      { type: String, index: true },
-  tls_cipher:     { type: String, required: true },
-  download:       Number,
-  upload:         Number,
-  flows:          Number,
-}, baseOptions);
-
-// ─── TLS Security (per agent) ──────────────────────────────────────────────────
-const TlsSecurityStatSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
-  agent_uuid:     { type: String, index: true },
-  site_uuid:      { type: String, index: true },
-  tls_security:   { type: String, required: true },
-  download:       Number,
-  upload:         Number,
-  flows:          Number,
-}, baseOptions);
-
-// ─── Country Traffic Stats (per agent) ────────────────────────────────────────
-const CountryStatSchema = new mongoose.Schema({
-  timestamp:    { type: Date,   required: true, index: true, expires: '7d' },
-  agent_uuid:   { type: String, index: true },
-  site_uuid:    { type: String, index: true },
-  country_code: { type: String, required: true },
-  country_name: { type: String, default: '' },
-  download:     Number,
-  upload:       Number,
-  flows:        Number,
-}, baseOptions);
-
-// ─── Compound Indexes for common dashboard queries ─────────────────────────────
 SummarySchema.index({ agent_uuid: 1, timestamp: -1 });
 AppStatSchema.index({ agent_uuid: 1, timestamp: -1, download: -1 });
 DeviceStatSchema.index({ agent_uuid: 1, ip_address: 1 }, { unique: true });
@@ -193,15 +147,6 @@ FlowSchema.index({ site_uuid: 1, app_label: 1, timestamp: -1 });
 ThreatSchema.index({ agent_uuid: 1, timestamp: -1 });
 AppCategoryStatSchema.index({ agent_uuid: 1, timestamp: -1 });
 EventSchema.index({ agent_uuid: 1, timestamp: -1 });
-TlsVersionStatSchema.index({ agent_uuid: 1, timestamp: -1 });
-TlsCipherStatSchema.index({ agent_uuid: 1, timestamp: -1 });
-TlsSecurityStatSchema.index({ agent_uuid: 1, timestamp: -1 });
-CountryStatSchema.index({ agent_uuid: 1, timestamp: -1 });
-
-const CustomDeviceLabelSchema = new mongoose.Schema({
-  mac_address:  { type: String, required: true, unique: true, index: true },
-  device_label: { type: String, required: true },
-}, baseOptions);
 
 // ── Per-Device Per-Application Stats (synced from proxy) ─────────────────
 const DeviceAppStatSchema = new mongoose.Schema({
@@ -220,34 +165,8 @@ DeviceAppStatSchema.index({ agent_uuid: 1, ip_address: 1, timestamp: -1 });
 DeviceAppStatSchema.index({ ip_address: 1, app_label: 1, timestamp: -1 });
 DeviceAppStatSchema.index({ site_uuid: 1, app_label: 1, timestamp: -1 });
 
-// ─── View As Audit Logs ────────────────────────────────────────────────────────
-const ViewAsLogSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   default: Date.now, index: true },
-  admin_id:       { type: String, required: true },
-  admin_username: { type: String, required: true },
-  admin_role:     String,
-  agent_uuid:     { type: String, required: true },
-  agent_label:    String,
-  end_timestamp:  Date,
-  duration:       Number, // duration in seconds
-}, baseOptions);
-
-// ─── Lookup App Dictionary ────────────────────────────────────────────────────
-const LookupAppSchema = new mongoose.Schema({
-  id: { type: Number, required: true, unique: true, index: true },
-  tag: String,
-  label: { type: String, index: true },
-  name: String,
-  full_name: String,
-  description: String,
-  favicon: String,
-  icon: String,
-  logo: String,
-  application_category: Object
-}, baseOptions);
-LookupAppSchema.index({ label: 1, tag: 1 });
-
 const telemetrySchemas = require('./SchemasTelemetry');
+const auxSchemas = require('./SchemasAux');
 
 module.exports = {
   Summary:       mongoose.model('Summary',       SummarySchema),
@@ -257,14 +176,9 @@ module.exports = {
   DeviceAppStat: mongoose.model('DeviceAppStat', DeviceAppStatSchema),
   Flow:          mongoose.model('Flow',          FlowSchema),
   Threat:        mongoose.model('Threat',        ThreatSchema),
-  CustomDeviceLabel: mongoose.model('CustomDeviceLabel', CustomDeviceLabelSchema),
   AppCategoryStat: mongoose.model('AppCategoryStat', AppCategoryStatSchema),
   Event:         mongoose.model('Event',         EventSchema),
-  TlsVersionStat: mongoose.model('TlsVersionStat', TlsVersionStatSchema),
-  TlsCipherStat: mongoose.model('TlsCipherStat', TlsCipherStatSchema),
-  TlsSecurityStat: mongoose.model('TlsSecurityStat', TlsSecurityStatSchema),
-  CountryStat:   mongoose.model('CountryStat',   CountryStatSchema),
-  LookupApp:     mongoose.model('LookupApp',     LookupAppSchema),
-  ViewAsLog:     mongoose.model('ViewAsLog',     ViewAsLogSchema),
+  ...auxSchemas,
   ...telemetrySchemas
 };
+

@@ -17,7 +17,17 @@ function blockAnalyst(req, res, next) {
 // GET /api/auth/admin/users — daftar semua users (admin & analyst)
 router.get('/admin/users', requireAdmin, async (req, res) => {
   try {
-    const users = await User.find({}, '-password_hash').sort({ created_at: 1 });
+    let query = {};
+    if (req.adminUser.role === 'TENANT_ADMIN') {
+      query = {
+        $or: [
+          { role: 'AGENT_VIEWER', site_uuid: req.adminUser.site_uuid },
+          { created_by: req.adminUser.username }
+        ]
+      };
+    }
+    query.username = { $ne: req.adminUser.username };
+    const users = await User.find(query, '-password_hash').sort({ created_at: 1 });
     const data = users.map(u => ({
       id: u._id.toString(),
       username: u.username,
@@ -42,7 +52,21 @@ router.post('/admin/create-agent-user', requireAdmin, blockAnalyst, async (req, 
       return res.status(400).json({ ok: false, error: 'Username dan password wajib diisi' });
     }
     const passwordHash = bcrypt.hashSync(password, 10);
-    const siteUuid = process.env.BACKONE_SITE_UUID || process.env.NETIFY_SITE_UUID || null;
+
+    let siteUuid = null;
+    if (agent_uuid) {
+      const { Summary } = require('../../models/Schemas');
+      const summaryDoc = await Summary.findOne({ agent_uuid: agent_uuid.trim() });
+      if (summaryDoc) {
+        siteUuid = summaryDoc.site_uuid;
+      }
+    }
+
+    if (!siteUuid) {
+      siteUuid = req.adminUser.role === 'SUPER_ADMIN'
+        ? (req.body.site_uuid || process.env.BACKONE_SITE_UUID || process.env.NETIFY_SITE_UUID || null)
+        : req.adminUser.site_uuid;
+    }
 
     const newUser = await User.create({
       username: username.trim(),
@@ -51,6 +75,7 @@ router.post('/admin/create-agent-user', requireAdmin, blockAnalyst, async (req, 
       agent_uuid: agent_uuid?.trim() || null,
       role: 'AGENT_VIEWER',
       site_uuid: siteUuid,
+      created_by: req.adminUser.username,
     });
 
     res.json({ ok: true, message: 'Akun Network Agent berhasil dibuat', userId: newUser._id.toString() });
@@ -69,6 +94,10 @@ router.post('/admin/update-agent-user', requireAdmin, blockAnalyst, upload.singl
     const target = await User.findById(user_id).select('+password_hash');
     if (!target) return res.status(404).json({ ok: false, error: 'User tidak ditemukan' });
     if (target.role === 'SUPER_ADMIN') return res.status(403).json({ ok: false, error: 'Tidak bisa mengubah akun SUPER_ADMIN dari sini' });
+    
+    if (req.adminUser.role !== 'SUPER_ADMIN' && target.site_uuid !== req.adminUser.site_uuid) {
+      return res.status(403).json({ ok: false, error: 'Unauthorized: This account does not belong to your tenant.' });
+    }
 
     if (username?.trim()) {
       const existing = await User.findOne({ username: username.trim(), _id: { $ne: user_id } });
@@ -77,7 +106,16 @@ router.post('/admin/update-agent-user', requireAdmin, blockAnalyst, upload.singl
     }
     if (password) target.password_hash = bcrypt.hashSync(password, 10);
     if (account_name != null) target.account_name = account_name?.trim() || null;
-    if (agent_uuid != null) target.agent_uuid = agent_uuid?.trim() || null;
+    if (agent_uuid != null) {
+      target.agent_uuid = agent_uuid?.trim() || null;
+      if (agent_uuid.trim()) {
+        const { Summary } = require('../../models/Schemas');
+        const summaryDoc = await Summary.findOne({ agent_uuid: agent_uuid.trim() });
+        if (summaryDoc) {
+          target.site_uuid = summaryDoc.site_uuid;
+        }
+      }
+    }
     if (req.file) target.profile_picture = req.file.filename;
 
     await target.save();
@@ -94,6 +132,10 @@ router.delete('/admin/delete-agent-user/:id', requireAdmin, blockAnalyst, async 
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ ok: false, error: 'User tidak ditemukan' });
     if (target.role === 'SUPER_ADMIN') return res.status(403).json({ ok: false, error: 'Tidak bisa menghapus SUPER_ADMIN' });
+    
+    if (req.adminUser.role !== 'SUPER_ADMIN' && target.site_uuid !== req.adminUser.site_uuid) {
+      return res.status(403).json({ ok: false, error: 'Unauthorized: This account does not belong to your tenant.' });
+    }
     await User.findByIdAndDelete(req.params.id);
     res.json({ ok: true, message: 'Akun berhasil dihapus' });
   } catch (err) {
@@ -107,6 +149,10 @@ router.post('/admin/upload-agent-picture/:id', requireAdmin, blockAnalyst, uploa
     if (!req.file) return res.status(400).json({ ok: false, error: 'File gambar wajib diupload' });
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ ok: false, error: 'User tidak ditemukan' });
+    
+    if (req.adminUser.role !== 'SUPER_ADMIN' && target.site_uuid !== req.adminUser.site_uuid) {
+      return res.status(403).json({ ok: false, error: 'Unauthorized: This account does not belong to your tenant.' });
+    }
     target.profile_picture = req.file.filename;
     await target.save();
     res.json({ ok: true, message: 'Foto profil berhasil diperbarui', filename: req.file.filename });
@@ -135,7 +181,13 @@ router.post('/admin/create-external-user', requireAdmin, blockAnalyst, upload.si
     }
 
     const passwordHash = bcrypt.hashSync(password, 10);
-    const siteUuid = process.env.BACKONE_SITE_UUID || process.env.NETIFY_SITE_UUID || null;
+    const siteUuid = req.adminUser.role === 'SUPER_ADMIN'
+      ? (req.body.site_uuid || process.env.BACKONE_SITE_UUID || process.env.NETIFY_SITE_UUID || null)
+      : req.adminUser.site_uuid;
+
+    const createdBy = req.adminUser.role === 'SUPER_ADMIN'
+      ? (req.body.created_by || req.adminUser.username)
+      : req.adminUser.username;
 
     const newUser = await User.create({
       username: username.trim(),
@@ -143,6 +195,7 @@ router.post('/admin/create-external-user', requireAdmin, blockAnalyst, upload.si
       account_name: account_name?.trim() || null,
       role: role,
       site_uuid: siteUuid,
+      created_by: createdBy,
       profile_picture: req.file ? req.file.filename : null
     });
 

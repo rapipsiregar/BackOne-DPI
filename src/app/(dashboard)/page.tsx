@@ -7,6 +7,7 @@ import { GlobeMap } from "@/components/ui/GlobeMap";
 import { getOriginLocation, getDestinationLocation } from "@/lib/geoUtils";
 import { KPICards } from "@/components/dashboard/KPICards";
 import { TopWidgets } from "@/components/dashboard/TopWidgets";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 export default function SummaryPage() {
   const [mounted, setMounted] = useState(false);
@@ -82,7 +83,7 @@ export default function SummaryPage() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Summary Overview
@@ -90,6 +91,7 @@ export default function SummaryPage() {
           </h2>
           <p className="text-muted-foreground mt-1">Real-time network traffic and intelligence summary.</p>
         </div>
+        <HelpTrigger pageId="overview" />
       </div>
 
       {/* KPI Cards */}

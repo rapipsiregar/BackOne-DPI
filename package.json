@@ -7,6 +7,7 @@
     "dev:next": "next dev",
     "dev:backend": "node backend/server.js",
     "dev:proxy": "node proxy/index.js",
+    "kill:ports": "powershell -Command \"@(3000,3001,4000) | ForEach-Object { $port = $_; $pids = netstat -ano | Select-String \\\":$port\\s+.+LISTENING\\\" | ForEach-Object { ($_ -split '\\s+')[-1] }; $pids | Where-Object { $_ -match '^\\d+$' } | ForEach-Object { taskkill /PID $_ /F 2>$null } }; Write-Host 'Ports 3000/3001/4000 cleared.'\"",
     "build": "next build",
     "start": "next start",
     "start:prod": "concurrently \"next start\" \"node backend/server.js\" \"node proxy/index.js\"",
@@ -17,6 +18,7 @@
     "install:all": "npm install && cd backend && npm install && cd ../proxy && npm install && cd .."
   },
   "dependencies": {
+    "@types/leaflet": "^1.9.21",
     "axios": "^1.18.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.11.1",
@@ -30,6 +32,7 @@
     "express": "^5.2.1",
     "framer-motion": "^12.42.2",
     "jsonwebtoken": "^9.0.3",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.21.0",
     "mongodb-memory-server": "^11.2.0",
     "mongoose": "^9.7.4",

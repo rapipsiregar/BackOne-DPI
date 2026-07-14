@@ -103,6 +103,9 @@ export default function SidebarProfile({ user, onOpenSettings }: ProfileProps) {
           <div className="h-px bg-border/50 my-1 mx-2" />
           <button
             onClick={async () => {
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('backone_view_as');
+              }
               await fetch('/api/auth/logout', { method: 'POST' });
               router.push('/login');
               router.refresh();

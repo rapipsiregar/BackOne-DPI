@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from 'react';
+import { getViewAsHeaders } from './admin-api';
 
 const API_BASE = '';
 
@@ -75,7 +76,10 @@ export function useMetadataDetail(
       const params = new URLSearchParams({ type, value, timeRange });
       const response = await fetch(
         `${API_BASE}/api/dashboard/metadata-detail?${params}`,
-        { credentials: 'include' }
+        {
+          headers: getViewAsHeaders(),
+          credentials: 'include'
+        }
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const result: MetadataDetailResult = await response.json();

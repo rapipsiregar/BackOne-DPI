@@ -48,30 +48,34 @@ module.exports = async function deviceDetailsHandler(req, res, helpers) {
   const t0 = Date.now();
   try {
     const {
-      getTimeFilter, generateMacFromIp,
+      getTimeFilter, getBaseFilter, generateMacFromIp,
       resolveDeviceTypeFromIp, resolveOSFromIp, resolveVendorFromIp, generateAutoLabel
     } = helpers;
+
+    const baseFilter = getBaseFilter(req);
 
     let ip  = String(req.query.ip  ?? '');
     const mac = String(req.query.mac ?? '');
 
     if (!ip && mac) {
-      const dev = await DeviceStat.findOne({ mac_address: mac }).sort({ timestamp: -1 }).lean();
+      const dev = await DeviceStat.findOne({ mac_address: mac, ...baseFilter }).sort({ timestamp: -1 }).lean();
       if (dev) {
         ip = dev.ip_address;
       } else {
-        const flow = await Flow.findOne({ src_mac: mac }).sort({ timestamp: -1 }).lean();
+        const flow = await Flow.findOne({ src_mac: mac, ...baseFilter }).sort({ timestamp: -1 }).lean();
         if (flow) ip = flow.src_ip;
       }
     }
-    if (!ip) return res.status(400).json({ ok: false, message: 'ip or mac required' });
+    if (!ip && !mac) return res.status(400).json({ ok: false, message: 'ip or mac required' });
 
-    const agentUuidParam = String(req.query.agent_uuid ?? '');
-    const metaFilter     = {};
-    if (req.user?.site_uuid) metaFilter.site_uuid = req.user.site_uuid;
+    // Find device stats by ip if set, else by mac
+    const deviceQuery = ip ? { ip_address: ip } : { mac_address: mac };
+    const device    = await DeviceStat.findOne({ ...deviceQuery, ...baseFilter }).sort({ timestamp: -1 }).lean();
+    if (!ip && device?.ip_address) {
+      ip = device.ip_address;
+    }
 
-    const device    = await DeviceStat.findOne({ ip_address: ip, ...metaFilter }).sort({ timestamp: -1 }).lean();
-    const agentUuid = agentUuidParam || device?.agent_uuid || req.user?.agent_uuid || null;
+    const agentUuid = baseFilter.agent_uuid || device?.agent_uuid || null;
 
     // ── PRIMARY bandwidth source ─────────────────────────────────────────────
     const totalDownload = device?.download || 0;
@@ -89,15 +93,35 @@ module.exports = async function deviceDetailsHandler(req, res, helpers) {
     }
 
     // ── Parallel queries ─────────────────────────────────────────────────────
+    const flowQueryConditions = [];
+    if (ip) {
+      flowQueryConditions.push({ src_ip: ip }, { dst_ip: ip });
+    }
+    if (mac) {
+      flowQueryConditions.push({ src_mac: mac }, { dst_mac: mac });
+    }
+
+    const threatQuery = {
+      ...(agentUuid ? { agent_uuid: agentUuid } : {})
+    };
+    if (ip && mac) {
+      threatQuery.$or = [{ ip_address: ip }, { mac_address: mac }, { src_mac: mac }];
+    } else if (ip) {
+      threatQuery.ip_address = ip;
+    } else if (mac) {
+      threatQuery.$or = [{ mac_address: mac }, { src_mac: mac }];
+    }
+
     const appFilter = agentUuid ? { agent_uuid: agentUuid, ip_address: ip } : { ip_address: ip };
     if (req.user?.site_uuid) appFilter.site_uuid = req.user.site_uuid;
 
     const [deviceAppStats, flowsQuery, rawThreats] = await Promise.all([
-      // PRIMARY: per-device per-app from DPI API (stored by proxy Step 3b)
-      DeviceAppStat.find(appFilter).sort({ timestamp: -1 }).lean(),
-      Flow.find({ ...flowFilter, $or: [{ src_ip: ip }, { dst_ip: ip }] }).sort({ timestamp: -1 }).limit(2000).lean(),
-      Threat.find({ ...(agentUuid ? { agent_uuid: agentUuid } : {}), ip_address: ip })
-            .sort({ detected_at: -1 }).lean(),
+      // Only query DeviceAppStat if we have an IP
+      ip ? DeviceAppStat.find(appFilter).sort({ timestamp: -1 }).lean() : [],
+      flowQueryConditions.length > 0
+        ? Flow.find({ ...flowFilter, $or: flowQueryConditions }).sort({ timestamp: -1 }).limit(2000).lean()
+        : [],
+      Threat.find(threatQuery).sort({ detected_at: -1 }).lean(),
     ]);
 
     // ── Apps tab — use DeviceAppStat (real DPI per-IP per-app data) ──────────
@@ -132,7 +156,8 @@ module.exports = async function deviceDetailsHandler(req, res, helpers) {
     };
 
     for (const f of flowsQuery) {
-      if (f.src_ip !== ip) continue; // outbound only
+      const isOutbound = ip ? (f.src_ip === ip) : (mac ? (f.src_mac === mac) : false);
+      if (!isOutbound) continue; // outbound only
       const down = f.download || 0;
       const up   = f.upload   || 0;
       const ls   = f.last_seen || (f.timestamp ? new Date(f.timestamp).toISOString() : new Date().toISOString());
@@ -178,7 +203,7 @@ module.exports = async function deviceDetailsHandler(req, res, helpers) {
     }));
 
     const flows = flowsQuery
-      .filter(f => f.src_ip === ip)
+      .filter(f => ip ? (f.src_ip === ip) : (mac ? (f.src_mac === mac) : false))
       .map(f => ({
         flow_id:   f.flow_id   || f._id.toString(),
         src_ip:    f.src_ip,

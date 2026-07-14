@@ -13,6 +13,7 @@ import { ThreatFilters } from "@/components/threats/ThreatFilters";
 import { ThreatRecommendationsDrawer } from "@/components/threats/ThreatRecommendationsDrawer";
 import { useSearchParams } from "next/navigation";
 import { formatAppLabel } from "@/lib/utils";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 // ─── ThreatsContent ───────────────────────────────────────────────────────────
 function ThreatsContent() {
@@ -212,7 +213,7 @@ function ThreatsContent() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Threat Intelligence
@@ -220,9 +221,12 @@ function ThreatsContent() {
           </h2>
           <p className="text-muted-foreground mt-1">Monitor and respond to network security threats.</p>
         </div>
-        <div className="flex items-center gap-2 text-sm font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-          <ShieldCheck className="h-4 w-4" />
-          <span>Active Monitoring</span>
+        <div className="flex items-center gap-3">
+          <HelpTrigger pageId="intelligence" />
+          <div className="flex items-center gap-2 text-sm font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+            <ShieldCheck className="h-4 w-4" />
+            <span>Active Monitoring</span>
+          </div>
         </div>
       </div>
 

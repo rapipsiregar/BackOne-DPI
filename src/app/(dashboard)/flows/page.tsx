@@ -10,6 +10,7 @@ import { fmtBytes, formatAppLabel } from "@/lib/utils";
 import { IpDetails } from "@/components/ui/IpDetails";
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
 import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 function explainAppOrPort(appLabel: string | null, domain: string | null, port: number) {
   const label = appLabel || domain || "";
@@ -61,13 +62,15 @@ function explainAppOrPort(appLabel: string | null, domain: string | null, port: 
 export default function FlowsPage() {
   const [mounted, setMounted] = useState(false);
   const [selectedIp, setSelectedIp] = useState<string | null>(null);
-  const { data, isLoading } = useFlows();
-  
+
   const { 
     filters, dateFrom, dateTo, 
     handleFilterChange, setDateFrom, setDateTo, 
     handleReset, activeCount 
   } = useUniversalFilterState();
+
+  // Pass dateFrom/dateTo so the backend filters by the exact calendar date range
+  const { data, isLoading } = useFlows(5000, dateFrom, dateTo);
 
   useEffect(() => {
     setMounted(true);
@@ -76,6 +79,7 @@ export default function FlowsPage() {
   if (!mounted) return null;
 
   const all = data || [];
+
 
   // Extract unique options
   const opts = (key: string) => {
@@ -101,15 +105,12 @@ export default function FlowsPage() {
     if (filters.dst_port && filters.dst_port !== "All" && String(row.dst_port) !== filters.dst_port) return false;
     if (filters.app && filters.app !== "All" && row.app_label !== filters.app) return false;
     if (filters.domain && filters.domain !== "All" && row.domain !== filters.domain) return false;
-    
-    if (dateFrom || dateTo) {
-      const d = row.last_seen ? new Date(row.last_seen).toISOString().slice(0, 10) : "";
-      if (dateFrom && d < dateFrom) return false;
-      if (dateTo && d > dateTo) return false;
-    }
-    
+    // Date filtering is handled server-side via date_from/date_to on timestamp.
+    // last_seen != timestamp (a flow collected July 13 can have last_seen=July 14)
+    // so client-side filtering by last_seen would incorrectly exclude valid records.
     return true;
   });
+
 
   let processedData = [...filteredData];
   const sortUpload = filters.sort_upload || "All";
@@ -127,14 +128,10 @@ export default function FlowsPage() {
     });
   }
 
-  const minTime = all.reduce((min: number, r: any) => {
-    if (r.last_seen) {
-      const time = new Date(r.last_seen).getTime();
-      if (isFinite(time) && time < min) return time;
-    }
-    return min;
-  }, Infinity);
-  const minDate = minTime !== Infinity ? new Date(minTime).toISOString().slice(0, 10) : "2024-01-01";
+  // Use the data retention window (7 days) as the minimum selectable date.
+  // Dynamic computation from loaded data causes a circular dependency where
+  // the sidebar time filter (e.g., Last 24h) restricts the date picker range.
+  const minDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const columns: Column<typeof data[0]>[] = [
     { 
@@ -207,11 +204,12 @@ export default function FlowsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
           Active Flows
           {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
         </h2>
+        <HelpTrigger pageId="flows" />
       </div>
 
       <UniversalFilters

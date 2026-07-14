@@ -6,17 +6,35 @@ const { getTimeFilter, getBaseFilter, topFlowField } = require('./helpers');
 // GET /api/dashboard/flows
 router.get('/flows', async (req, res) => {
   try {
-    const limit      = parseInt(req.query.limit  ?? 50);
+    const rawLimit   = parseInt(req.query.limit  ?? 50);
     const skip       = parseInt(req.query.skip   ?? 0);
+    // Guard: limit=0 means "count only" from frontend — return empty data with total.
+    // Cap at 20000 per Rule 14 to prevent server memory overload.
+    const limit      = rawLimit <= 0 ? 0 : Math.min(rawLimit, 20000);
     const timeFilter = getTimeFilter(req);
     const query      = getBaseFilter(req, timeFilter);
 
+    if (limit === 0) {
+      // Frontend is requesting total count only (for pagination), not actual rows
+      const total = await Flow.countDocuments(query);
+      return res.json({ ok: true, data: [], total });
+    }
+
+    // When an explicit calendar date range is active, sort OLDEST FIRST so
+    // historical data (e.g., July 13) appears before more recent data (July 14).
+    // Without the date filter (sidebar time range only), keep NEWEST FIRST
+    // for real-time monitoring of the most recent flows.
+    const hasExplicitDateRange = !!(req.query.date_from || req.query.date_to);
+    const sortOrder = hasExplicitDateRange ? 1 : -1;
+
     const raw = await Flow
       .find(query)
-      .sort({ timestamp: -1 })
+      .sort({ timestamp: sortOrder })
       .skip(skip)
       .limit(limit)
       .lean();
+
+
 
     const data = raw.map(f => {
       const port = f.dst_port ?? 0;

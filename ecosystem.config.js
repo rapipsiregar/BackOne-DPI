@@ -1,27 +1,21 @@
 module.exports = {
   apps: [
     {
-      name: "backone-frontend",
-      script: "./.next/standalone/server.js",
-      env: {
-        NODE_ENV: "production",
-        PORT: 8009
-      }
+      name: "backone-proxy",
+      script: "./proxy/index.js",
+      env_file: ".env.production"
     },
     {
       name: "backone-backend",
       script: "./backend/server.js",
-      env: {
-        NODE_ENV: "production",
-        PORT: 3001
-      }
+      env_file: ".env.production"
     },
     {
-      name: "backone-proxy",
-      script: "./proxy/index.js",
+      name: "backone-frontend",
+      script: "server.js",
+      env_file: ".env.production",
       env: {
-        NODE_ENV: "production",
-        PORT: 4000
+        PORT: 8009
       }
     }
   ]

@@ -3,24 +3,26 @@
 
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Calendar, Activity } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountSettingsModal } from "./AccountSettingsModal";
 import { useTimeFilter } from "@/contexts/TimeFilterContext";
+import { useTenantConfig } from "@/contexts/TenantConfigContext";
 import { getViewAsHeaders } from "@/lib/admin-api";
 import { NAVIGATION_GROUPS, TIME_OPTIONS } from "./SidebarData";
 import SidebarProfile from "./SidebarProfile";
 import SidebarNotifications from "./SidebarNotifications";
-
+import { SidebarSiteSwitcher } from "./SidebarSiteSwitcher";
+import { SidebarTimeFilter } from "./SidebarTimeFilter";
 
 export function Sidebar() {
   const pathname = usePathname();
   const { timeRange, setTimeRange } = useTimeFilter();
+  const { tenantConfig } = useTenantConfig();
 
   const [user, setUser] = useState<{ username?: string; account_name?: string; profile_picture?: string; role?: string; agent_uuid?: string } | null>(null);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false); // Time Filter dropdown
+  const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false);
   const [intervalText, setIntervalText] = useState<string>("");
 
   const timeDropdownRef = useRef<HTMLDivElement>(null);
@@ -34,7 +36,17 @@ export function Sidebar() {
     fetch('/api/auth/me', { headers: getViewAsHeaders() })
       .then(res => res.json())
       .then(data => {
-        if (data.user) setUser(data.user);
+        if (data.user) {
+          setUser(data.user);
+          if (data.user.site_uuid && data.user.role !== 'SUPER_ADMIN') {
+            const currentStored = localStorage.getItem('backone_site_uuid');
+            if (currentStored !== data.user.site_uuid) {
+              localStorage.setItem('backone_site_uuid', data.user.site_uuid);
+              setSelectedSite(data.user.site_uuid);
+              window.location.reload();
+            }
+          }
+        }
       })
       .catch(console.error);
 
@@ -87,13 +99,14 @@ export function Sidebar() {
     <div className="flex h-full max-h-screen flex-col border-r border-white/5 bg-black/20 backdrop-blur-3xl transition-all w-64 shrink-0 relative z-40 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)]">
       {/* Brand & Site Info */}
       <div className="flex flex-col p-2 shrink-0 gap-4 border-b border-white/5">
-        <div className="flex items-center justify-center gap-3 w-full pt-4 pb-2 px-1">
-          <img src="/backone-logo.png" alt="BackOne Logo" className="w-9 h-9 rounded-full drop-shadow-[0_0_12px_rgba(255,0,0,0.35)] shrink-0" />
-          <div className="flex flex-col min-w-0 justify-center text-left">
-            <span className="text-xl font-bold font-backone text-foreground tracking-tight leading-none">
-              BackOne
-            </span>
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold mt-1">
+        <div className="flex flex-col items-center justify-center text-center w-full pt-4 pb-2 px-2 gap-2">
+          <img 
+            src={tenantConfig?.brandLogo || "/backone-logo.png"} 
+            alt="Brand Logo" 
+            className="h-10 object-contain drop-shadow-[0_0_12px_rgba(255,0,0,0.2)] shrink-0" 
+          />
+          <div className="flex flex-col items-center justify-center text-center">
+            <span className="text-[9px] uppercase tracking-[0.1em] text-slate-400 font-semibold mt-1">
               Deep Package Inspection
             </span>
             <div className="flex items-center gap-1.5 mt-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold px-2 py-0.5 rounded-full w-fit">
@@ -103,108 +116,30 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* Global Site Switcher Widget (Visible to SUPER_ADMIN, SOC_ANALYST, ENGINEER) */}
-        {user && ['SUPER_ADMIN', 'SOC_ANALYST', 'ENGINEER'].includes(user.role || '') && (
-          <div className="relative w-full px-2" ref={siteDropdownRef}>
-            <button
-              onClick={() => setIsSiteDropdownOpen(!isSiteDropdownOpen)}
-              className="flex w-full items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] p-2.5 text-xs text-slate-300 transition-colors"
-            >
-              <div className="flex items-center gap-2 truncate">
-                <Activity className="h-3.5 w-3.5 text-primary shrink-0" />
-                <div className="flex flex-col items-start truncate leading-normal">
-                  <span className="font-semibold text-[10px] text-primary uppercase tracking-wider">Active Site</span>
-                  <span className="truncate max-w-[130px]">{getSiteLabel(selectedSite)}</span>
-                </div>
-              </div>
-              <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-300", isSiteDropdownOpen && "rotate-180")} />
-            </button>
-
-            <div
-              className={cn(
-                "absolute top-full left-2 right-2 mt-1 rounded-xl border border-white/10 bg-slate-950 p-1.5 shadow-2xl z-50 origin-top transition-all duration-300 ease-out",
-                isSiteDropdownOpen
-                  ? "opacity-100 scale-100 pointer-events-auto translate-y-0"
-                  : "opacity-0 scale-95 pointer-events-none -translate-y-2"
-              )}
-            >
-              <div className="flex flex-col gap-0.5">
-                <button
-                  onClick={() => handleSiteSelect('6681452d_9cae_4ff4_8ae8_0d504774265e')}
-                  className={cn(
-                    "w-full rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors",
-                    selectedSite === '6681452d_9cae_4ff4_8ae8_0d504774265e'
-                      ? "bg-primary/20 text-white font-medium"
-                      : "text-slate-400 hover:bg-white/5 hover:text-white"
-                  )}
-                >
-                  SIAB
-                </button>
-                <button
-                  onClick={() => handleSiteSelect('d7902405_0dc2_458b_8584_ed4d24b64f24')}
-                  className={cn(
-                    "w-full rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors",
-                    selectedSite === 'd7902405_0dc2_458b_8584_ed4d24b64f24'
-                      ? "bg-primary/20 text-white font-medium"
-                      : "text-slate-400 hover:bg-white/5 hover:text-white"
-                  )}
-                >
-                  Nexus
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Global Site Switcher Widget */}
+        <SidebarSiteSwitcher
+          user={user}
+          selectedSite={selectedSite}
+          isSiteDropdownOpen={isSiteDropdownOpen}
+          setIsSiteDropdownOpen={setIsSiteDropdownOpen}
+          siteDropdownRef={siteDropdownRef}
+          handleSiteSelect={handleSiteSelect}
+          getSiteLabel={getSiteLabel}
+        />
 
         {/* Global Time Filter Widget */}
-        <div className="relative w-full px-2 pb-2" ref={timeDropdownRef}>
-          <button
-            onClick={() => setIsTimeDropdownOpen(!isTimeDropdownOpen)}
-            className="flex w-full items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] p-2.5 text-xs text-slate-300 transition-colors"
-          >
-            <div className="flex items-center gap-2 truncate">
-              <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
-              <div className="flex flex-col items-start truncate leading-normal">
-                <span className="font-semibold text-[10px] text-primary uppercase tracking-wider">Time Filter</span>
-                <span className="truncate max-w-[130px]">{selectedTimeOption.label}</span>
-              </div>
-            </div>
-            <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-300", isTimeDropdownOpen && "rotate-180")} />
-          </button>
-
-          <div
-            className={cn(
-              "absolute top-full left-2 right-2 mt-1 rounded-xl border border-white/10 bg-slate-950 p-1.5 shadow-2xl z-50 origin-top transition-all duration-300 ease-out",
-              isTimeDropdownOpen
-                ? "opacity-100 scale-100 pointer-events-auto translate-y-0"
-                : "opacity-0 scale-95 pointer-events-none -translate-y-2"
-            )}
-          >
-            <div className="flex flex-col gap-0.5 max-h-60 overflow-y-auto custom-scrollbar">
-              {TIME_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => {
-                    setTimeRange(opt.value);
-                    setIsTimeDropdownOpen(false);
-                  }}
-                  className={cn(
-                    "w-full rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors",
-                    timeRange === opt.value
-                      ? "bg-primary/20 text-white font-medium"
-                      : "text-slate-400 hover:bg-white/5 hover:text-white"
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
+        <SidebarTimeFilter
+          timeRange={timeRange}
+          setTimeRange={setTimeRange}
+          isTimeDropdownOpen={isTimeDropdownOpen}
+          setIsTimeDropdownOpen={setIsTimeDropdownOpen}
+          timeDropdownRef={timeDropdownRef}
+          selectedTimeOption={selectedTimeOption}
+          timeOptions={TIME_OPTIONS}
+        />
       </div>
 
-      {/* Navigation (Flexible Scrollable Container for Rule 9) */}
+      {/* Navigation */}
       <div className="flex-1 overflow-y-auto px-4 py-3 custom-scrollbar h-full">
         {intervalText && (
           <div className="mb-4 rounded-lg bg-blue-500/5 border border-blue-500/10 p-2 text-center">
@@ -215,10 +150,9 @@ export function Sidebar() {
 
         <nav className="flex flex-col gap-5">
           {NAVIGATION_GROUPS.map((group) => {
-            // Role-based navigation item filtering
             const allowedItems = group.items.filter((item) => {
               if (item.href === "/agents") {
-                return user?.role === "SUPER_ADMIN";
+                return user?.role === "SUPER_ADMIN" || user?.role === "TENANT_ADMIN";
               }
               return true;
             });

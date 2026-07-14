@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-backone-key';
+const { requireAuth, requireAdmin, JWT_SECRET } = require('../../middleware/auth');
 
 function makeToken(user) {
   return jwt.sign(
@@ -29,52 +29,6 @@ function setCookieToken(res, token) {
     sameSite: 'strict',
     maxAge: 24 * 60 * 60 * 1000,
   });
-}
-
-function requireAuth(req, res, next) {
-  const token = req.cookies?.token;
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  try {
-    req.user = jwt.verify(token, JWT_SECRET);
-
-    // ── VIEW-AS MODE ──────────────────────────────────────────────────────────
-    const viewAsHeader = req.headers['x-view-as-agent'];
-    if (viewAsHeader && req.user.role === 'SUPER_ADMIN') {
-      try {
-        const viewDecoded = jwt.verify(viewAsHeader, JWT_SECRET);
-        if (viewDecoded.type === 'view-as' && viewDecoded.adminId === req.user.id && viewDecoded.viewAs) {
-          req.user = {
-            ...req.user,
-            role:          'AGENT_VIEWER',
-            agent_uuid:    viewDecoded.viewAs,
-            agent_label:   viewDecoded.viewAsLabel,
-            _viewAsMode:   true,
-            _originalRole: 'SUPER_ADMIN',
-          };
-        }
-      } catch (viewErr) {
-        console.warn('[ViewAs] Invalid view-as token, ignoring:', viewErr.message);
-      }
-    }
-    next();
-  } catch {
-    res.status(401).json({ error: 'Token tidak valid' });
-  }
-}
-
-function requireAdmin(req, res, next) {
-  const token = req.cookies?.token;
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.role !== 'SUPER_ADMIN' && decoded.role !== 'TENANT_ADMIN' && decoded.role !== 'SOC_ANALYST') {
-      return res.status(403).json({ error: 'Role Anda tidak memiliki izin untuk melakukan aksi ini (Hanya Administrator / Analyst)' });
-    }
-    req.adminUser = decoded;
-    next();
-  } catch {
-    res.status(401).json({ error: 'Token tidak valid' });
-  }
 }
 
 function getUploadsDir() {

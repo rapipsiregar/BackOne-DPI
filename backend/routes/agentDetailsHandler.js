@@ -13,7 +13,10 @@ module.exports = async function agentDetailsHandler(req, res, helpers) {
       getCustomLabelsMap
     } = helpers;
 
-    const uuid = String(req.query.uuid ?? '');
+    let uuid = String(req.query.uuid ?? '');
+    if (req.user?.role === 'AGENT_VIEWER' && req.user?.agent_uuid) {
+      uuid = req.user.agent_uuid;
+    }
     if (!uuid) return res.status(400).json({ ok: false, message: 'uuid required' });
 
     const timeFilter = getTimeFilter(req);
@@ -268,8 +271,14 @@ module.exports = async function agentDetailsHandler(req, res, helpers) {
     // 9. Server Discovery
     const server_discovery = [];
 
-    // Find the user object of this agent to get its name/label
-    const agentUser = await User.findOne({ agent_uuid: uuid, role: 'AGENT_VIEWER' });
+    const userQuery = { agent_uuid: uuid, role: 'AGENT_VIEWER' };
+    const isGlobalUser = req.user?.role === 'SUPER_ADMIN' ||
+      ((!req.user?.site_uuid || req.user?.site_uuid === 'default') && ['SOC_ANALYST', 'ENGINEER'].includes(req.user?.role));
+    if (!isGlobalUser && req.user?.site_uuid) {
+      userQuery.site_uuid = req.user.site_uuid;
+    }
+
+    const agentUser = await User.findOne(userQuery);
     const agent_label = agentUser?.account_name || uuid;
 
     const devicesDl = devices.reduce((sum, d) => sum + d.download, 0);

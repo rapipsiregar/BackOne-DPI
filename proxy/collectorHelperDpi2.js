@@ -4,7 +4,7 @@
 // Split from collector.js to satisfy the 256-line file size limit.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { DeviceStat, DeviceAppStat, Flow, Threat, Event } = require('./models/Schemas');
+const { DeviceStat, DeviceAppStat, Flow, Threat, Event, BlacklistRule, LookupApp } = require('./models/Schemas');
 const {
   generateMacFromIp,
   resolveVendorFromIp,
@@ -107,6 +107,62 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
       }));
       await Flow.bulkWrite(operations);
       console.log(`[Collector]   ✓ ${flowDocs.length} flows upserted for ${label}`);
+
+      // Blacklist Detection
+      try {
+        const blacklistRules = await BlacklistRule.find({ site_uuid: SITE_UUID, agent_uuid: agentUuid, is_active: true }).lean();
+        if (blacklistRules.length > 0) {
+          const blacklistedCategories = new Set(blacklistRules.filter(r => r.type === 'category').map(r => r.value.toLowerCase()));
+          const blacklistedDomains = new Set(blacklistRules.filter(r => r.type === 'domain').map(r => r.value.toLowerCase()));
+
+          const threatDocs = [];
+          for (const f of flowDocs) {
+            let isViolation = false;
+            let categoryLabel = "";
+
+            // Check if domain is blacklisted
+            if (f.domain && blacklistedDomains.has(f.domain.toLowerCase())) {
+              isViolation = true;
+            } else if (f.app_label && blacklistedDomains.has(f.app_label.toLowerCase())) {
+              isViolation = true;
+            }
+
+            // Look up app details to check category
+            if (!isViolation && f.app_label) {
+              const appDef = await LookupApp.findOne({ label: f.app_label }).lean();
+              if (appDef && appDef.application_category?.label) {
+                categoryLabel = appDef.application_category.label;
+                if (blacklistedCategories.has(categoryLabel.toLowerCase())) {
+                  isViolation = true;
+                }
+              }
+            }
+
+            if (isViolation) {
+              threatDocs.push({
+                timestamp,
+                agent_uuid: f.agent_uuid,
+                site_uuid: f.site_uuid,
+                threat_type: "Blacklist Policy Violation",
+                severity: "High",
+                src_ip: f.src_ip,
+                dst_ip: f.dst_ip,
+                dst_port: f.dst_port,
+                protocol: f.protocol,
+                description: `Access to blacklisted app/domain: ${f.app_label} (${f.domain || 'N/A'})${categoryLabel ? ' - Category: ' + categoryLabel : ''}`,
+                event_at: new Date().toISOString()
+              });
+            }
+          }
+
+          if (threatDocs.length > 0) {
+            await Threat.insertMany(threatDocs);
+            console.log(`[Collector]   ✓ ${threatDocs.length} blacklist policy violation threats recorded for ${label}`);
+          }
+        }
+      } catch (err) {
+        console.error('[Collector] Blacklist detection failed:', err.message);
+      }
 
       // Removed 1-hour pruning to comply with Rule 19 (7-day global retention)
     }

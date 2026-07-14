@@ -14,6 +14,7 @@ import { Loader2, Bitcoin, Shield, Server, Lock, AlertTriangle, Key, Globe, Netw
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
 import { TimestampCell } from "@/components/ui/TimestampCell";
 import { fmtBytes } from "@/lib/utils";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 export default function IntelligencePage() {
   const [mounted, setMounted] = useState(false);
@@ -370,11 +371,12 @@ export default function IntelligencePage() {
 
   return (
     <div className="space-y-6">
-<div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-            Threat Intelligence Feeds
-            {loadingStats && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
-          </h2>
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
+          Threat Intelligence Feeds
+          {loadingStats && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+        </h2>
+        <HelpTrigger pageId="intelligence" />
       </div>
       
 

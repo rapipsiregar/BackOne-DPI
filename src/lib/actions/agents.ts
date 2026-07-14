@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const BASE_URL = process.env.BACKONE_BASE_URL || process.env.NETIFY_BASE_URL;
 const API_URL = BASE_URL ? `${BASE_URL}/assets/agents` : "https://manager.netify.ai/api/v1/assets/agents";
@@ -55,11 +58,25 @@ export interface Agent {
 export async function getAgents(clientSiteUuid?: string): Promise<Agent[]> {
   try {
     const API_KEY = getApiKey();
-    const SITE_UUID = clientSiteUuid || getSiteUuid();
+    let SITE_UUID = clientSiteUuid || getSiteUuid();
+
+    // Securely retrieve the user's actual role and site_uuid on the server side
+    try {
+      const cookieStore = await cookies();
+      const token = cookieStore.get('token')?.value;
+      if (token) {
+        const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-backone-key');
+        if (decoded && decoded.role === 'TENANT_ADMIN') {
+          // Force user's site_uuid to prevent TENANT_ADMIN from requesting other sites
+          SITE_UUID = decoded.site_uuid;
+        }
+      }
+    } catch (cookieErr) {
+      console.warn("Failed to retrieve or verify cookie token inside getAgents:", cookieErr);
+    }
 
     // All agent data comes from MongoDB (single source of truth per Rule 13)
     if (API_KEY && API_KEY.startsWith("sk_db_")) {
-      const mongoose = require('mongoose');
       const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
 
       // Connect to MongoDB if not already connected
@@ -67,18 +84,30 @@ export async function getAgents(clientSiteUuid?: string): Promise<Agent[]> {
         await mongoose.connect(MONGODB_URI);
       }
       const db = mongoose.connection.db;
+      if (!db) {
+        throw new Error("Database connection not ready");
+      }
 
-      const filter: any = {};
+      const filter: any = { agent_uuid: { $ne: null } }; // exclude site-level aggregate rows
       if (SITE_UUID) {
         filter.site_uuid = SITE_UUID;
       }
 
-      // Get all agents from MongoDB summaries collection
+      // Get all agents from MongoDB summaries collection, deduplicated by agent_uuid
       const agentSummaries = await db.collection('summaries')
         .aggregate([
           { $match: filter },
           { $sort: { timestamp: -1 } },
-          { $group: { _id: '$agent_uuid', lastSeen: { $first: '$timestamp' }, label: { $first: '$agent_label' } } },
+          {
+            $group: {
+              _id: '$agent_uuid',
+              lastSeen:  { $first: '$timestamp' },
+              label:     { $first: '$agent_label' },
+              site_uuid: { $first: '$site_uuid' }, // capture the site this agent belongs to
+            }
+          },
+          // Final guard: only keep agents whose primary site matches the queried site
+          ...(SITE_UUID ? [{ $match: { site_uuid: SITE_UUID } }] : []),
         ]).toArray();
 
       // Check for any flows recorded in the last 12 hours to determine online status
