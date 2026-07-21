@@ -6,7 +6,8 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "dev": "concurrently --names \"NEXT,BACKEND,PROXY\" --prefix-colors \"cyan,green,yellow\" \"next dev\" \"node backend/server.js\" \"node proxy/index.js\"",
+    "dev": "concurrently --names \"MONGO,NEXT,BACKEND,PROXY\" --prefix-colors \"magenta,cyan,green,yellow\" \"node scripts/start-mongo.js\" \"next dev\" \"node backend/server.js\" \"node proxy/index.js\"",
+    "dev:mongo": "node scripts/start-mongo.js",
     "dev:next": "next dev",
     "dev:backend": "node backend/server.js",
     "dev:proxy": "node proxy/index.js",
