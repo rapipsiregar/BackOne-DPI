@@ -40,7 +40,7 @@ function getBaseFilter(req, timeFilter = null) {
   
   if (isGlobalUser && requestedSiteUuid) {
     filter.site_uuid = requestedSiteUuid;
-  } else if (!isGlobalUser && req.user?.site_uuid) {
+  } else if (req.user?.site_uuid) {
     filter.site_uuid = req.user.site_uuid;
   }
 

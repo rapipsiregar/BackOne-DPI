@@ -12,8 +12,8 @@ module.exports = {
       instances: 1,
       exec_mode: 'fork',
       watch: false,
-      node_args: '--max-old-space-size=256',
-      max_memory_restart: '300M',
+      node_args: '--max-old-space-size=1024',
+      max_memory_restart: '1200M',
       restart_delay: 5000,
       max_restarts: 10,
       env_file: '.env.production',
@@ -51,7 +51,7 @@ module.exports = {
     // ─── 3. Next.js Frontend (Standalone) ──────────────────────────────────
     {
       name: 'backone-frontend',
-      script: './.next/standalone/server.js',
+      script: 'start-with-env.js',
       cwd: '/home/adminbackend/web/demoplace.my.id/public_html',
       instances: 1,
       exec_mode: 'fork',

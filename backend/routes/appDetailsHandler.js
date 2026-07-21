@@ -40,7 +40,7 @@ module.exports = async function appDetailsHandler(req, res, helpers) {
     if (deviceApps.length > 0) {
       // Pre-load application lookup to resolve default domains
       const BASE_URL = process.env.NETIFY_INFORMATICS_BASE_URL || 'https://informatics.netify.ai/api/v1';
-      if (token) {
+      if (token && SITE_UUID) {
         await populateAppCache(BASE_URL, token, SITE_UUID).catch(e => console.warn('[AppDetails] Cache error:', e.message));
       }
       const appMeta = getAppLookupCache()?.[label.toLowerCase()];
@@ -96,7 +96,7 @@ module.exports = async function appDetailsHandler(req, res, helpers) {
     }
 
     // ── Step 2: Fall back to DPI API only if MongoDB has ZERO data ────────────
-    if (token) {
+    if (token && SITE_UUID) {
       const dpiResult = await fetchFromDpiApi(label, agentUuid, req.query.timeRange, token, SITE_UUID);
       if (dpiResult) {
         console.log(`[AppDetails] DPI fallback: label=${label} time=${Date.now()-t0}ms`);

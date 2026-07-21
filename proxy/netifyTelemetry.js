@@ -111,14 +111,13 @@ async function fetchTopCountries(interval = 1440, limit = 100, agentUuid = null,
   const ulMap = {};
   if (ulData) {
     for (const r of ulData) {
-      const cc = r.country?.code || r.country?.label;
+      const cc = r.country?.code;
       if (cc) ulMap[cc] = r.upload ?? 0;
     }
   }
   return dlData.map(r => {
-    const cc = r.country?.code || r.country?.label;
     return {
-      country_code: cc || 'Unknown',
+      country_code: r.country?.code ?? 'Unknown',
       country_name: r.country?.label ?? '',
       download:     r.download ?? 0,
       upload:       ulMap[r.country?.code] ?? 0,

@@ -170,8 +170,7 @@ async function fetchFlows(limit = 10000, agentUuid = null, siteUuid = null) {
     const port = r.remote_port ?? null;
     const portService = port ? (PORT_SERVICE_MAP[port] ?? `Port ${port}`) : null;
     const appLabel = r.application?.label || portService;
-    const sniVal = typeof r.tls_sni === 'object' ? r.tls_sni?.label : r.tls_sni;
-    const domain = sniVal || r.dns_hostname || r.hostname || null;
+    const domain = r.tls_sni || r.dns_hostname || r.hostname || null;
     return {
       flow_id:    String(r.flow_id ?? ''),
       src_ip:     r.local_ip?.address  ?? null,

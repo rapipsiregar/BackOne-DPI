@@ -11,10 +11,12 @@ const coreRoutes = require('./auth/core');
 const settingsRoutes = require('./auth/settings');
 const usersRoutes = require('./auth/users');
 const viewAsRoutes = require('./auth/viewAs');
+const sessionsRoutes = require('./auth/sessions');
 
 router.use('/', coreRoutes);
 router.use('/', settingsRoutes);
 router.use('/', usersRoutes);
 router.use('/', viewAsRoutes);
+router.use('/', sessionsRoutes);
 
 module.exports = router;

@@ -37,8 +37,37 @@ router.get('/admin/users', requireAdmin, async (req, res) => {
       site_uuid: u.site_uuid,
       agent_uuid: u.agent_uuid,
       is_active: u.is_active,
+      login_attempts: u.login_attempts || 0,
+      lockout_until: u.lockout_until || null,
     }));
     res.json({ ok: true, data });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/auth/admin/unlock-user — unlock akun yang terkunci
+router.post('/admin/unlock-user', requireAdmin, blockAnalyst, async (req, res) => {
+  try {
+    const { user_id } = req.body;
+    if (!user_id) {
+      return res.status(400).json({ ok: false, error: 'user_id wajib diisi' });
+    }
+
+    const target = await User.findById(user_id);
+    if (!target) {
+      return res.status(404).json({ ok: false, error: 'User tidak ditemukan' });
+    }
+    
+    if (req.adminUser.role !== 'SUPER_ADMIN' && target.site_uuid !== req.adminUser.site_uuid) {
+      return res.status(403).json({ ok: false, error: 'Unauthorized: Account does not belong to your tenant.' });
+    }
+
+    target.login_attempts = 0;
+    target.lockout_until = null;
+    await target.save();
+
+    res.json({ ok: true, message: 'Akun berhasil di-unlock' });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }

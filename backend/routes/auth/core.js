@@ -9,144 +9,9 @@ const { TenantConfig, CustomAgentLocation } = require('../../models/Schemas');
 
 const router = express.Router();
 
-// ─── Auto-seed SUPER_ADMIN, SOC_ANALYST, dan TENANT_ADMIN jika belum ada ─────────
-(async () => {
-  try {
-    const count = await User.countDocuments({ role: 'SUPER_ADMIN' });
-    if (count === 0) {
-      const hash = bcrypt.hashSync('admin', 10);
-      await User.create({
-        username: 'admin',
-        password_hash: hash,
-        account_name: 'BackOne Administrator',
-        role: 'SUPER_ADMIN',
-        site_uuid: process.env.NETIFY_SITE_UUID || null,
-        agent_uuid: null,
-      });
-      console.log('[Auth] ✓ Default SUPER_ADMIN created: admin / admin');
-      console.log('[Auth] ⚠ GANTI PASSWORD INI SEGERA DI PRODUCTION!');
-    }
-
-    const siabCount = await User.countDocuments({ username: 'siab' });
-    if (siabCount === 0) {
-      const hash = bcrypt.hashSync('siab', 10);
-      await User.create({
-        username: 'siab',
-        password_hash: hash,
-        account_name: 'SIAB Administrator',
-        role: 'TENANT_ADMIN',
-        site_uuid: '6681452d_9cae_4ff4_8ae8_0d504774265e',
-        agent_uuid: null,
-      });
-      console.log('[Auth] ✓ Default SIAB Tenant created: siab / siab');
-    }
-
-    const nexusCount = await User.countDocuments({ username: 'nexus' });
-    if (nexusCount === 0) {
-      const hash = bcrypt.hashSync('nexus', 10);
-      await User.create({
-        username: 'nexus',
-        password_hash: hash,
-        account_name: 'Nexus Administrator',
-        role: 'TENANT_ADMIN',
-        site_uuid: 'd7902405_0dc2_458b_8584_ed4d24b64f24',
-        agent_uuid: null,
-      });
-      console.log('[Auth] ✓ Default Nexus Tenant created: nexus / nexus');
-    }
-
-    // Repair/Migration: Ensure legacy users have appropriate created_by values
-    try {
-      const missingCreatedBy = await User.find({ $or: [{ created_by: { $exists: false } }, { created_by: null }] });
-      if (missingCreatedBy.length > 0) {
-        console.log(`[Auth] Migrating ${missingCreatedBy.length} legacy users to set created_by...`);
-        for (const u of missingCreatedBy) {
-          if (u.username === 'admin') {
-            u.created_by = 'admin';
-          } else if (u.site_uuid === '6681452d_9cae_4ff4_8ae8_0d504774265e') {
-            u.created_by = 'siab';
-          } else if (u.site_uuid === 'd7902405_0dc2_458b_8584_ed4d24b64f24') {
-            u.created_by = 'nexus';
-          } else {
-            u.created_by = 'admin';
-          }
-          await u.save();
-        }
-        console.log(`[Auth] Migration complete.`);
-      }
-    } catch (migrateErr) {
-      console.error('[Auth] Migration failed:', migrateErr.message);
-    }
-
-    const defaultConfigs = [
-      {
-        site_uuid: 'default',
-        brand_name: 'BackOne',
-        brand_logo: '/backone-logo.png',
-        footer_copyright: 'PT. Data Bisnis Solusi',
-        primary_color: '#E11D48',
-      },
-      {
-        site_uuid: '6681452d_9cae_4ff4_8ae8_0d504774265e',
-        brand_name: 'SIAB',
-        brand_logo: '/siab-logo.png',
-        footer_copyright: 'PT. SIAB Indonesia',
-        primary_color: '#3B82F6',
-      },
-      {
-        site_uuid: 'd7902405_0dc2_458b_8584_ed4d24b64f24',
-        brand_name: 'Nexus',
-        brand_logo: '/nexus-logo.png',
-        footer_copyright: 'PT. Nexus Solusi',
-        primary_color: '#8B5CF6',
-      }
-    ];
-
-    for (const config of defaultConfigs) {
-      const existing = await TenantConfig.findOne({ site_uuid: config.site_uuid });
-      if (!existing) {
-        await TenantConfig.create(config);
-        console.log(`[Auth] ✓ Seeded TenantConfig for: ${config.brand_name}`);
-      }
-    }
-
-    // Seed default agent locations
-    const defaultLocations = [
-      {
-        agent_uuid: 'F6-2V-DT-8A',
-        site_uuid: '6681452d_9cae_4ff4_8ae8_0d504774265e',
-        latitude: -6.2263304,
-        longitude: 106.4247322,
-        label: 'CPI Balaraja Agent Office'
-      },
-      {
-        agent_uuid: '2F-TF-1D-GK',
-        site_uuid: '6681452d_9cae_4ff4_8ae8_0d504774265e',
-        latitude: -6.3763318,
-        longitude: 106.8983017,
-        label: 'JRP Cibubur Agent Office'
-      },
-      {
-        agent_uuid: '8A-V3-PB-85',
-        site_uuid: '6681452d_9cae_4ff4_8ae8_0d504774265e',
-        latitude: -6.2253265,
-        longitude: 106.8061484,
-        label: 'IFG LT.18 Agent HQ'
-      }
-    ];
-
-    for (const loc of defaultLocations) {
-      const existing = await CustomAgentLocation.findOne({ agent_uuid: loc.agent_uuid });
-      if (!existing) {
-        await CustomAgentLocation.create(loc);
-        console.log(`[Auth] ✓ Seeded CustomAgentLocation for: ${loc.agent_uuid}`);
-      }
-    }
-
-  } catch (err) {
-    console.warn('[Auth] Seed skipped (MongoDB not ready yet):', err.message);
-  }
-})();
+// ─── Auto-seed database records if empty ──────────────────────────────────────
+const seedAuth = require('./seed');
+seedAuth();
 
 // ─── POST /api/auth/login ─────────────────────────────────────────────────────
 router.post('/login', async (req, res) => {
@@ -157,12 +22,50 @@ router.post('/login', async (req, res) => {
     }
 
     const user = await User.findOne({ username, is_active: true }).select('+password_hash');
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user) {
+      return res.status(401).json({ error: 'Username not found' });
+    }
+
+    // Check if account is currently locked out
+    if (user.lockout_until && user.lockout_until > new Date()) {
+      const remainingTime = Math.ceil((user.lockout_until - new Date()) / 60000);
+      return res.status(403).json({ error: `Account is temporarily locked. Please try again in ${remainingTime} minute(s).` });
+    }
 
     const isValid = bcrypt.compareSync(password, user.password_hash);
-    if (!isValid) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!isValid) {
+      user.login_attempts = (user.login_attempts || 0) + 1;
+      if (user.login_attempts >= 3) {
+        user.lockout_until = new Date(Date.now() + 15 * 60 * 1000); // 15 mins lockout
+        await user.save();
+        return res.status(403).json({ error: 'Account is temporarily locked. Please try again in 15 minute(s).' });
+      } else {
+        await user.save();
+        return res.status(401).json({ error: 'Invalid Password' });
+      }
+    }
 
-    const token = makeToken(user);
+    // Reset login attempts on successful login
+    user.login_attempts = 0;
+    user.lockout_until = null;
+    await user.save();
+
+    // Create session in MongoDB
+    const Session = require('../../models/Session');
+    const crypto = require('crypto');
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 1); // 1 day session lifetime
+
+    const newSession = await Session.create({
+      user_id: user._id,
+      ip_address: req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown',
+      user_agent: req.headers['user-agent'] || 'Unknown',
+      session_token: sessionToken,
+      expires_at: expiresAt,
+    });
+
+    const token = makeToken(user, newSession._id);
     setCookieToken(res, token);
 
     res.json({
@@ -187,8 +90,19 @@ router.post('/renew', requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
+
+    const sessionId = req.user.session_id;
+    if (sessionId) {
+      const Session = require('../../models/Session');
+      const session = await Session.findById(sessionId);
+      if (session) {
+        // Extend session expires_at in MongoDB by another 24h
+        session.expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await session.save();
+      }
+    }
     
-    const token = makeToken(user);
+    const token = makeToken(user, sessionId);
     setCookieToken(res, token);
     
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -239,7 +153,16 @@ router.get('/me', requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/auth/logout ────────────────────────────────────────────────────
-router.post('/logout', (req, res) => {
+router.post('/logout', requireAuth, async (req, res) => {
+  try {
+    const sessionId = req.user?.session_id;
+    if (sessionId) {
+      const Session = require('../../models/Session');
+      await Session.findByIdAndDelete(sessionId);
+    }
+  } catch (err) {
+    console.error('[Logout] Session deletion failed:', err.message);
+  }
   res.clearCookie('token');
   res.json({ message: 'Logged out successfully' });
 });

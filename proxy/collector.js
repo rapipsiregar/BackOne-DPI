@@ -18,8 +18,6 @@ const {
 } = require('./collectorHelperDpi2');
 
 const { Summary, AppStat } = require('./models/Schemas');
-const { LookupApp } = require('./models/SchemasAux');
-const { BASE_URL } = require('./netifyClientCore');
 const { pruneOldData } = require('./dataRetention');
 
 const SITE_UUIDS_STR = process.env.NETIFY_SITE_UUIDS || process.env.NETIFY_SITE_UUID;
@@ -257,47 +255,8 @@ async function collectSpecificAgents(agentUuids, siteUuid = SITE_UUIDS[0], delay
   return { success: true, mode: 'specific_agents', agents_count: agentUuids.length, successful, results };
 }
 
-async function populateLookupApps(siteUuid = '') {
-  try {
-    const axios = require('axios');
-    const headers = { 'Accept': 'application/json' };
-    const res = await axios.get(`${BASE_URL}/lookup/applications`, {
-      headers, params: { settings_limit: 10000 }, timeout: 20000
-    });
-    const apps = res.data?.data;
-    if (!apps || !Array.isArray(apps)) {
-      console.log('[LookupApp] No application data from DPI API');
-      return { success: false, count: 0 };
-    }
-    let upserted = 0;
-    for (const a of apps) {
-      if (!a.id) continue;
-      const doc = {
-        id: a.id,
-        tag: a.tag || '',
-        label: a.label || '',
-        name: a.full_label || a.label || '',
-        full_name: a.full_label || '',
-        description: a.description || '',
-        favicon: a.favicon || '',
-        icon: a.icon || '',
-        logo: a.logo || '',
-        application_category: a.category || null
-      };
-      await LookupApp.updateOne({ id: a.id }, { $set: doc }, { upsert: true });
-      upserted++;
-    }
-    console.log(`[LookupApp] Upserted ${upserted} applications`);
-    return { success: true, count: upserted };
-  } catch (err) {
-    console.error('[LookupApp] Population error:', err.message);
-    return { success: false, count: 0 };
-  }
-}
-
 module.exports = {
   collectAllAgents,
   collectSpecificAgent,
-  collectSpecificAgents,
-  populateLookupApps
+  collectSpecificAgents
 };

@@ -240,7 +240,7 @@ export function Sidebar() {
                       className={cn(
                         "group flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold tracking-wide transition-all duration-300",
                         isActive
-                          ? "bg-primary/10 text-primary border-l-2 border-primary font-bold shadow-md shadow-primary/5"
+                          ? "bg-primary/20 text-white font-bold border border-primary/30 shadow-lg shadow-primary/10"
                           : "text-slate-400 hover:bg-white/[0.02] hover:text-slate-200"
                       )}
                     >

@@ -6,7 +6,7 @@ const fs = require('fs');
 
 const { requireAuth, requireAdmin, JWT_SECRET } = require('../../middleware/auth');
 
-function makeToken(user) {
+function makeToken(user, sessionId) {
   return jwt.sign(
     {
       id: user._id.toString(),
@@ -16,6 +16,7 @@ function makeToken(user) {
       role: user.role,
       site_uuid: user.site_uuid,
       agent_uuid: user.agent_uuid,
+      session_id: sessionId ? sessionId.toString() : undefined,
     },
     JWT_SECRET,
     { expiresIn: '1d' }

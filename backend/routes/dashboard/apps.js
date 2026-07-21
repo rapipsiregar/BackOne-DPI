@@ -1,6 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const { AppStat, ProtocolStat, AppCategoryStat, LookupApp, Flow } = require('../../models/Schemas');
+const { AppStat, ProtocolStat, AppCategoryStat, LookupApp } = require('../../models/Schemas');
 const { getTimeFilter, getBaseFilter } = require('./helpers');
 
 // GET /api/dashboard/apps
@@ -44,18 +44,17 @@ router.get('/protocols', async (req, res) => {
     const base = getBaseFilter(req, timeFilter);
 
     const pipeline = [
-      { $match: { ...base, protocol: { $ne: null, $ne: '' } } },
+      { $match: base },
       { $group: {
-          _id:      '$protocol',
+          _id:      '$protocol_label',
           download: { $sum: '$download' },
           upload:   { $sum: '$upload' },
-          flows:    { $sum: 1 },
+          flows:    { $sum: '$flows' },
       }},
-      { $sort: { download: -1 } },
-      { $limit: 20 }
+      { $sort: { download: -1 } }
     ];
 
-    const result = await Flow.aggregate(pipeline);
+    const result = await ProtocolStat.aggregate(pipeline);
     const formatted = result.map(r => ({
       protocol_label: r._id,
       download:       r.download || 0,

@@ -115,16 +115,34 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
           const blacklistedCategories = new Set(blacklistRules.filter(r => r.type === 'category').map(r => r.value.toLowerCase()));
           const blacklistedDomains = new Set(blacklistRules.filter(r => r.type === 'domain').map(r => r.value.toLowerCase()));
 
+          const flowIdsInBatch = flowDocs.map(f => f.flow_id).filter(Boolean);
+          const existingFlowThreats = new Set(
+            await Threat.find({ flow_id: { $in: flowIdsInBatch } }).distinct('flow_id')
+          );
+
           const threatDocs = [];
+          const eventDocs = [];
+
           for (const f of flowDocs) {
             let isViolation = false;
             let categoryLabel = "";
 
             // Check if domain is blacklisted
-            if (f.domain && blacklistedDomains.has(f.domain.toLowerCase())) {
-              isViolation = true;
-            } else if (f.app_label && blacklistedDomains.has(f.app_label.toLowerCase())) {
-              isViolation = true;
+            for (const r of blacklistRules) {
+              if (r.type === 'domain') {
+                const val = r.value.toLowerCase();
+                // Direct domain match
+                if (f.domain && f.domain.toLowerCase().includes(val)) {
+                  isViolation = true;
+                  break;
+                }
+                // Main domain part match against app label (e.g. "google" from "google.com")
+                const mainDomainPart = val.split('.')[0];
+                if (mainDomainPart && f.app_label && f.app_label.toLowerCase().includes(mainDomainPart)) {
+                  isViolation = true;
+                  break;
+                }
+              }
             }
 
             // Look up app details to check category
@@ -138,7 +156,7 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
               }
             }
 
-            if (isViolation) {
+            if (isViolation && !existingFlowThreats.has(f.flow_id)) {
               threatDocs.push({
                 timestamp,
                 agent_uuid: f.agent_uuid,
@@ -150,7 +168,21 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
                 dst_port: f.dst_port,
                 protocol: f.protocol,
                 description: `Access to blacklisted app/domain: ${f.app_label} (${f.domain || 'N/A'})${categoryLabel ? ' - Category: ' + categoryLabel : ''}`,
-                event_at: new Date().toISOString()
+                event_at: new Date().toISOString(),
+                flow_id: f.flow_id
+              });
+
+              eventDocs.push({
+                timestamp,
+                agent_uuid: f.agent_uuid,
+                site_uuid: f.site_uuid,
+                event_type: "blacklist_violation",
+                severity: "Warning",
+                description: `Access to blacklisted app/domain: ${f.app_label} (${f.domain || 'N/A'})${categoryLabel ? ' - Category: ' + categoryLabel : ''}`,
+                ip_address: f.src_ip,
+                mac_address: f.src_mac,
+                event_at: new Date(),
+                flow_id: f.flow_id
               });
             }
           }
@@ -158,6 +190,10 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
           if (threatDocs.length > 0) {
             await Threat.insertMany(threatDocs);
             console.log(`[Collector]   ✓ ${threatDocs.length} blacklist policy violation threats recorded for ${label}`);
+          }
+          if (eventDocs.length > 0) {
+            await Event.insertMany(eventDocs);
+            console.log(`[Collector]   ✓ ${eventDocs.length} blacklist policy violation events recorded for ${label}`);
           }
         }
       } catch (err) {

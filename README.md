@@ -41,7 +41,7 @@ Produk BackOne oleh **PT. Data Bisnis Solusi** — Dashboard monitoring jaringan
 
 ## 📡 Proxy — 2 Mode Pengambilan Data
 
-Proxy server (port 4000) mendukung 3 mode yang dikontrol via environment variable:
+Proxy server (port 4000) mendukung 2 mode yang dikontrol via environment variable:
 
 ### Mode 1: Semua Network Agent (Admin BackOne)
 
@@ -62,26 +62,14 @@ PROXY_AGENT_UUID=2F-TF-1D-GK    # UUID Network Agent CPI Balaraja
 
 Proxy hanya mengambil data dari **satu Network Agent spesifik** (berdasarkan UUID). Data agent lain tidak pernah masuk ke database. Cocok untuk deployment di sisi client (Pihak A, B, C) agar mereka hanya punya data milik mereka sendiri.
 
-### Mode 3: Beberapa Agent Spesifik (Multi-Agent)
-
-```env
-# .env.local
-PROXY_COLLECT_MODE=agents
-PROXY_AGENT_UUIDS=UUID-AGENT-A,UUID-AGENT-B,UUID-AGENT-C   # comma-separated list
-PROXY_AGENT_DELAY_MS=5000                                   # delay antar agent (default: 5000ms)
-```
-
-Proxy mengambil data dari **beberapa Network Agent spesifik** (berdasarkan daftar UUID yang dipisahkan koma). Data agent di luar daftar tidak pernah masuk ke database. Delay antar agent dapat diatur dengan `PROXY_AGENT_DELAY_MS` untuk menghindari rate-limit.
-
 ### Contoh Multi-Tenant Deployment
 
-| Deployment | PROXY_COLLECT_MODE | PROXY_AGENT_UUID / PROXY_AGENT_UUIDS | Data yang disimpan |
+| Deployment | PROXY_COLLECT_MODE | PROXY_AGENT_UUID | Data yang disimpan |
 |---|---|---|---|
 | Kantor BackOne (Admin) | `all` | _(kosong)_ | Semua agent |
 | Pihak A | `agent` | `UUID-AGENT-A` | Hanya data Pihak A |
 | Pihak B | `agent` | `UUID-AGENT-B` | Hanya data Pihak B |
 | Pihak C | `agent` | `UUID-AGENT-C` | Hanya data Pihak C |
-| Multi-Client | `agents` | `UUID-A,UUID-B` | Data Pihak A dan B |
 
 ---
 
@@ -94,7 +82,6 @@ Proxy mengambil data dari **beberapa Network Agent spesifik** (berdasarkan dafta
 | GET | `/agents` | List semua agent UUID yang ada di MongoDB |
 | POST | `/collect/all` | Trigger manual — kumpulkan semua agent |
 | POST | `/collect/:uuid` | Trigger manual — kumpulkan agent spesifik |
-| POST | `/collect/agents` | Trigger manual — kumpulkan multiple agents (body: `{"uuids": [...], "delay_ms": 5000}`) |
 
 ---
 

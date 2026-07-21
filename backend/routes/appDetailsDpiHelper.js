@@ -44,25 +44,21 @@ async function populateAppCache(BASE_URL, token, siteUuid) {
     const headers = { 'x-api-key': token, 'Accept': 'application/json' };
     if (siteUuid) headers['x-net-site'] = siteUuid;
     const res = await axios.get(`${BASE_URL}/lookup/applications`, {
-      headers, params: { settings_limit: 10000 }, timeout: 20000
+      headers, params: { settings_limit: 2000 }, timeout: 8000
     });
     appLookupCache = {};
     if (res.data && Array.isArray(res.data.data)) {
       res.data.data.forEach(a => {
-        if (!a.id) return;
-        const label = (a.label || '').trim();
-        if (!label) return;
+        if (!a.label || !a.id) return;
         let domain = null;
         if (a.home_page?.url) {
           domain = a.home_page.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
         } else if (a.domain_list?.length > 0) {
           domain = a.domain_list[0].label;
         } else {
-          domain = label.toLowerCase();
+          domain = a.label.toLowerCase();
         }
-        const entry = { id: a.id, label, domain };
-        appLookupCache[label.toLowerCase()] = entry;
-        if (a.tag) appLookupCache[a.tag.toLowerCase()] = entry;
+        appLookupCache[a.label.toLowerCase()] = { id: a.id, label: a.label, domain };
       });
     }
     console.log(`[AppDetailsDpiHelper] App cache: ${Object.keys(appLookupCache).length} apps`);
@@ -96,12 +92,12 @@ async function fetchFromDpiApi(label, agentUuid, timeRange, token, siteUuid) {
 
     const params = {
       filter_interval: timeRangeToMinutes(timeRange),
-      filter_applications: `[${appInfo.id}]`,
+      filter_applications: `["${appInfo.id}"]`,
       settings_limit: 10000
     };
 
     if (agentUuid && agentMapCache?.[agentUuid]) {
-      params.filter_agents = `["${agentMapCache[agentUuid]}"]`;
+      params.filter_agents = `[${agentMapCache[agentUuid]}]`;
     }
 
     const [dlRes, ulRes] = await Promise.all([

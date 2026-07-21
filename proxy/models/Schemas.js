@@ -103,6 +103,7 @@ const ThreatSchema = new mongoose.Schema({
   protocol:    String,
   description: String,
   event_at:    String,
+  flow_id:     { type: String, index: true },
 }, baseOptions);
 
 // ─── App Categories (per agent) ───────────────────────────────────────────────
@@ -129,6 +130,7 @@ const EventSchema = new mongoose.Schema({
   ip_address:     String,
   mac_address:    String,
   event_at:       Date,
+  flow_id:        { type: String, index: true },
 }, baseOptions);
 
 // ─── Compound indexes for common dashboard queries ─────────────────────────────

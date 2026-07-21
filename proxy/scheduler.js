@@ -3,7 +3,7 @@
 // Runs every 5 minutes, collecting data for all agents or a specific agent.
 
 const cron = require('node-cron');
-const { collectAllAgents, collectSpecificAgent, collectSpecificAgents, populateLookupApps } = require('./collector');
+const { collectAllAgents, collectSpecificAgent, collectSpecificAgents } = require('./collector');
 
 // Mode: 'all' = collect all agents, 'agent' = collect one specific agent, 'agents' = collect multiple agents
 const COLLECT_MODE    = process.env.PROXY_COLLECT_MODE || 'all';
@@ -21,7 +21,6 @@ let lastRunAt = null;
 let lastRunResult = null;
 let runCount = 0;
 let lastCapacityLogAt = 0;
-let lastAppLookupRefresh = 0;
 
 /**
  * Execute one collection cycle (called by cron and manual trigger).
@@ -58,14 +57,6 @@ async function runCollection() {
       lastCapacityLogAt = now;
       const { logCapacityStats } = require('./db/capacityTracker');
       await logCapacityStats(`[PROXY] [MongoDB] Capacity Used after Run #${runCount}:`);
-    }
-
-    // Refresh application lookup catalog daily (expensive: fetches 5000+ apps)
-    if (now - (lastAppLookupRefresh || 0) >= CAPACITY_LOG_INTERVAL_MS) {
-      lastAppLookupRefresh = now;
-      await populateLookupApps('').catch(err =>
-        console.error('[Scheduler] LookupApp refresh failed:', err.message)
-      );
     }
     
     return lastRunResult;
@@ -105,8 +96,8 @@ function startScheduler() {
   
   // Initial run immediately on startup (async, do not block server start)
   setTimeout(async () => {
-    // 1. Sync application lookup catalog from DPI API
-    populateLookupApps('').catch(err => console.error('[Scheduler] Initial LookupApp sync failed:', err.message));
+    // 1. Sync dictionary first
+    // await netifyClient.syncApplicationDictionary();
     
     // 2. Start normal telemetry collection
     runCollection().catch(err => console.error('[Scheduler] Initial run error:', err.message));

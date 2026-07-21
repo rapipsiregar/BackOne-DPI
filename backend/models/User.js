@@ -19,6 +19,8 @@ const UserSchema = new mongoose.Schema({
   agent_uuid:      { type: String, default: null },
   created_by:      { type: String, default: null, index: true },
   is_active:       { type: Boolean, default: true },
+  login_attempts:  { type: Number, default: 0 },
+  lockout_until:   { type: Date, default: null },
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });

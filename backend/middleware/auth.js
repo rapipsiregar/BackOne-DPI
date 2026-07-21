@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Session = require('../models/Session');
 const { Summary } = require('../models/Schemas');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-backone-key';
@@ -10,6 +11,18 @@ async function requireAuth(req, res, next) {
 
   try {
     req.user = jwt.verify(token, JWT_SECRET);
+
+    // Verify session status in MongoDB
+    if (req.user.session_id) {
+      const activeSession = await Session.findById(req.user.session_id);
+      if (!activeSession) {
+        res.clearCookie('token');
+        return res.status(401).json({ error: 'Sesi login telah dinonaktifkan atau kedaluwarsa.' });
+      }
+      // Update last active
+      activeSession.last_active = new Date();
+      await activeSession.save();
+    }
 
     // ── VIEW-AS MODE ──────────────────────────────────────────────────────────
     const viewAsHeader = req.headers['x-view-as-agent'];
@@ -50,11 +63,23 @@ async function requireAuth(req, res, next) {
   }
 }
 
-function requireAdmin(req, res, next) {
+async function requireAdmin(req, res, next) {
   const token = req.cookies?.token;
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+
+    // Verify session status in MongoDB
+    if (decoded.session_id) {
+      const activeSession = await Session.findById(decoded.session_id);
+      if (!activeSession) {
+        res.clearCookie('token');
+        return res.status(401).json({ error: 'Sesi login telah dinonaktifkan atau kedaluwarsa.' });
+      }
+      activeSession.last_active = new Date();
+      await activeSession.save();
+    }
+
     if (decoded.role !== 'SUPER_ADMIN' && decoded.role !== 'TENANT_ADMIN' && decoded.role !== 'SOC_ANALYST') {
       return res.status(403).json({ error: 'Forbidden' });
     }
