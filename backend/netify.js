@@ -1,0 +1,2718 @@
+// backend/netify.js
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
+const axios = require('axios');
+
+const BASE_URL  = process.env.BACKONE_INFORMATICS_BASE_URL || process.env.NETIFY_INFORMATICS_BASE_URL || 'https://informatics.netify.ai/api/v1';
+const JWT_TOKEN = process.env.BACKONE_JWT_TOKEN || process.env.NETIFY_TOKEN || process.env.NETIFY_JWT_TOKEN;
+const SITE_UUID = process.env.BACKONE_SITE_UUID || process.env.NETIFY_SITE_UUID;
+const agentMap = {};
+
+function headersSite(useApiKey = false) {
+  const token = process.env.BACKONE_API_KEY || process.env.NETIFY_API_KEY || JWT_TOKEN;
+  const headers = { 'x-api-key': token, 'Accept': 'application/json' };
+  if (SITE_UUID) {
+    headers['x-net-site'] = SITE_UUID;
+  }
+  return headers;
+}
+
+
+
+function fixDates(obj) {
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) fixDates(obj[i]);
+  } else if (obj !== null && typeof obj === 'object') {
+    for (const key in obj) {
+      if ((key === 'first_seen_at' || key === 'last_seen_at' || key.endsWith('_at')) && obj[key] && typeof obj[key].date === 'string') {
+        let d = obj[key].date;
+        if (d.includes(' ') && !d.endsWith('Z')) {
+          obj[key].date = d.replace(' ', 'T') + 'Z';
+        } else if (!d.endsWith('Z') && !d.includes('+') && d.includes('T')) {
+          obj[key].date = d + 'Z';
+        }
+      } else if (typeof obj[key] === 'object') {
+        fixDates(obj[key]);
+      }
+    }
+  }
+}
+
+async function netifyFetch(path, params = {}, useApiKey = false, agentUuid = null) {
+  if (agentUuid) {
+    const agentId = agentMap[agentUuid];
+    if (agentId) {
+      params.filter_agents = `[${agentId}]`;
+    } else {
+      params.settings_agent = agentUuid;
+    }
+  }
+  if (!JWT_TOKEN || !SITE_UUID || JWT_TOKEN === 'YOUR_JWT_TOKEN' || SITE_UUID === 'YOUR_SITE_UUID' || JWT_TOKEN.startsWith('change_me') || JWT_TOKEN.startsWith('YOUR_')) {
+    console.error('[Netify] Failed due to invalid config', {hasToken: !!JWT_TOKEN, SITE_UUID});
+    return null;
+  }
+  try {
+    const res = await axios.get(`${BASE_URL}${path}`, {
+      headers: headersSite(useApiKey), params, timeout: 30000,
+    });
+    const json = res.data;
+    if (json?.status_code !== 0) {
+      console.error(`[Netify] API Error ${json?.status_code} pada ${path}: ${json?.status_message}`);
+      return null;
+    }
+    if (json && json.data) fixDates(json.data);
+    return json?.data ?? null;
+  } catch (err) {
+    const s = err.response?.status;
+    const msg = JSON.stringify(err.response?.data ?? err.message);
+    console.error(`[Netify] ${s ?? 'ERR'} ${path}: ${msg}`);
+    return null;
+  }
+}
+
+// ─── TOP APPS: download + upload digabung ─────────────────────────────────────
+async function fetchTopApps(interval = 1440, limit = 20, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/application/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+
+  // Buat map upload berdasarkan app_id
+  const ulMap = {};
+  if (ulData) {
+    for (const r of ulData) {
+      const id = r.application?.id;
+      if (id) ulMap[id] = r.upload ?? 0;
+    }
+  }
+
+  return dlData.map(r => ({
+    app_id    : r.application?.id ?? null,
+    app_label : r.application?.label ?? 'Unknown',
+    app_tag   : r.application?.tag ?? null,
+    category  : r.application?.category?.label ?? null,
+    favicon   : r.application?.favicon ?? null,
+    download  : r.download ?? 0,
+    upload    : ulMap[r.application?.id] ?? 0,
+    total     : (r.download ?? 0) + (ulMap[r.application?.id] ?? 0),
+    flows     : r.flows ?? 0,
+  }));
+}
+
+// ─── TOP DEVICES: download + upload digabung ──────────────────────────────────
+async function fetchTopDevices(interval = 1440, limit = 50, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/local_ip/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+
+  // Map upload berdasarkan IP address
+  const ulMap = {};
+  if (ulData) {
+    for (const r of ulData) {
+      const ip = r.local_ip?.address ?? String(r.local_ip);
+      ulMap[ip] = r.upload ?? 0;
+    }
+  }
+
+  return dlData.map(r => {
+    const ip = r.local_ip?.address ?? String(r.local_ip ?? '');
+    return {
+      ip_address   : ip,
+      mac_address  : null,
+      device_label : ip,
+      device_type  : null,
+      os_label     : null,
+      manufacturer : null,
+      download     : r.download ?? 0,
+      upload       : ulMap[ip] ?? 0,
+      last_seen    : null,
+    };
+  });
+}
+
+// ─── PORT-TO-SERVICE MAPPING — untuk enrichment flows ────────────────────────
+const PORT_SERVICE_MAP = {
+  80: 'HTTP', 443: 'HTTPS / TLS', 8080: 'HTTP Alt', 8443: 'HTTPS Alt',
+  53: 'DNS', 5353: 'mDNS', 853: 'DNS-over-TLS',
+  25: 'SMTP', 587: 'SMTP TLS', 465: 'SMTPS', 110: 'POP3', 143: 'IMAP',
+  22: 'SSH', 23: 'Telnet', 3389: 'RDP', 5900: 'VNC',
+  21: 'FTP', 20: 'FTP Data', 989: 'FTPS', 990: 'FTPS Control',
+  3306: 'MySQL', 5432: 'PostgreSQL', 6379: 'Redis', 27017: 'MongoDB',
+  1194: 'OpenVPN', 51820: 'WireGuard', 500: 'IPSec IKE', 4500: 'IPSec NAT-T',
+  1723: 'PPTP', 1701: 'L2TP',
+  67: 'DHCP', 68: 'DHCP Client', 123: 'NTP',
+  161: 'SNMP', 162: 'SNMP Trap', 514: 'Syslog',
+  6881: 'BitTorrent', 6882: 'BitTorrent', 6883: 'BitTorrent',
+  9993: 'ZeroTier VPN', 3478: 'STUN/TURN', 5004: 'RTP Media',
+  5060: 'SIP', 5061: 'SIP TLS',
+  8883: 'MQTT TLS', 1883: 'MQTT',
+  179: 'BGP', 520: 'RIP',
+};
+
+// ─── FLOWS: endpoint /data/flows dengan enrichment app/domain ─────────────────
+// NOTE: API flows tidak punya field app/domain — enrichment dilakukan via:
+//   1. PORT_SERVICE_MAP (reliable, berdasarkan dst port)
+//   2. tls_sni field (satu-satunya SNI field valid, tapi nilai sering kosong)
+async function fetchFlows(limit = 500, agentUuid = null) {
+  // Hanya fetch flows + tls_sni (satu-satunya SNI field yang valid = bukan 422)
+  const [raw, tslSniRaw] = await Promise.all([
+    netifyFetch('/data/flows', { settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/tls_sni/download', { filter_interval: 1440, settings_limit: 50 }, false, agentUuid),
+  ]);
+
+  if (!raw || !Array.isArray(raw)) return null;
+
+  // Build TLS SNI lookup — filter yang tidak kosong
+  const sniList = [];
+  if (tslSniRaw && Array.isArray(tslSniRaw)) {
+    for (const r of tslSniRaw) {
+      const sni = r.tls_sni;
+      if (sni && sni.trim() !== '') {
+        sniList.push(sni.replace(/^\*\./, '').trim());
+      }
+    }
+  }
+
+  return raw.map(r => {
+    const port = r.remote_port ?? null;
+    // Primary enrichment: port → service name
+    const portService = port ? (PORT_SERVICE_MAP[port] ?? `Port ${port}`) : null;
+
+    let domain = null;
+    let appLabel = portService;
+
+    // Secondary enrichment: for HTTPS flows, use SNI list if available
+    if ((port === 443 || port === 8443) && sniList.length > 0) {
+      domain = sniList[0];
+    }
+
+    return {
+      flow_id    : String(r.flow_id ?? ''),
+      src_ip     : r.local_ip?.address  ?? null,
+      src_mac    : r.local_mac          ?? r.mac?.address ?? null,
+      dst_ip     : r.remote_ip?.address ?? null,
+      dst_port   : port,
+      protocol   : r.ip_protocol?.label ?? null,
+      app_label  : appLabel,
+      domain     : domain,
+      download   : r.download ?? 0,
+      upload     : r.upload   ?? 0,
+      first_seen : r.first_seen_at?.date ?? null,
+      last_seen  : r.last_seen_at?.date  ?? null,
+    };
+  });
+}
+
+
+// ─── PROTOCOLS ────────────────────────────────────────────────────────────────
+async function fetchTopProtocols(interval = 1440, limit = 20, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/protocol/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/protocol/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+
+  const ulMap = {};
+  if (ulData) {
+    for (const r of ulData) {
+      const id = r.protocol?.id;
+      if (id) ulMap[id] = r.upload ?? 0;
+    }
+  }
+
+  return dlData.map(r => ({
+    protocol_id    : r.protocol?.id ?? null,
+    protocol_label : r.protocol?.label ?? 'Unknown',
+    download       : r.download ?? 0,
+    upload         : ulMap[r.protocol?.id] ?? 0,
+    flows          : r.flows ?? 0,
+  }));
+}
+
+// ─── COUNTRIES ────────────────────────────────────────────────────────────────
+async function fetchTopCountries(interval = 1440, limit = 15, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/country/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/country/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+
+  const ulMap = {};
+  if (ulData) {
+    for (const r of ulData) {
+      const code = r.country?.code;
+      if (code) ulMap[code] = r.upload ?? 0;
+    }
+  }
+
+  return dlData.map(r => ({
+    country_code : r.country?.code ?? null,
+    country_name : r.country?.label ?? 'Unknown',
+    download     : r.download ?? 0,
+    upload       : ulMap[r.country?.code] ?? 0,
+    flows        : r.flows ?? 0,
+  }));
+}
+
+// ─── DNS/HOSTNAME — gunakan tls_sni karena hostname endpoint timeout ──────────
+async function fetchTopDomains(interval = 1440, limit = 50, agentUuid = null) {
+  // NOTE: /data/stats/top/hostname/download selalu timeout
+  // Gunakan tls_sni yang confirmed bekerja di API ini
+  const raw = await netifyFetch('/data/stats/top/tls_sni/download', {
+    filter_interval: interval, settings_limit: limit,
+  }, false, agentUuid);
+  if (!raw) return null;
+
+  return raw
+    .filter(r => r.tls_sni && r.tls_sni.trim() !== '')
+    .map(r => ({
+      domain      : r.tls_sni.replace(/^\*\./, '').trim(),
+      app_label   : null,
+      category    : 'HTTPS/TLS',
+      download    : r.download ?? 0,
+      query_count : r.download ?? 0,
+    }));
+}
+
+
+// ─── BANDWIDTH SUMMARY untuk timeline ─────────────────────────────────────────
+async function fetchBandwidthSummary(interval = 30, agentUuid = null) {
+  const rawSummary = await netifyFetch('/data/stats/summary', { filter_interval: interval }, false, agentUuid);
+  if (rawSummary) {
+    return {
+      download: rawSummary.download ?? 0,
+      upload: rawSummary.upload ?? 0,
+      flows: rawSummary.flow_hourly_count ?? 0,
+      download_speed: rawSummary.download_speed ?? 0,
+      upload_speed: rawSummary.upload_speed ?? 0,
+      flow_speed: rawSummary.flow_speed ?? 0,
+      devices: 0,
+    };
+  }
+
+  // Fallback to old way (aggregate top 100 application stats)
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/stats/top/application/upload', { filter_interval: interval, settings_limit: 100 }, false, agentUuid),
+  ]);
+
+  const download = (dlData ?? []).reduce((s, r) => s + (r.download ?? 0), 0);
+  const upload   = (ulData ?? []).reduce((s, r) => s + (r.upload   ?? 0), 0);
+  const flows    = (dlData ?? []).reduce((s, r) => s + (r.flows    ?? 0), 0);
+
+  return {
+    download,
+    upload,
+    flows,
+    download_speed: 0,
+    upload_speed: 0,
+    flow_speed: 0,
+    devices: dlData?.length ?? 0
+  };
+}
+
+// ─── THREATS — gunakan flows dengan filter anomali sebagai fallback ────────────
+async function fetchCyberThreats(limit = 50, agentUuid = null) {
+  // Events/threats belum ada di v1 — return array kosong agar tidak error
+  // Akan diisi saat endpoint ditemukan
+  return [];
+}
+
+// ─── EVENTS ───────────────────────────────────────────────────────────────────
+async function fetchEvents(limit = 50, agentUuid = null) {
+  const raw = await netifyFetch('/event/events', { settings_limit: limit }, false, agentUuid);
+  if (!raw || !Array.isArray(raw)) return [];
+
+  return raw.map(r => {
+    let msg = r.label || '';
+    if (r.description) {
+      try {
+        const descObj = JSON.parse(r.description);
+        msg = descObj.default || r.label || '';
+        if (descObj.tags) {
+          for (const k in descObj.tags) {
+            const val = Array.isArray(descObj.tags[k]) ? descObj.tags[k][0] : descObj.tags[k];
+            msg = msg.replace(`{{ ${k} }}`, val).replace(`{{${k}}}`, val);
+          }
+        }
+      } catch (e) {
+        msg = r.description;
+      }
+    }
+
+    let sevLabel = 'Info';
+    if (r.severity >= 30) sevLabel = 'Critical';
+    else if (r.severity >= 20) sevLabel = 'High';
+    else if (r.severity >= 10) sevLabel = 'Warning';
+
+    let srcIp = null;
+    if (r.description) {
+      try {
+        const descObj = JSON.parse(r.description);
+        srcIp = descObj.tags?.device_ip || descObj.tags?.ip || null;
+      } catch {}
+    }
+
+    return {
+      event_id: r.id || null,
+      event_type: r.basename || 'unknown',
+      severity: sevLabel,
+      mac_address: r.additional?.device?.mac?.address || null,
+      ip_address: srcIp,
+      description: msg,
+      event_at: r.created_at?.date || new Date().toISOString()
+    };
+  });
+}
+
+async function fetchDiscoveredDevices(interval = 1440, limit = 500, agentUuid = null) {
+  // Ambil lebih banyak bandwidth data (limit x2) supaya coverage IP lebih luas
+  const [intelRaw, dlData, ulData, flowsRaw] = await Promise.all([
+    netifyFetch('/intelligence/discovery/devices', { settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/local_ip/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
+  ]);
+
+  if (!intelRaw || !Array.isArray(intelRaw)) return [];
+
+  // Map bandwidth per IP
+  const dlMap = {};
+  const ulMap = {};
+  if (dlData) {
+    for (const r of dlData) {
+      const ip = r.local_ip?.address ?? String(r.local_ip);
+      if (ip) dlMap[ip] = r.download ?? 0;
+    }
+  }
+  if (ulData) {
+    for (const r of ulData) {
+      const ip = r.local_ip?.address ?? String(r.local_ip);
+      if (ip) ulMap[ip] = r.upload ?? 0;
+    }
+  }
+
+  // Enrich bandwidth from flows — aggregate per local_ip as fallback
+  // Bagi device yang IP-nya tidak ada di top stats (traffic kecil)
+  const dlFlowMap = {};
+  const ulFlowMap = {};
+  const macFlowMap = {};
+  const lastSeenFlowMap = {};
+
+  if (flowsRaw && Array.isArray(flowsRaw)) {
+    for (const f of flowsRaw) {
+      const ip = f.local_ip?.address;
+      if (!ip) continue;
+      
+      if (!dlMap[ip]) {
+        dlFlowMap[ip] = (dlFlowMap[ip] ?? 0) + (f.download ?? 0);
+      }
+      if (!ulMap[ip]) {
+        ulFlowMap[ip] = (ulFlowMap[ip] ?? 0) + (f.upload ?? 0);
+      }
+
+      // Correlate MAC Address from flow
+      if (!macFlowMap[ip]) {
+          const flowMac = f.local_mac ?? f.mac?.address;
+          if (flowMac && flowMac !== '00:00:00:00:00:00') {
+              macFlowMap[ip] = flowMac;
+          }
+      }
+
+      // Correlate Timestamp from flow
+      const flowTime = f.last_seen_at?.date || f.created_at?.date;
+      if (flowTime) {
+          if (!lastSeenFlowMap[ip] || new Date(flowTime) > new Date(lastSeenFlowMap[ip])) {
+              lastSeenFlowMap[ip] = flowTime;
+          }
+      }
+    }
+  }
+
+  const resolvedList = intelRaw.map(r => {
+    const ip = r.ip?.address ?? null;
+    let mac = r.mac_address ?? r.discovery_mac?.address ?? null;
+    if (!mac && ip && macFlowMap[ip]) mac = macFlowMap[ip];
+    
+    const oui = mac ? mac.substring(0, 8).toUpperCase() : null;
+    const mfr = r.mac_vendor !== 'Unknown' && r.mac_vendor !== 'Local' ? r.mac_vendor : (OUI_MAP[oui] ?? r.mac_vendor ?? null);
+
+    // Get device_type — prefer discovery_type if meaningful, else device_type
+    const rawType = r.discovery_type?.label;
+    const deviceType = (rawType && rawType !== 'Unknown' && rawType !== 'Unclassified')
+      ? rawType
+      : (r.device_type?.label && r.device_type.label !== 'Unclassified' ? r.device_type.label : rawType ?? null);
+
+    // Get OS — prefer discovery_os if meaningful, else device_os
+    const rawOs = r.discovery_os?.label;
+    const osLabel = (rawOs && rawOs !== 'Unknown' && rawOs !== 'Unclassified')
+      ? rawOs
+      : (r.device_os?.label && r.device_os.label !== 'Unclassified' ? r.device_os.label : rawOs ?? null);
+
+    // Bandwidth: prioritize top stats, fallback to flows aggregation
+    const dl = ip ? (dlMap[ip] ?? dlFlowMap[ip] ?? 0) : 0;
+    const ul = ip ? (ulMap[ip] ?? ulFlowMap[ip] ?? 0) : 0;
+
+    let last_seen = r.last_seen_at?.date || r.discovery_mac?.last_seen_at?.date || null;
+    if (!last_seen && ip && lastSeenFlowMap[ip]) last_seen = lastSeenFlowMap[ip];
+
+    return {
+      ip_address   : ip,
+      mac_address  : mac,
+      device_label : r.device?.label || r.discovery_mac?.discovery_hardware || ip || 'Unknown',
+      device_type  : deviceType,
+      os_label     : osLabel,
+      manufacturer : mfr,
+      download     : dl,
+      upload       : ul,
+      last_seen    : last_seen,
+    };
+  });
+
+  const seenIps = new Set(resolvedList.map(d => d.ip_address).filter(Boolean));
+  const allActiveIps = new Set([
+    ...Object.keys(dlMap),
+    ...Object.keys(ulMap)
+  ]);
+
+  for (const ip of allActiveIps) {
+    if (!seenIps.has(ip)) {
+      seenIps.add(ip);
+      const dl = dlMap[ip] ?? dlFlowMap[ip] ?? 0;
+      const ul = ulMap[ip] ?? ulFlowMap[ip] ?? 0;
+      resolvedList.push({
+        ip_address   : ip,
+        mac_address  : macFlowMap[ip] || null,
+        device_label : ip,
+        device_type  : 'LAN Client',
+        os_label     : 'Windows/Linux',
+        manufacturer : 'Unknown',
+        download     : dl,
+        upload       : ul,
+        last_seen    : lastSeenFlowMap[ip] || new Date().toISOString()
+      });
+    }
+  }
+
+  return resolvedList.sort((a, b) => (b.download + b.upload) - (a.download + a.upload));
+}
+
+// OUI lookup — manufacturer dari 3 oktet pertama MAC
+const OUI_MAP = {
+  '60:BE:B4' : 'Ruckus Networks',
+  '74:6F:88' : 'Ruckus Networks',
+  '04:F4:1C' : 'MikroTik',
+  'F4:6D:3F' : 'TP-Link',
+  'B8:27:EB' : 'Raspberry Pi',
+  'DC:A6:32' : 'Raspberry Pi',
+  'E4:5F:01' : 'Raspberry Pi',
+  '00:50:56' : 'VMware',
+  '08:00:27' : 'VirtualBox',
+  'AC:17:02' : 'ASUSTek',
+  'B4:2E:99' : 'ASUSTek',
+  '18:31:BF' : 'ASUSTek',
+  '74:D0:2B' : 'Cisco',
+  'F8:72:EA' : 'Cisco',
+  '00:1A:A0' : 'Cisco',
+  'FC:FB:FB' : 'Cisco Meraki',
+  '88:15:44' : 'Cisco Meraki',
+  '00:18:0A' : 'Ubiquiti',
+  '04:18:D6' : 'Ubiquiti',
+  '24:A4:3C' : 'Ubiquiti',
+  '78:8A:20' : 'Ubiquiti',
+  'DC:9F:DB' : 'Ubiquiti',
+  '80:2A:A8' : 'Ubiquiti',
+  'FC:EC:DA' : 'Ubiquiti',
+  '00:27:22' : 'Ubiquiti',
+  'B4:FB:E4' : 'Samsung',
+  '8C:79:F0' : 'Samsung',
+  'F0:25:B7' : 'Samsung',
+  '78:BD:BC' : 'Samsung',
+  '3C:28:6D' : 'Apple',
+  'A4:C3:F0' : 'Apple',
+  'F8:FF:C2' : 'Apple',
+  '98:01:A7' : 'Apple',
+  '3C:22:FB' : 'Apple',
+  'F0:DB:F8' : 'Huawei',
+  '00:E0:FC' : 'Huawei',
+  '54:89:98' : 'Huawei',
+  '28:31:52' : 'Xiaomi',
+  '64:09:80' : 'Xiaomi',
+  'AC:C1:EE' : 'Xiaomi',
+  '50:64:2B' : 'Xiaomi',
+  '00:0C:29' : 'VMware',
+  '00:15:5D' : 'Microsoft Hyper-V',
+  '52:54:00' : 'QEMU/KVM',
+};
+
+// ─── TAMBAHAN FITUR 1-11 ──────────────────────────────────────────────────────
+
+// 1. Top Application Category
+async function fetchTopAppCategories(interval = 1440, limit = 15, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/application_category/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/application_category/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.application_category?.label ?? r.application_category;
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => {
+    const label = r.application_category?.label ?? String(r.application_category ?? 'Unknown');
+    return {
+      category_label : label,
+      download       : r.download ?? 0,
+      upload         : ulMap[label] ?? 0,
+      total          : (r.download ?? 0) + (ulMap[label] ?? 0),
+    };
+  });
+}
+
+// 2. Top Continent
+async function fetchTopContinents(interval = 1440, limit = 10, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/continent/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/continent/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.continent?.label ?? String(r.continent ?? '');
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => {
+    const label = r.continent?.label ?? String(r.continent ?? 'Unknown');
+    return {
+      continent_name : label,
+      download       : r.download ?? 0,
+      upload         : ulMap[label] ?? 0,
+      total          : (r.download ?? 0) + (ulMap[label] ?? 0),
+    };
+  });
+}
+
+// 3. Top Region
+async function fetchTopRegions(interval = 1440, limit = 20, agentUuid = null) {
+  const raw = await netifyFetch('/data/stats/top/region/download', {
+    filter_interval: interval, settings_limit: limit,
+  }, false, agentUuid);
+  if (!raw) return null;
+  return raw.map(r => ({
+    region_name  : r.region?.region_name?.trim() || '(Unknown Region)',
+    region_code  : r.region?.region_code?.trim() || null,
+    country_name : r.region?.country_name ?? null,
+    country_code : r.region?.country_code ?? null,
+    download     : r.download ?? 0,
+  }));
+}
+
+// 4. Top City
+async function fetchTopCities(interval = 1440, limit = 20, agentUuid = null) {
+  const raw = await netifyFetch('/data/stats/top/city/download', {
+    filter_interval: interval, settings_limit: limit,
+  }, false, agentUuid);
+  if (!raw) return null;
+  return raw.map(r => ({
+    city_name    : r.city?.city?.trim() || '(Unknown City)',
+    region_name  : r.city?.region_name?.trim() || null,
+    country_name : r.city?.country_name ?? null,
+    country_code : r.city?.country_code ?? null,
+    download     : r.download ?? 0,
+  }));
+}
+
+// 5. Top VLAN
+async function fetchTopVLANs(interval = 1440, limit = 20, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/vlan/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/vlan/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.vlan?.id ?? 0;
+    ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => ({
+    vlan_id    : r.vlan?.id    ?? 0,
+    vlan_label : r.vlan?.label ?? `VLAN ${r.vlan?.id ?? 0}`,
+    download   : r.download ?? 0,
+    upload     : ulMap[r.vlan?.id ?? 0] ?? 0,
+    total      : (r.download ?? 0) + (ulMap[r.vlan?.id ?? 0] ?? 0),
+  }));
+}
+
+// 6. Top Interface
+async function fetchTopInterfaces(interval = 1440, limit = 20, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/interface/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/interface/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.interface?.id;
+    if (key !== undefined) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => ({
+    iface_id   : r.interface?.id    ?? null,
+    iface_name : r.interface?.name  ?? 'Unknown',
+    iface_role : r.interface?.role  ?? null,
+    agent_id   : r.interface?.agent_id ?? null,
+    download   : r.download ?? 0,
+    upload     : ulMap[r.interface?.id] ?? 0,
+    total      : (r.download ?? 0) + (ulMap[r.interface?.id] ?? 0),
+  }));
+}
+
+// 7. Top Flow Type
+async function fetchTopFlowTypes(interval = 1440, limit = 10, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/flow_type/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/flow_type/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.flow_type?.label ?? String(r.flow_type ?? '');
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => {
+    const label = r.flow_type?.label ?? String(r.flow_type ?? 'Unknown');
+    return {
+      flow_type_label : label,
+      download        : r.download ?? 0,
+      upload          : ulMap[label] ?? 0,
+      total           : (r.download ?? 0) + (ulMap[label] ?? 0),
+    };
+  });
+}
+
+// 8. Top Flow Origin
+async function fetchTopFlowOrigins(interval = 1440, limit = 10, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/flow_origin/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/flow_origin/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.flow_origin?.label ?? String(r.flow_origin ?? '');
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => {
+    const label = r.flow_origin?.label ?? String(r.flow_origin ?? 'Unknown');
+    return {
+      flow_origin_label : label,
+      download          : r.download ?? 0,
+      upload            : ulMap[label] ?? 0,
+      total             : (r.download ?? 0) + (ulMap[label] ?? 0),
+    };
+  });
+}
+
+// 9. Top IP Version
+async function fetchTopIPVersions(interval = 1440, limit = 5, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/ip_version/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/ip_version/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.ip_version?.label ?? String(r.ip_version ?? '');
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => {
+    const label = r.ip_version?.label ?? String(r.ip_version ?? 'Unknown');
+    return {
+      ip_version_label : label,
+      download         : r.download ?? 0,
+      upload           : ulMap[label] ?? 0,
+      total            : (r.download ?? 0) + (ulMap[label] ?? 0),
+    };
+  });
+}
+
+// 10. Top Remote IP
+async function fetchTopRemoteIPs(interval = 1440, limit = 20, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/remote_ip/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/remote_ip/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.remote_ip?.address ?? String(r.remote_ip ?? '');
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => {
+    const addr = r.remote_ip?.address ?? String(r.remote_ip ?? 'Unknown');
+    return {
+      remote_ip  : addr,
+      ip_version : r.remote_ip?.version ?? null,
+      download   : r.download ?? 0,
+      upload     : ulMap[addr] ?? 0,
+      total      : (r.download ?? 0) + (ulMap[addr] ?? 0),
+    };
+  });
+}
+
+// 11. Top Local MAC + Discovery OS
+async function fetchTopLocalMACs(interval = 1440, limit = 50, agentUuid = null) {
+  const [dlData, ulData, osData] = await Promise.all([
+    netifyFetch('/data/stats/top/local_mac/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/local_mac/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/discovery_os/download', { filter_interval: interval, settings_limit: 20 }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    if (r.local_mac) ulMap[r.local_mac] = r.upload ?? 0;
+  }
+  // OS summary untuk info panel
+  const osList = (osData ?? []).map(r => ({
+    os_label : r.discovery_os?.label ?? String(r.discovery_os ?? 'Unknown'),
+    download : r.download ?? 0,
+  }));
+  return dlData.map(r => {
+    const mac = r.local_mac ?? 'Unknown';
+    const oui = mac.substring(0, 8).toUpperCase();
+    return {
+      mac_address  : mac,
+      manufacturer : OUI_MAP[oui] ?? null,
+      download     : r.download ?? 0,
+      upload       : ulMap[mac] ?? 0,
+      total        : (r.download ?? 0) + (ulMap[mac] ?? 0),
+      _os_summary  : osList,  // disertakan di item pertama saja
+    };
+  });
+}
+
+// ─── DISCOVERY OS (standalone) ───────────────────────────────────────────────
+async function fetchTopDiscoveryOS(interval = 1440, limit = 20, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/discovery_os/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/discovery_os/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.discovery_os?.label ?? String(r.discovery_os ?? '');
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => {
+    const label = r.discovery_os?.label ?? String(r.discovery_os ?? 'Unknown');
+    return {
+      os_label : label,
+      download : r.download ?? 0,
+      upload   : ulMap[label] ?? 0,
+      total    : (r.download ?? 0) + (ulMap[label] ?? 0),
+    };
+  });
+}
+
+// ─── DPI FIELDS ───────────────────────────────────────────────────────────────
+
+// TLS Version
+async function fetchTLSVersions(interval = 1440, limit = 10, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/tls_version/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/tls_version/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.tls_version?.label ?? String(r.tls_version ?? '');
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => {
+    const label = r.tls_version?.label ?? String(r.tls_version ?? 'Unknown');
+    return {
+      tls_version : label,
+      download    : r.download ?? 0,
+      upload      : ulMap[label] ?? 0,
+      total       : (r.download ?? 0) + (ulMap[label] ?? 0),
+    };
+  });
+}
+
+// TLS Cipher
+async function fetchTLSCiphers(interval = 1440, limit = 15, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/tls_cipher/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/tls_cipher/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.tls_cipher?.label ?? String(r.tls_cipher ?? '');
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => {
+    const label = r.tls_cipher?.label ?? String(r.tls_cipher ?? 'Unknown');
+    return {
+      tls_cipher : label,
+      download   : r.download ?? 0,
+      upload     : ulMap[label] ?? 0,
+      total      : (r.download ?? 0) + (ulMap[label] ?? 0),
+    };
+  });
+}
+
+// TLS Security Level
+async function fetchTLSSecurity(interval = 1440, limit = 10, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/tls_security/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/tls_security/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.tls_security?.label ?? String(r.tls_security ?? '');
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => {
+    const label = r.tls_security?.label ?? String(r.tls_security ?? 'Unknown');
+    // Assign warna berdasarkan label untuk UI
+    const color = label === 'Recommended' ? 'green'
+                : label === 'Secure'      ? 'blue'
+                : label === 'Weak'        ? 'orange'
+                : label === 'Insecure'    ? 'red'
+                : 'gray';
+    return {
+      tls_security : label,
+      color        : color,
+      download     : r.download ?? 0,
+      upload       : ulMap[label] ?? 0,
+      total        : (r.download ?? 0) + (ulMap[label] ?? 0),
+    };
+  });
+}
+
+// NetBIOS Hostname (nama PC Windows)
+async function fetchNetBIOSHostnames(interval = 1440, limit = 30, agentUuid = null) {
+  const [dlData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/netbios_hostname/download', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch('/data/stats/top/netbios_hostname/upload', { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dlData) return null;
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const key = r.netbios_hostname?.name ?? String(r.netbios_hostname ?? '');
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return dlData.map(r => {
+    const name = r.netbios_hostname?.name ?? String(r.netbios_hostname ?? 'Unknown');
+    return {
+      hostname : name,
+      download : r.download ?? 0,
+      upload   : ulMap[name] ?? 0,
+      total    : (r.download ?? 0) + (ulMap[name] ?? 0),
+    };
+  });
+}
+
+async function fetchLookupApplications(page = 1, limit = 50, search = '', agentUuid = null) {
+  if (!JWT_TOKEN || !SITE_UUID || JWT_TOKEN === 'YOUR_JWT_TOKEN' || SITE_UUID === 'YOUR_SITE_UUID' || JWT_TOKEN.startsWith('change_me') || JWT_TOKEN.startsWith('YOUR_')) {
+    return {
+      applications: [
+        { id: 1, label: 'YouTube', tag: 'video', category: { label: 'Streaming' } },
+        { id: 2, label: 'Netflix', tag: 'video', category: { label: 'Streaming' } },
+        { id: 3, label: 'Web Browsing', tag: 'web', category: { label: 'General' } },
+        { id: 4, label: 'Google Services', tag: 'google', category: { label: 'Tech' } },
+        { id: 5, label: 'WhatsApp', tag: 'im', category: { label: 'Chat' } }
+      ],
+      pagination: { total_records: 5, current_page: 1, total_pages: 1 }
+    };
+  }
+  const params = {
+    settings_page: page,
+    settings_limit: limit,
+  };
+  if (search) {
+    params.filter_application = search;
+  }
+  try {
+    const res = await axios.get(`${BASE_URL}/lookup/applications`, {
+      headers: headersSite(true), params, timeout: 30000,
+    });
+    const json = res.data;
+    if (json?.status_code !== 0) {
+      console.error(`[Netify] API Error ${json?.status_code}: ${json?.status_message}`);
+      return { applications: [], pagination: {} };
+    }
+    return {
+      applications: json.data || [],
+      pagination: json.data_info || {}
+    };
+  } catch (err) {
+    console.error('[Netify] Lookup error:', err.message);
+    return { applications: [], pagination: {} };
+  }
+}
+
+// ─── DETAIL FETCHERS FOR INTERACTIVE MODALS (DB-BASED — API ignores filter params) ─────────
+//
+// NOTE: Netify Informatics API does NOT filter by filter_agent / filter_local_ip —
+// all filter params are silently ignored and global data is returned.
+// All detail queries therefore use the local SQLite DB (flows, devices tables).
+//
+// Agent ↔ src_mac mapping (determined empirically from flows data):
+//   2F-TF-1D-GK (JRP Cibubur)  → src_mac '60:be:b4:1f:05:96'  (IPs 10.1.x.x, 10.0.x.x)
+//   8A-V3-PB-85 (IFG LT.18)    → src_mac '04:f4:1c:ce:c2:e6'  (IPs 10.6.x.x, 192.168.9.x)
+//   F6-2V-DT-8A (CPI Balaraja) → src_mac '2c:7b:a0:d8:86:91', '16:11:ac:73:34:1d', etc (IPs 10.250.x.x)
+
+const AGENT_LABELS = {
+  '2F-TF-1D-GK': 'JRP Cibubur',
+  '8A-V3-PB-85': 'IFG LT.18',
+  'F6-2V-DT-8A': 'CPI Balaraja',
+  '1R-79-J9-YE': 'CPI Balaraja WAN',
+};
+
+// Maps each agent UUID to its gateway/interface MAC address(es) in flows
+const AGENT_MAC_MAP = {
+  '2F-TF-1D-GK': ['60:be:b4:1f:05:96'],
+  '8A-V3-PB-85': ['04:f4:1c:ce:c2:e6'],
+  'F6-2V-DT-8A': ['2c:7b:a0:d8:86:91', '16:11:ac:73:34:1d', 'bc:45:5b:ca:d5:be',
+                   'de:ed:cc:57:58:34', 'f4:6d:3f:ef:01:a0', '60:be:b4:29:d3:36',
+                   '60:be:b4:29:d3:33', '60:be:b4:26:4c:d6', '60:be:b4:29:d3:32'],
+  '1R-79-J9-YE': ['70:85:6c:6d:f7:17', '70:85:6c:81:50:d4', 'a2:cc:8e:7d:39:51',
+                   'f2:69:9d:a1:5e:11', '8e:91:0f:6e:24:63'],
+};
+
+// Build SQL IN clause placeholders
+function inClause(arr) {
+  return arr.map(() => '?').join(',');
+}
+
+// Fetch all data for a specific agent (by UUID) — from local DB flows
+async function fetchAgentDetails(agentUuid) {
+  const db = require('./database');
+  const d  = db.getDB();
+
+  const label = AGENT_LABELS[agentUuid] || agentUuid;
+  const macs  = AGENT_MAC_MAP[agentUuid];
+
+  const emptyResult = { agent_uuid: agentUuid, agent_label: label, summary: null, devices: [], flows: [], top_apps: [], security: { encryption_audit: [], insecure_protocols: [], unencrypted_passwords: [], ip_reputation: [], tor_detections: [], vpn_detections: [] }, events: [], mac_bandwidth: [], server_discovery: [] };
+
+  if (!macs || macs.length === 0) return emptyResult;
+
+  const ph = inClause(macs);
+
+  // ── 1. Top apps by this agent (from flows) ─────────────────────────────────
+  const appRows = db.getLatestBandwidthApps(15, null, agentUuid);
+
+  const top_apps = appRows.map(r => ({
+    app_id    : null,
+    app_label : r.app_label,
+    category  : null,
+    favicon   : null,
+    download  : r.download ?? 0,
+    upload    : r.upload   ?? 0,
+  }));
+
+  // ── 2. Distinct devices for this agent (using aligned subnet and MAC mapping) ─
+  let resolvedDevices = db.getLatestDevices(100, null, agentUuid);
+  
+  // FALLBACK: If agent-specific API failed to return devices, extract from global using MACs
+  if (resolvedDevices.length === 0 && macs.length > 0) {
+    const latestDevGlobal = d.prepare(`SELECT MAX(fetched_at) as t FROM devices WHERE agent_uuid IS NULL`).get()?.t;
+    if (latestDevGlobal) {
+      resolvedDevices = d.prepare(`SELECT * FROM devices WHERE fetched_at = ? AND agent_uuid IS NULL AND mac_address IN (${ph})`).all(latestDevGlobal, ...macs);
+    }
+  }
+
+  const agentIPs = resolvedDevices.map(d => d.ip_address).filter(Boolean);
+  const phIPs    = agentIPs.length > 0 ? agentIPs.map(() => '?').join(',') : null;
+
+  const latestEncAudit = d.prepare(`SELECT MAX(fetched_at) AS t FROM intel_encryption_audit`).get()?.t;
+  const riskMap = {};
+  if (latestEncAudit) {
+    const riskRows = d.prepare(`SELECT ip_address, encrypted_pct, risk_level FROM intel_encryption_audit WHERE fetched_at = ?`).all(latestEncAudit);
+    for (const r of riskRows) {
+      if (r.ip_address) riskMap[r.ip_address] = { encrypted_pct: r.encrypted_pct, risk_level: r.risk_level };
+    }
+  }
+
+  const insecureIPs = new Set(
+    phIPs ? d.prepare(`SELECT DISTINCT ip_address FROM intel_insecure_protocols WHERE ip_address IN (${phIPs})`).all(...agentIPs).map(r => r.ip_address) : []
+  );
+
+  const devices = resolvedDevices.map(r => ({
+    ip_address   : r.ip_address,
+    mac_address  : r.mac_address,
+    device_label : r.device_label || r.ip_address || 'Unknown',
+    device_type  : r.device_type  || null,
+    os_label     : r.os_label     || null,
+    manufacturer : r.manufacturer || null,
+    last_seen    : r.fetched_at   || null,
+    download     : r.download ?? 0,
+    upload       : r.upload ?? 0,
+    encrypted_pct: riskMap[r.ip_address]?.encrypted_pct ?? null,
+    risk_level   : riskMap[r.ip_address]?.risk_level    ?? null,
+    has_insecure : insecureIPs.has(r.ip_address),
+  }));
+
+  // ── 3. Recent flows for this agent (using aligned flows list) ───────────────
+  let flows = db.getLatestFlows(100, null, agentUuid);
+  
+  // FALLBACK: Extrapolate flows from global using MACs/IPs if agent-specific fails
+  if (flows.length === 0 && (macs.length > 0 || agentIPs.length > 0)) {
+    const latestFlowGlobal = d.prepare(`SELECT MAX(fetched_at) as t FROM flows WHERE agent_uuid IS NULL`).get()?.t;
+    if (latestFlowGlobal) {
+      if (phIPs) {
+        flows = d.prepare(`SELECT * FROM flows WHERE fetched_at = ? AND agent_uuid IS NULL AND (local_mac IN (${ph}) OR local_ip IN (${phIPs})) ORDER BY download DESC LIMIT 100`).all(latestFlowGlobal, ...macs, ...agentIPs);
+      } else {
+        flows = d.prepare(`SELECT * FROM flows WHERE fetched_at = ? AND agent_uuid IS NULL AND local_mac IN (${ph}) ORDER BY download DESC LIMIT 100`).all(latestFlowGlobal, ...macs);
+      }
+    }
+  }
+
+  // ── 4. Summary stats (aligned with dashboard stats query) ───────────────────
+  const stats = db.getStats(null, agentUuid);
+  
+  // ACCURATE BANDWIDTH CALCULATION FROM MAC BANDWIDTH (Overrides broken Netify Summary endpoint)
+  let totalDown = 0;
+  let totalUp = 0;
+  const latestMacSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM mac_bandwidth`).get()?.t;
+  if (latestMacSnap && macs.length > 0) {
+    const macRows = d.prepare(`SELECT download, upload FROM mac_bandwidth WHERE fetched_at = ? AND mac_address IN (${ph})`).all(latestMacSnap, ...macs);
+    for (const r of macRows) {
+      totalDown += (r.download || 0);
+      totalUp += (r.upload || 0);
+    }
+  }
+
+  const summary = {
+    total_devices  : stats.totalDevices > 0 ? stats.totalDevices : devices.length,
+    active_flows   : stats.activeFlows > 0 ? stats.activeFlows : flows.length,
+    bandwidth_down : totalDown > 0 ? totalDown : (stats.latestBw?.total_download ?? 0),
+    bandwidth_up   : totalUp > 0 ? totalUp : (stats.latestBw?.total_upload   ?? 0),
+  };
+
+  // ── 5. Security Intel filtered by agent IPs & MACs ─────────────────────────
+  const encryptionRows = (latestEncAudit && phIPs)
+    ? d.prepare(`SELECT ip_address, mac_address, device_label, encrypted_pct, unencrypted, encrypted, total, risk_level, detected_at FROM intel_encryption_audit WHERE fetched_at = ? AND ip_address IN (${phIPs}) ORDER BY CASE risk_level WHEN 'Vulnerable' THEN 1 WHEN 'Moderate' THEN 2 ELSE 3 END`).all(latestEncAudit, ...agentIPs)
+    : [];
+
+  const insecureProtoRows = phIPs
+    ? d.prepare(`SELECT ip_address, mac_address, protocol, risk, app_label, dst_ip, dst_port, download, upload, detected_at FROM intel_insecure_protocols WHERE ip_address IN (${phIPs}) ORDER BY detected_at DESC LIMIT 50`).all(...agentIPs)
+    : [];
+
+  let unencPwdRows = d.prepare(`SELECT ip_address, mac_address, dst_ip, dst_port, protocol, username, severity, download, upload, detected_at FROM intel_unencrypted_passwords WHERE mac_address IN (${ph}) ORDER BY detected_at DESC LIMIT 50`).all(...macs);
+  if (unencPwdRows.length === 0 && phIPs) {
+    unencPwdRows = d.prepare(`SELECT ip_address, mac_address, dst_ip, dst_port, protocol, username, severity, download, upload, detected_at FROM intel_unencrypted_passwords WHERE ip_address IN (${phIPs}) ORDER BY detected_at DESC LIMIT 50`).all(...agentIPs);
+  }
+
+  const latestRepSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM intel_ip_reputation`).get()?.t;
+  const ipReputRows = (latestRepSnap && phIPs)
+    ? d.prepare(`SELECT ip_address, local_ip, mac_address, reputation, score, country, app_label, blacklisted, download, upload, detected_at FROM intel_ip_reputation WHERE fetched_at = ? AND (local_ip IN (${phIPs}) OR ip_address IN (${phIPs})) ORDER BY score DESC LIMIT 50`).all(latestRepSnap, ...agentIPs, ...agentIPs)
+    : [];
+
+  let torRows = d.prepare(`SELECT ip_address, mac_address, exit_node, circuit_id, country, download, upload, detected_at FROM intel_tor_detection WHERE mac_address IN (${ph}) ORDER BY detected_at DESC LIMIT 20`).all(...macs);
+  if (torRows.length === 0 && phIPs) {
+    torRows = d.prepare(`SELECT ip_address, mac_address, exit_node, circuit_id, country, download, upload, detected_at FROM intel_tor_detection WHERE ip_address IN (${phIPs}) ORDER BY detected_at DESC LIMIT 20`).all(...agentIPs);
+  }
+
+  let vpnRows = d.prepare(`SELECT ip_address, mac_address, vpn_type, remote_ip, protocol, country, confidence, download, upload, detected_at FROM intel_vpn_detection WHERE mac_address IN (${ph}) ORDER BY detected_at DESC LIMIT 20`).all(...macs);
+  if (vpnRows.length === 0 && phIPs) {
+    vpnRows = d.prepare(`SELECT ip_address, mac_address, vpn_type, remote_ip, protocol, country, confidence, download, upload, detected_at FROM intel_vpn_detection WHERE ip_address IN (${phIPs}) ORDER BY detected_at DESC LIMIT 20`).all(...agentIPs);
+  }
+
+  const serverDiscRows = phIPs
+    ? d.prepare(`SELECT ip_address, mac_address, server_type, hostname, port, protocol, os_label, download, upload, detected_at FROM intel_server_discovery WHERE ip_address IN (${phIPs}) ORDER BY detected_at DESC LIMIT 50`).all(...agentIPs)
+    : [];
+
+  const security = {
+    encryption_audit     : encryptionRows,
+    insecure_protocols   : insecureProtoRows,
+    unencrypted_passwords: unencPwdRows,
+    ip_reputation        : ipReputRows,
+    tor_detections       : torRows,
+    vpn_detections       : vpnRows,
+  };
+
+  // ── 6. Events filtered by agent (aligned with events page) ───────────────
+  const events = db.getLatestEvents(200, null, agentUuid);
+
+  // ── 7. MAC bandwidth for this agent's MACs ──────────────────────────────────
+  // latestMacSnap was already declared above, reusing it.
+  const mac_bandwidth = latestMacSnap
+    ? d.prepare(`SELECT mac_address, manufacturer, download, upload, total FROM mac_bandwidth WHERE fetched_at = ? AND mac_address IN (${ph}) ORDER BY download DESC`).all(latestMacSnap, ...macs)
+    : [];
+
+  return {
+    agent_uuid      : agentUuid,
+    agent_label     : label,
+    summary,
+    devices,
+    flows,
+    top_apps,
+    security,
+    events,
+    mac_bandwidth,
+    server_discovery: serverDiscRows,
+  };
+}
+
+// Fetch data for a specific device IP — from local DB (all 10 correlated tables)
+async function fetchDeviceDetails(ip, agentUuid = null) {
+  const db = require('./database');
+  const d  = db.getDB();
+
+  // ── 0. Resolve MAC from flows (most recent) ──────────────────────────────
+  const macRow = d.prepare(`SELECT src_mac FROM flows WHERE src_ip = ? AND src_mac IS NOT NULL ORDER BY last_seen DESC LIMIT 1`).get(ip);
+  const mac = macRow?.src_mac || null;
+
+  // ── 1. Device info from devices table ────────────────────────────────────
+  const deviceRow = d.prepare(`
+    SELECT device_label, device_type, os_label, manufacturer, download, upload, last_seen
+    FROM   devices
+    WHERE  ip_address = ?
+    ORDER  BY fetched_at DESC
+    LIMIT  1
+  `).get(ip);
+
+  // ── 2. Discovery info (may differ from devices table) ────────────────────
+  const discRow = d.prepare(`
+    SELECT device_type, os_label, manufacturer, device_label, is_new
+    FROM   intel_device_discovery
+    WHERE  ip_address = ?
+    ORDER  BY fetched_at DESC
+    LIMIT  1
+  `).get(ip);
+
+  const device_info = {
+    device_label : deviceRow?.device_label || discRow?.device_label || null,
+    device_type  : deviceRow?.device_type  || discRow?.device_type  || null,
+    os_label     : deviceRow?.os_label     || discRow?.os_label     || null,
+    manufacturer : deviceRow?.manufacturer || discRow?.manufacturer || null,
+    mac_address  : mac,
+    is_new       : discRow?.is_new ?? null,
+  };
+
+  // ── 3. Named apps & correlated ports ─────────────────────────────────────
+  const rawAppRows = d.prepare(`
+    SELECT app_label,
+           SUM(bytes_download) AS download,
+           SUM(bytes_upload)   AS upload,
+           COUNT(*)            AS flow_count
+    FROM   flows
+    WHERE  src_ip = ?
+      AND  app_label IS NOT NULL
+    GROUP  BY app_label
+    ORDER  BY download DESC
+    LIMIT  30
+  `).all(ip);
+
+  // Cache helper mappings
+  const devices = d.prepare(`
+    SELECT ip_address, device_label, manufacturer, device_type
+    FROM devices
+    WHERE ip_address IS NOT NULL
+  `).all();
+
+  const devMap = new Map();
+  for (const dev of devices) {
+    const label = dev.device_label || (dev.manufacturer && dev.manufacturer !== 'Unknown' ? `${dev.manufacturer} Device` : null);
+    if (label) {
+      devMap.set(dev.ip_address, label);
+    }
+  }
+
+  const flowIPs = d.prepare(`
+    SELECT dst_ip, domain, app_label, COUNT(*) as count
+    FROM flows
+    WHERE dst_ip IS NOT NULL 
+      AND (domain IS NOT NULL OR (app_label IS NOT NULL AND app_label NOT LIKE 'Port %'))
+    GROUP BY dst_ip, domain, app_label
+    ORDER BY count DESC
+  `).all();
+
+  const publicIpMap = new Map();
+  for (const row of flowIPs) {
+    if (!publicIpMap.has(row.dst_ip)) {
+      publicIpMap.set(row.dst_ip, {
+        domain: row.domain,
+        app_label: row.app_label
+      });
+    }
+  }
+
+  function getFriendlyIpName(ipAddress) {
+    if (devMap.has(ipAddress)) return devMap.get(ipAddress);
+    if (publicIpMap.has(ipAddress)) {
+      const pub = publicIpMap.get(ipAddress);
+      return pub.domain || pub.app_label;
+    }
+    if (ipAddress.startsWith('10.6.')) return 'IFG Client';
+    if (ipAddress.startsWith('10.250.') || ipAddress.startsWith('192.168.') || ipAddress.startsWith('10.121.')) return 'CPI Client';
+    if (
+      ipAddress.startsWith('10.0.') || ipAddress.startsWith('10.1.') || ipAddress.startsWith('10.26.') ||
+      ipAddress.startsWith('10.43.') || ipAddress.startsWith('10.35.') || ipAddress.startsWith('10.21.') ||
+      ipAddress.startsWith('10.7.') || ipAddress.startsWith('10.182.') || ipAddress.startsWith('10.109.') ||
+      ipAddress.startsWith('10.181.') || ipAddress.startsWith('10.75.') || ipAddress.startsWith('10.202.') ||
+      ipAddress.startsWith('10.93.')
+    ) return 'JRP Client';
+    return 'Intranet Client';
+  }
+
+  const matches = {
+    "1433": "MSSQL Database Server",
+    "1434": "MSSQL Monitor Server",
+    "3306": "MySQL/MariaDB",
+    "5432": "PostgreSQL",
+    "1521": "Oracle DB Server",
+    "27017": "MongoDB",
+    "6379": "Redis Cache",
+    "80": "HTTP Web Server",
+    "443": "HTTPS/TLS Secure Connection",
+    "22": "SSH Remote Management",
+    "21": "FTP File Storage",
+    "23": "Telnet Command Insecure",
+    "25": "SMTP Mail Delivery",
+    "587": "Secure SMTP Mail",
+    "110": "POP3 Mail Retrieval",
+    "993": "Secure IMAP Mail",
+    "53": "DNS Domain Directory Query",
+    "123": "NTP Network Time",
+    "161": "SNMP Monitoring Service",
+    "3389": "RDP Remote Windows Desktop",
+    "445": "SMB Windows File Share",
+    "137": "NetBIOS Name Service",
+    "138": "NetBIOS Datagram Service",
+    "139": "NetBIOS Session Service",
+    "1812": "RADIUS Auth Server",
+    "1813": "RADIUS Accounting",
+    "5060": "SIP VoIP Service"
+  };
+
+  // ── 4. Top domains accessed by this device ─────────────────────────────
+  const domainRows = d.prepare(`
+    SELECT domain,
+           -- use app_label that appeared most with this domain
+           (SELECT app_label FROM flows
+            WHERE src_ip = f.src_ip AND domain = f.domain
+              AND app_label IS NOT NULL
+            ORDER BY bytes_download DESC LIMIT 1) AS app_label,
+           -- extract root domain for display
+           domain AS display_name,
+           SUM(bytes_download) AS download,
+           SUM(bytes_upload)   AS upload,
+           COUNT(*)            AS flow_count
+    FROM   flows f
+    WHERE  src_ip = ?
+      AND  domain IS NOT NULL
+    GROUP  BY domain
+    ORDER  BY download DESC
+    LIMIT  30
+  `).all(ip);
+
+  // ── 5. Smart combined display list ──────────────────────────────────────
+  const combinedMap = new Map();
+
+  // Add domains first (higher priority)
+  for (const r of domainRows) {
+    combinedMap.set('domain:' + r.domain, {
+      label      : r.domain,          // the actual website/domain
+      sub_label  : r.app_label || null, // protocol (HTTPS/TLS etc)
+      type       : 'domain',
+      download   : r.download ?? 0,
+      upload     : r.upload   ?? 0,
+      flow_count : r.flow_count,
+    });
+  }
+
+  // Add named & correlated apps
+  for (const r of rawAppRows) {
+    let label = r.app_label;
+    let sub_label = null;
+    let type = 'protocol';
+
+    const isPortLabel = label.startsWith("Port ") || label.toLowerCase().includes("port");
+
+    if (isPortLabel) {
+      const portStr = label.replace("Port ", "").trim();
+      type = 'port';
+
+      const flow = d.prepare(`
+        SELECT dst_ip, protocol, dst_port
+        FROM flows
+        WHERE src_ip = ? AND (app_label = ? OR dst_port = ?)
+        GROUP BY dst_ip, protocol, dst_port
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+      `).get(ip, label, portStr);
+
+      if (flow && flow.dst_ip) {
+        const friendlyName = getFriendlyIpName(flow.dst_ip);
+        label = friendlyName;
+        sub_label = `Port ${portStr} (${flow.protocol || 'TCP'})`;
+      } else {
+        const stdName = matches[portStr];
+        if (stdName) {
+          label = stdName;
+          sub_label = `Port ${portStr}`;
+        } else {
+          sub_label = `Port ${portStr}`;
+        }
+      }
+    }
+
+    const key = isPortLabel ? 'port:' + r.app_label : 'app:' + r.app_label;
+    if (!combinedMap.has(key)) {
+      combinedMap.set(key, {
+        label      : label,
+        sub_label  : sub_label,
+        type       : type,
+        download   : r.download ?? 0,
+        upload     : r.upload   ?? 0,
+        flow_count : r.flow_count,
+      });
+    }
+  }
+
+  const top_apps = [...combinedMap.values()].sort((a, b) => b.download - a.download).slice(0, 25);
+
+  // top_domains: keep simple list for Info tab
+  const top_domains = domainRows.map(r => ({
+    domain     : r.domain,
+    app_label  : r.app_label,
+    download   : r.download ?? 0,
+    upload     : r.upload   ?? 0,
+    flow_count : r.flow_count,
+  }));
+
+  // ── 5. Recent flows ────────────────────────────────────────────────────
+  const flowRows = d.prepare(`
+    SELECT dst_ip, dst_port, protocol, app_label, domain,
+           bytes_download AS download, bytes_upload AS upload, last_seen
+    FROM   flows
+    WHERE  src_ip = ?
+    ORDER  BY last_seen DESC
+    LIMIT  100
+  `).all(ip);
+
+  const flows = flowRows.map(r => ({
+    dst_ip    : r.dst_ip,
+    dst_port  : r.dst_port,
+    protocol  : r.protocol,
+    app_label : r.app_label,
+    domain    : r.domain,
+    download  : r.download ?? 0,
+    upload    : r.upload   ?? 0,
+    last_seen : r.last_seen,
+  }));
+
+  // ── 6. Totals ─────────────────────────────────────────────────────────
+  const sumRow = d.prepare(`
+    SELECT SUM(bytes_download) AS total_download,
+           SUM(bytes_upload)   AS total_upload,
+           COUNT(*) AS flow_count
+    FROM   flows
+    WHERE  src_ip = ?
+  `).get(ip);
+
+  // ── 7. Encryption audit (latest snapshot) ─────────────────────────────
+  const latestAudit = d.prepare(`SELECT MAX(fetched_at) AS t FROM intel_encryption_audit`).get()?.t;
+  const encRow = latestAudit
+    ? d.prepare(`
+        SELECT encrypted_pct, encrypted, unencrypted, total, risk_level, mac_address
+        FROM   intel_encryption_audit
+        WHERE  fetched_at = ? AND ip_address = ?
+        LIMIT  1
+      `).get(latestAudit, ip)
+    : null;
+
+  // Also try fallback by MAC if not found by IP
+  const encRowMac = (!encRow && mac && latestAudit)
+    ? d.prepare(`
+        SELECT encrypted_pct, encrypted, unencrypted, total, risk_level, ip_address
+        FROM   intel_encryption_audit
+        WHERE  fetched_at = ? AND mac_address = ?
+        ORDER  BY detected_at DESC
+        LIMIT  1
+      `).get(latestAudit, mac)
+    : null;
+
+  const encFinal = encRow || encRowMac;
+
+  const encryption = encFinal ? {
+    encrypted_pct   : encFinal.encrypted_pct   ?? null,
+    encrypted_bytes : encFinal.encrypted        ?? null,
+    unencrypted_bytes: encFinal.unencrypted     ?? null,
+    total_bytes     : encFinal.total            ?? null,
+    risk_level      : encFinal.risk_level       ?? null,
+  } : null;
+
+  // ── 8. Server discovery (servers this device accessed) ─────────────────
+  const serverRows = d.prepare(`
+    SELECT DISTINCT server_type, hostname, port, protocol, os_label,
+           MAX(download) AS download, MAX(upload) AS upload, MAX(detected_at) AS detected_at
+    FROM   intel_server_discovery
+    WHERE  ip_address = ?
+    GROUP  BY server_type, port, protocol
+    ORDER  BY download DESC
+    LIMIT  50
+  `).all(ip);
+
+  // fallback by MAC if no rows by IP
+  const serverRowsMac = (serverRows.length === 0 && mac)
+    ? d.prepare(`
+        SELECT DISTINCT server_type, hostname, port, protocol, os_label,
+               MAX(download) AS download, MAX(upload) AS upload, MAX(detected_at) AS detected_at
+        FROM   intel_server_discovery
+        WHERE  mac_address = ?
+        GROUP  BY server_type, port, protocol
+        ORDER  BY download DESC
+        LIMIT  50
+      `).all(mac)
+    : [];
+
+  const server_discovery = (serverRows.length > 0 ? serverRows : serverRowsMac).map(r => ({
+    server_type : r.server_type,
+    hostname    : r.hostname || null,
+    port        : r.port,
+    protocol    : r.protocol,
+    os_label    : r.os_label || null,
+    download    : r.download ?? 0,
+    upload      : r.upload   ?? 0,
+    detected_at : r.detected_at,
+  }));
+
+  // ── 9. Unencrypted passwords ───────────────────────────────────────────
+  let pwdRows = d.prepare(`
+    SELECT dst_ip, dst_port, protocol, username, severity, download, upload, detected_at
+    FROM   intel_unencrypted_passwords
+    WHERE  ip_address = ?
+    ORDER  BY detected_at DESC
+    LIMIT  50
+  `).all(ip);
+
+  if (pwdRows.length === 0 && mac) {
+    pwdRows = d.prepare(`
+      SELECT dst_ip, dst_port, protocol, username, severity, download, upload, detected_at
+      FROM   intel_unencrypted_passwords
+      WHERE  mac_address = ?
+      ORDER  BY detected_at DESC
+      LIMIT  50
+    `).all(mac);
+  }
+
+  const unencrypted_passwords = pwdRows.map(r => ({
+    dst_ip      : r.dst_ip,
+    dst_port    : r.dst_port,
+    protocol    : r.protocol,
+    username    : r.username,
+    severity    : r.severity,
+    download    : r.download ?? 0,
+    upload      : r.upload   ?? 0,
+    detected_at : r.detected_at,
+  }));
+
+  // ── 10. IP Reputation (latest snapshot, this device's local_ip) ─────────
+  const latestRepSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM intel_ip_reputation`).get()?.t;
+  const repRows = latestRepSnap
+    ? d.prepare(`
+        SELECT ip_address, local_ip, reputation, score, country, app_label, blacklisted, download, upload
+        FROM   intel_ip_reputation
+        WHERE  fetched_at = ? AND (local_ip = ? OR ip_address = ?)
+        ORDER  BY score DESC NULLS LAST
+        LIMIT  30
+      `).all(latestRepSnap, ip, ip)
+    : [];
+
+  const ip_reputation = repRows.map(r => ({
+    remote_ip   : r.ip_address,
+    local_ip    : r.local_ip,
+    reputation  : r.reputation,
+    score       : r.score,
+    country     : r.country,
+    app_label   : r.app_label,
+    blacklisted : !!r.blacklisted,
+    download    : r.download ?? 0,
+    upload      : r.upload   ?? 0,
+  }));
+
+  // ── 11. VPN detection ─────────────────────────────────────────────────
+  let vpnRows = d.prepare(`
+    SELECT vpn_type, remote_ip, protocol, country, confidence, download, upload, detected_at
+    FROM   intel_vpn_detection
+    WHERE  ip_address = ?
+    ORDER  BY detected_at DESC
+    LIMIT  20
+  `).all(ip);
+
+  if (vpnRows.length === 0 && mac) {
+    vpnRows = d.prepare(`
+      SELECT vpn_type, remote_ip, protocol, country, confidence, download, upload, detected_at
+      FROM   intel_vpn_detection
+      WHERE  mac_address = ?
+      ORDER  BY detected_at DESC
+      LIMIT  20
+    `).all(mac);
+  }
+
+  const vpn_detections = vpnRows.map(r => ({
+    vpn_type    : r.vpn_type,
+    remote_ip   : r.remote_ip,
+    protocol    : r.protocol,
+    country     : r.country,
+    confidence  : r.confidence,
+    download    : r.download ?? 0,
+    upload      : r.upload   ?? 0,
+    detected_at : r.detected_at,
+  }));
+
+  // ── 12. Events ────────────────────────────────────────────────────────
+  const evtByIP  = d.prepare(`SELECT event_type, severity, ip_address, mac_address, description, event_at FROM events WHERE ip_address = ? ORDER BY event_at DESC LIMIT 50`).all(ip);
+  const evtByMAC = mac ? d.prepare(`SELECT event_type, severity, ip_address, mac_address, description, event_at FROM events WHERE mac_address = ? ORDER BY event_at DESC LIMIT 50`).all(mac) : [];
+
+  const seenEvt = new Set();
+  const evtMerged = [];
+  for (const r of [...evtByIP, ...evtByMAC]) {
+    const key = `${r.event_type}:${r.event_at}`;
+    if (!seenEvt.has(key)) {
+      seenEvt.add(key);
+      evtMerged.push({ event_type: r.event_type, severity: r.severity, ip_address: r.ip_address, mac_address: r.mac_address, description: r.description, event_at: r.event_at });
+    }
+  }
+  evtMerged.sort((a, b) => (b.event_at || '').localeCompare(a.event_at || ''));
+  const events = evtMerged.slice(0, 100);
+
+  // ── 13. MAC bandwidth (latest snapshot) ───────────────────────────────
+  const latestMacSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM mac_bandwidth`).get()?.t;
+  const macBwRow = (latestMacSnap && mac)
+    ? d.prepare(`SELECT manufacturer, download, upload, total FROM mac_bandwidth WHERE fetched_at = ? AND mac_address = ? LIMIT 1`).get(latestMacSnap, mac)
+    : null;
+
+  const mac_bandwidth = macBwRow ? {
+    mac_address  : mac,
+    manufacturer : macBwRow.manufacturer,
+    download     : macBwRow.download ?? 0,
+    upload       : macBwRow.upload   ?? 0,
+    total        : macBwRow.total    ?? 0,
+  } : null;
+
+  return {
+    ip,
+    mac_address    : mac,
+    total_download : deviceRow?.download || sumRow?.total_download || 0,
+    total_upload   : deviceRow?.upload || sumRow?.total_upload || 0,
+    flow_count     : sumRow?.flow_count     ?? 0,
+    device_info,
+    top_apps,
+    top_domains    : domainRows.map(r => ({ domain: r.domain, download: r.download ?? 0, upload: r.upload ?? 0, flow_count: r.flow_count })),
+    flows,
+    encryption,
+    server_discovery,
+    unencrypted_passwords,
+    ip_reputation,
+    vpn_detections,
+    events,
+    mac_bandwidth,
+  };
+}
+
+// Fetch data for a specific application// Fetch data for a specific application — from local DB
+async function fetchAppDetails(appLabel, agentUuid = null) {
+  const db = require('./database');
+  const d  = db.getDB();
+
+  // ── Totals: from flows (protocol-level) OR bandwidth_apps (brand-level) ──
+  // IMPORTANT: use MAX(download) from latest snapshot — NOT SUM() of all history!
+  let flowQuery = `
+    SELECT SUM(bytes_download) AS download,
+           SUM(bytes_upload)   AS upload,
+           COUNT(*) AS flow_count
+    FROM   flows
+    WHERE  app_label = @appLabel
+  `;
+  if (agentUuid) flowQuery += ` AND agent_uuid = @agentUuid`;
+  const flowTotalRow = d.prepare(flowQuery).get({ appLabel, agentUuid });
+
+  let total_download = flowTotalRow?.download ?? 0;
+  let total_upload   = flowTotalRow?.upload   ?? 0;
+  let data_source    = 'flows'; // track where totals came from
+
+  // If no flows data (brand-name app like YouTube), use LATEST bandwidth_apps snapshot
+  if (total_download === 0 && total_upload === 0) {
+    let snapQuery = `SELECT MAX(fetched_at) AS t FROM bandwidth_apps WHERE app_label = @appLabel`;
+    snapQuery += agentUuid ? ` AND agent_uuid = @agentUuid` : ` AND agent_uuid IS NULL`;
+    const latestSnap = d.prepare(snapQuery).get({ appLabel, agentUuid })?.t;
+    
+    if (latestSnap) {
+      let bwQuery = `
+        SELECT download, upload
+        FROM   bandwidth_apps
+        WHERE  app_label = @appLabel AND fetched_at = @latestSnap
+      `;
+      bwQuery += agentUuid ? ` AND agent_uuid = @agentUuid` : ` AND agent_uuid IS NULL`;
+      bwQuery += ` LIMIT 1`;
+      
+      const bwRow = d.prepare(bwQuery).get({ appLabel, latestSnap, agentUuid });
+      if (bwRow) {
+        total_download = bwRow.download ?? 0;
+        total_upload   = bwRow.upload   ?? 0;
+        data_source    = 'bandwidth_apps';
+      }
+    }
+  }
+
+  // ── Top 5 Flow Records accessing this app (Raw Flows) ──
+  let ipQuery = `
+    SELECT src_ip AS ip_address,
+           dst_ip,
+           domain,
+           last_seen,
+           bytes_download AS download,
+           bytes_upload   AS upload
+    FROM   flows
+    WHERE  app_label = @appLabel
+  `;
+  if (agentUuid) ipQuery += ` AND agent_uuid = @agentUuid`;
+  ipQuery += ` ORDER BY download DESC LIMIT 5`;
+  const ipRows = d.prepare(ipQuery).all({ appLabel, agentUuid });
+
+  // ── Domain-based per-IP breakdown (bridges HTTPS/TLS → brand name) ──
+  // Build keyword map for common brand names
+  const DOMAIN_KEYWORDS = {
+    'YouTube'   : ['youtube', 'googlevideo', 'ytimg', 'yt3.ggpht'],
+    'Facebook'  : ['facebook', 'fbcdn', 'fb.com', 'fbsbx'],
+    'WhatsApp'  : ['whatsapp', 'wa.me'],
+    'Instagram' : ['instagram', 'cdninstagram'],
+    'TikTok'    : ['tiktok', 'tiktokcdn', 'tiktokv'],
+    'Netflix'   : ['netflix', 'nflxvideo', 'nflximg'],
+    'Google'    : ['google.com', 'googleapis', 'gstatic', 'googlesyndication'],
+    'Microsoft' : ['microsoft', 'msftncsi', 'live.com', 'office365', 'sharepoint'],
+    'Zoom'      : ['zoom.us', 'zoomgov'],
+    'Spotify'   : ['spotify', 'scdn.co'],
+  };
+
+  let domain_breakdown = [];
+  const kws = DOMAIN_KEYWORDS[appLabel];
+  if (kws && kws.length > 0) {
+    // Build WHERE clause for domain keywords
+    const likeClause = kws.map(() => `LOWER(domain) LIKE ?`).join(' OR ');
+    const likeParams = kws.map(k => `%${k}%`);
+    let domQuery = `
+      SELECT src_ip AS ip_address,
+             dst_ip,
+             domain,
+             last_seen,
+             bytes_download AS download,
+             bytes_upload   AS upload
+      FROM   flows
+      WHERE  domain IS NOT NULL AND (${likeClause})
+    `;
+    const domParams = [...likeParams];
+    if (agentUuid) {
+      domQuery += ` AND agent_uuid = ?`;
+      domParams.push(agentUuid);
+    }
+    domQuery += ` ORDER BY download DESC LIMIT 5`;
+    const domRows = d.prepare(domQuery).all(...domParams);
+    
+    domain_breakdown = domRows.map(r => ({
+      ip_address : r.ip_address,
+      dst_ip     : r.dst_ip,
+      domain     : r.domain,
+      last_seen  : r.last_seen,
+      download   : r.download ?? 0,
+      upload     : r.upload   ?? 0,
+    }));
+  }
+
+  // ── Threat flags: cross-reference top IPs with intel_ip_reputation ──
+  const latestRepSnap = d.prepare(`SELECT MAX(fetched_at) AS t FROM intel_ip_reputation`).get()?.t;
+  const threatMap = {};
+  if (latestRepSnap) {
+    const repRows = d.prepare(`
+      SELECT local_ip, ip_address, reputation, blacklisted
+      FROM   intel_ip_reputation
+      WHERE  fetched_at = ?
+    `).all(latestRepSnap);
+    for (const r of repRows) {
+      const key = r.local_ip || r.ip_address;
+      if (key) threatMap[key] = { reputation: r.reputation, blacklisted: r.blacklisted };
+    }
+  }
+
+  const allIpRows = domain_breakdown.length > 0 ? domain_breakdown : ipRows;
+  const top_ips = allIpRows.map(r => ({
+    ip_address  : r.ip_address,
+    dst_ip      : r.dst_ip,
+    domain      : r.domain,
+    last_seen   : r.last_seen,
+    download    : r.download ?? 0,
+    upload      : r.upload   ?? 0,
+    reputation  : threatMap[r.ip_address]?.reputation  ?? null,
+    blacklisted : threatMap[r.ip_address]?.blacklisted ?? false,
+  }));
+
+  // ── Per-agent breakdown using agent_uuid grouping in flows OR local_mac mapping ──
+  let allRelevantFlows = [];
+  if (kws && kws.length > 0) {
+    const likeClause2 = kws.map(() => `LOWER(domain) LIKE ?`).join(' OR ');
+    const likeParams2 = kws.map(k => `%${k}%`);
+    let scoreQuery = `
+      SELECT agent_uuid, src_mac AS local_mac,
+             bytes_download AS download,
+             bytes_upload   AS upload
+      FROM   flows
+      WHERE  domain IS NOT NULL AND (${likeClause2})
+    `;
+    const scoreParams = [...likeParams2];
+    if (agentUuid) {
+      scoreQuery += ` AND (agent_uuid = ? OR agent_uuid IS NULL)`;
+      scoreParams.push(agentUuid);
+    }
+    allRelevantFlows = d.prepare(scoreQuery).all(...scoreParams);
+  } else {
+    let scoreQuery = `
+      SELECT agent_uuid, src_mac AS local_mac,
+             bytes_download AS download,
+             bytes_upload   AS upload
+      FROM   flows
+      WHERE  app_label = ?
+    `;
+    const scoreParams = [appLabel];
+    if (agentUuid) {
+      scoreQuery += ` AND (agent_uuid = ? OR agent_uuid IS NULL)`;
+      scoreParams.push(agentUuid);
+    }
+    allRelevantFlows = d.prepare(scoreQuery).all(...scoreParams);
+  }
+
+  // Reverse map MAC to Agent UUID
+  const macToAgent = {};
+  for (const [auid, macs] of Object.entries(AGENT_MAC_MAP)) {
+    for (const m of macs) {
+      macToAgent[m] = auid;
+    }
+  }
+
+  const agentScoreMap = {};
+  for (const row of allRelevantFlows) {
+    let auid = row.agent_uuid;
+    if (!auid && row.local_mac && macToAgent[row.local_mac]) {
+      auid = macToAgent[row.local_mac]; // Fallback to MAC mapping
+    }
+    if (auid) {
+      if (agentUuid && auid !== agentUuid) continue; // skip if filtering by a specific agent
+      if (!agentScoreMap[auid]) {
+        agentScoreMap[auid] = { download: 0, upload: 0, flow_count: 0 };
+      }
+      agentScoreMap[auid].download += (row.download ?? 0);
+      agentScoreMap[auid].upload += (row.upload ?? 0);
+      agentScoreMap[auid].flow_count += 1;
+    }
+  }
+
+  let agent_scorecard = Object.keys(agentScoreMap).map(auid => ({
+    agent_uuid  : auid,
+    agent_label : AGENT_LABELS[auid] || auid,
+    download    : agentScoreMap[auid].download,
+    upload      : agentScoreMap[auid].upload,
+    flow_count  : agentScoreMap[auid].flow_count,
+  })).filter(a => a.download > 0 || a.upload > 0);
+
+  // Fallback to bandwidth_apps if flow-based scorecard is empty
+  if (agent_scorecard.length === 0) {
+    const snapQuery = `SELECT MAX(fetched_at) AS t FROM bandwidth_apps WHERE app_label = @appLabel AND agent_uuid IS NOT NULL`;
+    const latestAppSnap = d.prepare(snapQuery).get({ appLabel })?.t;
+    if (latestAppSnap) {
+      let bwQuery = `SELECT agent_uuid, download, upload FROM bandwidth_apps WHERE app_label = @appLabel AND fetched_at = @latestAppSnap AND agent_uuid IS NOT NULL`;
+      if (agentUuid) bwQuery += ` AND agent_uuid = @agentUuid`;
+      const bwRows = d.prepare(bwQuery).all({ appLabel, latestAppSnap, agentUuid });
+      for (const row of bwRows) {
+        agent_scorecard.push({
+          agent_uuid: row.agent_uuid,
+          agent_label: AGENT_LABELS[row.agent_uuid] || row.agent_uuid,
+          download: row.download,
+          upload: row.upload,
+          flow_count: 0
+        });
+      }
+    }
+  }
+
+  return {
+    app_label      : appLabel,
+    total_download,
+    total_upload,
+    data_source,
+    agent_scorecard,
+    top_ips,
+    has_domain_breakdown: domain_breakdown.length > 0,
+  };
+}
+
+
+// Fetch security device risk overview — encryption audit + insecure protocols per device
+async function fetchSecurityDevices(siteUuid = null, agentUuid = null) {
+  const db = require('./database');
+  const d  = db.getDB();
+
+  // Get active IPs and MACs for filtering if agentUuid is provided
+  let agentIPs = null;
+  let agentIPSet = null;
+  let agentMacs = null;
+  if (agentUuid && AGENT_MAC_MAP[agentUuid]) {
+    agentMacs = AGENT_MAC_MAP[agentUuid];
+    const resolvedDevices = db.getLatestDevices(1000, null, agentUuid);
+    agentIPs = resolvedDevices.map(d => d.ip_address).filter(Boolean);
+    agentIPSet = new Set(agentIPs);
+  }
+
+  const latestFetch = d.prepare(`SELECT MAX(fetched_at) AS t FROM intel_encryption_audit`).get()?.t;
+  let encryptRows = [];
+  if (latestFetch) {
+    if (agentMacs) {
+      // Query with agent's MACs or JRP subnet IPs
+      const placeholders = agentMacs.map(() => '?').join(',');
+      encryptRows = d.prepare(`
+        SELECT * FROM intel_encryption_audit 
+        WHERE fetched_at = ? AND (mac_address IN (${placeholders}) OR ip_address IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders})))
+      `).all(latestFetch, ...agentMacs, ...agentMacs);
+    } else {
+      encryptRows = d.prepare(`
+        SELECT * FROM intel_encryption_audit 
+        WHERE fetched_at = ? AND (@siteUuid IS NULL OR site_uuid = @siteUuid)
+      `).all(latestFetch, { siteUuid });
+    }
+  }
+
+  let insecureRows = [];
+  if (agentMacs) {
+    const placeholders = agentMacs.map(() => '?').join(',');
+    insecureRows = d.prepare(`
+      SELECT DISTINCT ip_address FROM intel_insecure_protocols 
+      WHERE mac_address IN (${placeholders}) OR ip_address IN (SELECT DISTINCT src_ip FROM flows WHERE src_mac IN (${placeholders}))
+    `).all(...agentMacs, ...agentMacs);
+  } else {
+    insecureRows = d.prepare(`
+      SELECT DISTINCT ip_address FROM intel_insecure_protocols
+      WHERE (@siteUuid IS NULL OR site_uuid = @siteUuid)
+    `).all({ siteUuid });
+  }
+  const insecureIPs  = new Set(insecureRows.map(r => r.ip_address).filter(Boolean));
+
+  // Compute risk per device
+  const deviceMap = {};
+  for (const r of encryptRows) {
+    const ip = r.ip_address;
+    if (!ip) continue;
+    
+    // Additional security check: if agent is logged in, ensure we do not leak other agent's IPs
+    if (agentIPSet && !agentIPSet.has(ip)) {
+      continue;
+    }
+
+    const encPct = r.encrypted_pct ?? 100;
+    let riskLevel;
+    if (encPct < 50 || insecureIPs.has(ip)) {
+      riskLevel = 'Vulnerable';
+    } else if (encPct < 80) {
+      riskLevel = 'Moderate';
+    } else {
+      riskLevel = 'Safe';
+    }
+    if (!deviceMap[ip] || deviceMap[ip].encrypted_pct < encPct) {
+      deviceMap[ip] = {
+        ip_address    : ip,
+        mac_address   : r.mac_address ?? null,
+        device_label  : r.device_label ?? null,
+        encrypted_pct : encPct,
+        unencrypted   : r.unencrypted ?? 0,
+        encrypted     : r.encrypted ?? 0,
+        total         : r.total ?? 0,
+        risk_level    : riskLevel,
+        has_insecure  : insecureIPs.has(ip),
+      };
+    }
+  }
+
+  // Get device details (type, OS) from discovery data
+  const discMap = {};
+  try {
+    const discRows = db.getLatestDevices(1000, siteUuid, agentUuid);
+    for (const r of discRows) {
+      if (r.ip_address) discMap[r.ip_address] = r;
+    }
+  } catch (_) {
+    // skip enrichment if error
+  }
+
+  const devices = Object.values(deviceMap).map(dev => ({
+    ...dev,
+    device_type  : discMap[dev.ip_address]?.device_type ?? null,
+    os_label     : discMap[dev.ip_address]?.os_label ?? null,
+    manufacturer : discMap[dev.ip_address]?.manufacturer ?? null,
+  }));
+
+  // Sort: Vulnerable first, then Moderate, then Safe
+  const ORDER = { Vulnerable: 0, Moderate: 1, Safe: 2 };
+  devices.sort((a, b) => (ORDER[a.risk_level] ?? 3) - (ORDER[b.risk_level] ?? 3));
+
+  return devices;
+}
+
+module.exports = {
+  fetchLookupApplications,
+  fetchAgents,
+  fetchTopApps, fetchTopDevices, fetchTopProtocols, fetchTopCountries,
+  fetchTopDomains, fetchBandwidthSummary, fetchDiscoveredDevices,
+  fetchCyberThreats, fetchFlows, fetchEvents,
+  fetchTopAppCategories, fetchTopContinents, fetchTopRegions, fetchTopCities,
+  fetchTopVLANs, fetchTopInterfaces, fetchTopFlowTypes, fetchTopFlowOrigins,
+  fetchTopIPVersions, fetchTopRemoteIPs, fetchTopLocalMACs,
+  fetchTopDiscoveryOS,
+  fetchTLSVersions, fetchTLSCiphers, fetchTLSSecurity, fetchNetBIOSHostnames,
+  // DPI 12-21 (field name sudah diperbaiki sesuai dokumentasi resmi)
+  fetchDHCPClassFingerprints,
+  fetchHTTPUserAgents,
+  fetchSNIHostnames,
+  fetchSSLServerCN,
+  fetchQUICHostnames,
+  fetchBitTorrentInfoHashes,
+  fetchSSHClients,
+  fetchSSHServers,
+  fetchMDNSHostnames,
+  // Intelligence 22-30 (derive dari data yang tersedia)
+  fetchCryptoMining,
+  fetchDeviceDiscovery,
+  fetchEncryptionAudit,
+  fetchInsecureProtocols,
+  fetchIPReputation,
+  fetchServerDiscovery,
+  fetchTorDetection,
+  fetchUnencryptedPasswords,
+  fetchVPNDetection,
+  // Interactive detail fetchers
+  fetchAgentDetails,
+  fetchDeviceDetails,
+  fetchAppDetails,
+  fetchSecurityDevices,
+};
+
+// ─── DPI FIELDS 12-21 — FIELD NAMES DIPERBAIKI SESUAI DOCS ──────────────────
+// Sumber: https://www.netify.ai/documentation/informatics/v2/data/fields
+//
+// Field yang SALAH sebelumnya → yang BENAR:
+//   dhcp_fingerprint  → dhcp_class
+//   user_agent        → http_useragent
+//   ssl_cn            → https_sni_hostname
+//   ssl_server_cn     → ssl_server_cn  ✓ (sudah benar)
+//   quic_hostname     → quic_hostname  ✓ (sudah benar, mungkin belum aktif di akun)
+//   bt_info_hash      → bittorrent_info_hash
+//   ssh_version       → ssh_client / ssh_server (2 field terpisah)
+//   mdns_hostname     → mdns_hostname  ✓ (sudah benar, mungkin belum aktif di akun)
+
+// Helper builder untuk DPI single-field
+async function _dpiTopField(fieldName, interval, limit, agentUuid = null) {
+  const [dl, ul] = await Promise.all([
+    netifyFetch(`/data/stats/top/${fieldName}/download`, { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+    netifyFetch(`/data/stats/top/${fieldName}/upload`, { filter_interval: interval, settings_limit: limit }, false, agentUuid),
+  ]);
+  if (!dl) return null;
+  const ulMap = {};
+  if (ul) for (const r of ul) {
+    const key = r[fieldName]?.name ?? r[fieldName]?.label ?? String(r[fieldName] ?? '');
+    if (key) ulMap[key] = r.upload ?? 0;
+  }
+  return { dl, ulMap };
+}
+
+// 12. DHCP Class (field: dhcp_class)
+async function fetchDHCPClassFingerprints(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('dhcp_class', interval, limit, agentUuid);
+  if (!res) return null;
+  return res.dl.map(r => {
+    const label = r.dhcp_class?.name ?? r.dhcp_class?.label ?? String(r.dhcp_class ?? 'Unknown');
+    return {
+      fingerprint : label,
+      download    : r.download ?? 0,
+      upload      : res.ulMap[label] ?? 0,
+      total       : (r.download ?? 0) + (res.ulMap[label] ?? 0),
+    };
+  });
+}
+
+// 13. HTTP User-Agent (field: http_useragent)
+async function fetchHTTPUserAgents(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('http_useragent', interval, limit, agentUuid);
+  if (!res) return null;
+  return res.dl.map(r => {
+    const label = r.http_useragent?.name ?? r.http_useragent?.label ?? String(r.http_useragent ?? 'Unknown');
+    return {
+      user_agent : label,
+      download   : r.download ?? 0,
+      upload     : res.ulMap[label] ?? 0,
+      total      : (r.download ?? 0) + (res.ulMap[label] ?? 0),
+    };
+  });
+}
+
+// 14. HTTPS SNI Hostname (field: https_sni_hostname)
+async function fetchSNIHostnames(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('https_sni_hostname', interval, limit, agentUuid);
+  if (!res) return null;
+  return res.dl.map(r => {
+    const name = r.https_sni_hostname?.name ?? r.https_sni_hostname?.label ?? String(r.https_sni_hostname ?? 'Unknown');
+    return {
+      sni_hostname : name,
+      download     : r.download ?? 0,
+      upload       : res.ulMap[name] ?? 0,
+      total        : (r.download ?? 0) + (res.ulMap[name] ?? 0),
+    };
+  });
+}
+
+// 15. SSL Server Common Name (field: ssl_server_cn)
+async function fetchSSLServerCN(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('ssl_server_cn', interval, limit, agentUuid);
+  if (!res) return null;
+  return res.dl.map(r => {
+    const name = r.ssl_server_cn?.name ?? r.ssl_server_cn?.label ?? String(r.ssl_server_cn ?? 'Unknown');
+    return {
+      ssl_server_cn : name,
+      download      : r.download ?? 0,
+      upload        : res.ulMap[name] ?? 0,
+      total         : (r.download ?? 0) + (res.ulMap[name] ?? 0),
+    };
+  });
+}
+
+// 17. QUIC Hostname (field: quic_hostname)
+async function fetchQUICHostnames(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('quic_hostname', interval, limit, agentUuid);
+  if (!res) return null;
+  return res.dl.map(r => {
+    const name = r.quic_hostname?.name ?? r.quic_hostname?.label ?? String(r.quic_hostname ?? 'Unknown');
+    return {
+      quic_hostname : name,
+      download      : r.download ?? 0,
+      upload        : res.ulMap[name] ?? 0,
+      total         : (r.download ?? 0) + (res.ulMap[name] ?? 0),
+    };
+  });
+}
+
+// 18. BitTorrent Info Hash (field: bittorrent_info_hash)
+async function fetchBitTorrentInfoHashes(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('bittorrent_info_hash', interval, limit, agentUuid);
+  if (!res) return null;
+  return res.dl.map(r => {
+    const hash  = r.bittorrent_info_hash?.hash  ?? r.bittorrent_info_hash?.name ?? String(r.bittorrent_info_hash ?? 'Unknown');
+    const label = r.bittorrent_info_hash?.label ?? hash;
+    return {
+      info_hash : hash,
+      label     : label,
+      download  : r.download ?? 0,
+      upload    : res.ulMap[hash] ?? res.ulMap[label] ?? 0,
+      total     : (r.download ?? 0) + (res.ulMap[hash] ?? res.ulMap[label] ?? 0),
+    };
+  });
+}
+
+// 19a. SSH Client (field: ssh_client)
+async function fetchSSHClients(interval = 1440, limit = 20, agentUuid = null) {
+  const res = await _dpiTopField('ssh_client', interval, limit, agentUuid);
+  if (!res) return null;
+  return res.dl.map(r => {
+    const label = r.ssh_client?.name ?? r.ssh_client?.label ?? String(r.ssh_client ?? 'Unknown');
+    return {
+      ssh_version : label,
+      direction   : 'client',
+      download    : r.download ?? 0,
+      upload      : res.ulMap[label] ?? 0,
+      total       : (r.download ?? 0) + (res.ulMap[label] ?? 0),
+    };
+  });
+}
+
+// 19b. SSH Server (field: ssh_server)
+async function fetchSSHServers(interval = 1440, limit = 20, agentUuid = null) {
+  const res = await _dpiTopField('ssh_server', interval, limit, agentUuid);
+  if (!res) return null;
+  return res.dl.map(r => {
+    const label = r.ssh_server?.name ?? r.ssh_server?.label ?? String(r.ssh_server ?? 'Unknown');
+    return {
+      ssh_version : label,
+      direction   : 'server',
+      download    : r.download ?? 0,
+      upload      : res.ulMap[label] ?? 0,
+      total       : (r.download ?? 0) + (res.ulMap[label] ?? 0),
+    };
+  });
+}
+
+// 21. mDNS Hostname (field: mdns_hostname)
+async function fetchMDNSHostnames(interval = 1440, limit = 30, agentUuid = null) {
+  const res = await _dpiTopField('mdns_hostname', interval, limit, agentUuid);
+  if (!res) return null;
+  return res.dl.map(r => {
+    const name = r.mdns_hostname?.name ?? r.mdns_hostname?.label ?? String(r.mdns_hostname ?? 'Unknown');
+    return {
+      mdns_hostname : name,
+      download      : r.download ?? 0,
+      upload        : res.ulMap[name] ?? 0,
+      total         : (r.download ?? 0) + (res.ulMap[name] ?? 0),
+    };
+  });
+}
+
+// ─── INTELLIGENCE 22-30 — DERIVE DARI DATA YANG SUDAH ADA ────────────────────
+// Endpoint /intelligence/* dan /events/* semua 404 di akun ini.
+// Semua fungsi berikut meng-DERIVE data dari endpoint yang sudah confirmed bekerja:
+// /data/stats/top/*, /data/flows
+// Ini memberikan data nyata, bukan mock/dummy.
+
+// 22. Cryptocurrency Mining — derive dari apps dengan nama mengandung "crypto" / "mining"
+// + flows ke port mining pool (3333, 4444, 8333, 9999, 14444)
+async function fetchCryptoMining(interval = 1440, limit = 50, agentUuid = null) {
+  const MINING_POOLS_PORTS = new Set([3333, 4444, 5555, 7777, 8333, 9332, 9999, 14444, 45560, 45700]);
+  const MINING_APPS = ['bitcoin', 'crypto', 'mining', 'monero', 'ethereum', 'nicehash', 'nanopool', 'f2pool', 'antpool', 'slushpool'];
+
+  const [appData, flowsRaw] = await Promise.all([
+    netifyFetch('/data/stats/top/application/download', { filter_interval: interval, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
+  ]);
+
+  const results = [];
+
+  // Derive dari aplikasi
+  if (appData) {
+    for (const r of appData) {
+      const name = (r.application?.label ?? '').toLowerCase();
+      const tag  = (r.application?.tag  ?? '').toLowerCase();
+      if (MINING_APPS.some(k => name.includes(k) || tag.includes(k))) {
+        results.push({
+          detected_at : null,
+          ip_address  : null,
+          mac_address : null,
+          pool_host   : r.application?.label ?? null,
+          pool_ip     : null,
+          protocol    : null,
+          app_label   : r.application?.label ?? null,
+          confidence  : 0.7,
+          download    : r.download ?? 0,
+          upload      : r.upload ?? 0,
+          source      : 'derived:app',
+        });
+      }
+    }
+  }
+
+  // Derive dari flows ke port mining
+  if (flowsRaw) {
+    for (const r of flowsRaw) {
+      const port = r.remote_port ?? 0;
+      if (MINING_POOLS_PORTS.has(port)) {
+        results.push({
+          detected_at : r.first_seen_at?.date ?? null,
+          ip_address  : r.local_ip?.address ?? null,
+          mac_address : r.local_mac ?? null,
+          pool_host   : null,
+          pool_ip     : r.remote_ip?.address ?? null,
+          protocol    : r.ip_protocol?.label ?? null,
+          app_label   : null,
+          confidence  : 0.85,
+          download    : r.download ?? 0,
+          upload      : r.upload ?? 0,
+          source      : 'derived:flow',
+        });
+      }
+    }
+  }
+
+  return results.slice(0, limit);
+}
+
+// 23. Device Discovery — derive dari flows (perangkat unik dengan MAC)
+async function fetchDeviceDiscovery(limit = 100, agentUuid = null) {
+  const [flowsRaw, dlData] = await Promise.all([
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
+    netifyFetch('/data/stats/top/local_ip/download', { filter_interval: 1440, settings_limit: 200 }, false, agentUuid),
+  ]);
+
+  const seen = new Map();
+  if (flowsRaw) {
+    for (const r of flowsRaw) {
+      const ip  = r.local_ip?.address;
+      const mac = r.local_mac;
+      if (!ip) continue;
+      if (!seen.has(ip)) {
+        seen.set(ip, {
+          detected_at  : r.first_seen_at?.date ?? null,
+          ip_address   : ip,
+          mac_address  : mac ?? null,
+          device_label : r.device?.label ?? null,
+          device_type  : r.mac?.discovery_hardware ?? null,
+          os_label     : r.discovery_os?.label ?? null,
+          manufacturer : mac ? (OUI_MAP[mac.substring(0,8).toUpperCase()] ?? null) : null,
+          is_new       : true,
+        });
+      }
+    }
+  }
+
+  // Tambah IP yang punya bandwidth tapi tidak ada di flows
+  if (dlData) {
+    for (const r of dlData) {
+      const ip = r.local_ip?.address ?? String(r.local_ip ?? '');
+      if (ip && !seen.has(ip)) {
+        seen.set(ip, {
+          detected_at  : null,
+          ip_address   : ip,
+          mac_address  : null,
+          device_label : null,
+          device_type  : null,
+          os_label     : null,
+          manufacturer : null,
+          is_new       : true,
+        });
+      }
+    }
+  }
+
+  return Array.from(seen.values()).slice(0, limit);
+}
+
+// 24. Encryption Audit — derive dari TLS security per-IP dari flows
+async function fetchEncryptionAudit(limit = 50, agentUuid = null) {
+  const [tlsSec, flowsRaw] = await Promise.all([
+    netifyFetch('/data/stats/top/tls_security/download', { filter_interval: 1440, settings_limit: 10 }, false, agentUuid),
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
+  ]);
+
+  // Hitung per-IP: encrypted vs unencrypted flows
+  const ipStats = {};
+  if (flowsRaw) {
+    for (const r of flowsRaw) {
+      const ip   = r.local_ip?.address;
+      const port = r.remote_port ?? 0;
+      const mac  = r.local_mac ?? null;
+      if (!ip) continue;
+      if (!ipStats[ip]) ipStats[ip] = { mac, encrypted: 0, unencrypted: 0, total_bytes: 0 };
+      const bytes = (r.download ?? 0) + (r.upload ?? 0);
+      // Port 443, 8443, 465, 993, 995, 22 = encrypted
+      const isEnc = [443, 8443, 465, 993, 995, 22, 853].includes(port);
+      if (isEnc) ipStats[ip].encrypted    += bytes;
+      else       ipStats[ip].unencrypted  += bytes;
+      ipStats[ip].total_bytes += bytes;
+    }
+  }
+
+  return Object.entries(ipStats)
+    .map(([ip, s]) => {
+      const total    = s.encrypted + s.unencrypted;
+      const enc_pct  = total > 0 ? (s.encrypted / total) * 100 : null;
+      const risk     = enc_pct === null ? null
+                     : enc_pct >= 90   ? 'Low'
+                     : enc_pct >= 60   ? 'Medium'
+                     : enc_pct >= 30   ? 'High'
+                     : 'Critical';
+      const oui = s.mac ? s.mac.substring(0,8).toUpperCase() : null;
+      return {
+        ip_address    : ip,
+        mac_address   : s.mac,
+        device_label  : OUI_MAP[oui] ?? null,
+        encrypted_pct : enc_pct != null ? Math.round(enc_pct * 10) / 10 : null,
+        encrypted     : s.encrypted,
+        unencrypted   : s.unencrypted,
+        total         : total,
+        risk_level    : risk,
+        detected_at   : null,
+      };
+    })
+    .sort((a, b) => (a.encrypted_pct ?? 101) - (b.encrypted_pct ?? 101))
+    .slice(0, limit);
+}
+
+// 25. Insecure Protocols — derive dari top protocols (confirmed bekerja)
+async function fetchInsecureProtocols(interval = 1440, limit = 50, agentUuid = null) {
+  const INSECURE = {
+    'HTTP'   : { port: 80,   risk: 'High' },
+    'FTP'    : { port: 21,   risk: 'Critical' },
+    'Telnet' : { port: 23,   risk: 'Critical' },
+    'SMTP'   : { port: 25,   risk: 'Medium' },
+    'POP3'   : { port: 110,  risk: 'Medium' },
+    'IMAP'   : { port: 143,  risk: 'Medium' },
+    'DNS'    : { port: 53,   risk: 'Low' },
+    'SNMP'   : { port: 161,  risk: 'High' },
+    'LDAP'   : { port: 389,  risk: 'High' },
+    'RDP'    : { port: 3389, risk: 'High' },
+    'NTP'    : { port: 123,  risk: 'Low' },
+    'TFTP'   : { port: 69,   risk: 'High' },
+    'rsh'    : { port: 514,  risk: 'Critical' },
+    'rlogin' : { port: 513,  risk: 'Critical' },
+  };
+
+  const [protoData, ulData] = await Promise.all([
+    netifyFetch('/data/stats/top/protocol/download', { filter_interval: interval, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/stats/top/protocol/upload', { filter_interval: interval, settings_limit: 100 }, false, agentUuid),
+  ]);
+  if (!protoData) return [];
+
+  const ulMap = {};
+  if (ulData) for (const r of ulData) {
+    const id = r.protocol?.id;
+    if (id) ulMap[id] = r.upload ?? 0;
+  }
+
+  return protoData
+    .filter(r => INSECURE[r.protocol?.label])
+    .map(r => {
+      const label = r.protocol?.label ?? 'Unknown';
+      const info  = INSECURE[label];
+      return {
+        protocol    : label,
+        ip_address  : null,
+        mac_address : null,
+        dst_ip      : null,
+        dst_port    : info.port,
+        app_label   : null,
+        download    : r.download ?? 0,
+        upload      : ulMap[r.protocol?.id] ?? 0,
+        risk        : info.risk,
+        detected_at : null,
+        source      : 'derived',
+      };
+    })
+    .slice(0, limit);
+}
+
+// 26. IP Reputation — derive dari top remote_ip + cross-check negara berisiko tinggi
+async function fetchIPReputation(limit = 50, agentUuid = null) {
+  // Negara dengan risiko tinggi berdasarkan threat intel umum
+  const HIGH_RISK_COUNTRIES = new Set([
+    'China', 'Russia', 'Iran', 'North Korea', 'Nigeria', 'Romania',
+    'Brazil', 'Ukraine', 'Vietnam', 'Indonesia',
+  ]);
+
+  const [ipData, countryData] = await Promise.all([
+    netifyFetch('/data/stats/top/remote_ip/download', { filter_interval: 1440, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/stats/top/country/download', { filter_interval: 1440, settings_limit: 50 }, false, agentUuid),
+  ]);
+
+  const results = [];
+
+  if (ipData) {
+    // Tandai IP dari negara berisiko (informasi negara tidak ada per-IP dari API,
+    // jadi kita pakai country data untuk konteks)
+    for (const r of ipData) {
+      const ip = r.remote_ip?.address ?? String(r.remote_ip ?? '');
+      if (!ip) continue;
+      results.push({
+        ip_address  : ip,
+        local_ip    : null,
+        mac_address : null,
+        reputation  : 'Unknown',
+        score       : null,
+        country     : null,
+        app_label   : null,
+        download    : r.download ?? 0,
+        upload      : r.upload ?? 0,
+        detected_at : null,
+        blacklisted : false,
+        source      : 'derived:top_ip',
+      });
+    }
+  }
+
+  // Tambah entri untuk negara berisiko yang terdeteksi
+  if (countryData) {
+    for (const r of countryData) {
+      const country = r.country?.label ?? '';
+      if (HIGH_RISK_COUNTRIES.has(country)) {
+        results.push({
+          ip_address  : null,
+          local_ip    : null,
+          mac_address : null,
+          reputation  : 'High-Risk Country',
+          score       : 0.7,
+          country     : country,
+          app_label   : null,
+          download    : r.download ?? 0,
+          upload      : r.upload ?? 0,
+          detected_at : null,
+          blacklisted : false,
+          source      : 'derived:country',
+        });
+      }
+    }
+  }
+
+  return results.slice(0, limit);
+}
+
+// 27. Server Discovery — derive dari flows dengan flow_origin=Server + port well-known server
+async function fetchServerDiscovery(limit = 100, agentUuid = null) {
+  const SERVER_PORTS = {
+    80: 'HTTP', 443: 'HTTPS', 22: 'SSH', 21: 'FTP', 25: 'SMTP',
+    110: 'POP3', 143: 'IMAP', 3306: 'MySQL', 5432: 'PostgreSQL',
+    6379: 'Redis', 27017: 'MongoDB', 8080: 'HTTP-Alt', 8443: 'HTTPS-Alt',
+    53: 'DNS', 3389: 'RDP', 5900: 'VNC', 161: 'SNMP', 123: 'NTP',
+    389: 'LDAP', 636: 'LDAPS', 5060: 'SIP', 1194: 'OpenVPN',
+  };
+
+  const [flowOriginData, flowsRaw] = await Promise.all([
+    netifyFetch('/data/stats/top/flow_origin/download', { filter_interval: 1440, settings_limit: 10 }, false, agentUuid),
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
+  ]);
+
+  const serverMap = {};
+  if (flowsRaw) {
+    for (const r of flowsRaw) {
+      const localIP  = r.local_ip?.address;
+      const localPort = r.local_port ?? r.remote_port;
+      const proto    = r.ip_protocol?.label ?? null;
+      const mac      = r.local_mac ?? null;
+      if (!localIP) continue;
+
+      // Deteksi server: local device listening di port well-known
+      const svcName = SERVER_PORTS[localPort] ?? SERVER_PORTS[r.remote_port];
+      if (svcName) {
+        const key = `${localIP}:${localPort ?? r.remote_port}`;
+        if (!serverMap[key]) {
+          const oui = mac ? mac.substring(0,8).toUpperCase() : null;
+          serverMap[key] = {
+            detected_at : r.first_seen_at?.date ?? null,
+            ip_address  : localIP,
+            mac_address : mac,
+            server_type : svcName,
+            hostname    : r.device?.label ?? null,
+            port        : localPort ?? r.remote_port,
+            protocol    : proto,
+            os_label    : null,
+            download    : 0,
+            upload      : 0,
+          };
+        }
+        serverMap[key].download += r.download ?? 0;
+        serverMap[key].upload   += r.upload   ?? 0;
+      }
+    }
+  }
+
+  return Object.values(serverMap)
+    .sort((a, b) => (b.download + b.upload) - (a.download + a.upload))
+    .slice(0, limit);
+}
+
+// 28. Tor Detection — derive dari top remote_ip + app/hostname matching Tor
+async function fetchTorDetection(limit = 50, agentUuid = null) {
+  const TOR_INDICATORS = ['tor', '.onion', 'torproject', 'torbrowser'];
+
+  const [appData, domainData] = await Promise.all([
+    netifyFetch('/data/stats/top/application/download', { filter_interval: 1440, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/stats/top/hostname/download', { filter_interval: 1440, settings_limit: 100 }, false, agentUuid),
+  ]);
+
+  const results = [];
+
+  if (appData) {
+    for (const r of appData) {
+      const name = (r.application?.label ?? '').toLowerCase();
+      const tag  = (r.application?.tag  ?? '').toLowerCase();
+      if (TOR_INDICATORS.some(k => name.includes(k) || tag.includes(k))) {
+        results.push({
+          detected_at : null,
+          ip_address  : null,
+          mac_address : null,
+          exit_node   : null,
+          circuit_id  : null,
+          download    : r.download ?? 0,
+          upload      : r.upload ?? 0,
+          country     : null,
+          source      : 'derived:app',
+          label       : r.application?.label,
+        });
+      }
+    }
+  }
+
+  if (domainData) {
+    for (const r of domainData) {
+      const host = (r.hostname?.name ?? '').toLowerCase();
+      if (TOR_INDICATORS.some(k => host.includes(k))) {
+        results.push({
+          detected_at : null,
+          ip_address  : null,
+          mac_address : null,
+          exit_node   : null,
+          circuit_id  : null,
+          download    : r.download ?? 0,
+          upload      : 0,
+          country     : null,
+          source      : 'derived:hostname',
+          label       : r.hostname?.name,
+        });
+      }
+    }
+  }
+
+  return results.slice(0, limit);
+}
+
+// 29. Unencrypted Passwords — derive dari flows ke port cleartext auth
+async function fetchUnencryptedPasswords(limit = 50, agentUuid = null) {
+  // Port yang dikenal mengirim kredensial cleartext
+  const CLEARTEXT_AUTH_PORTS = {
+    21  : { protocol: 'FTP',    severity: 'Critical' },
+    23  : { protocol: 'Telnet', severity: 'Critical' },
+    25  : { protocol: 'SMTP',   severity: 'High' },
+    80  : { protocol: 'HTTP',   severity: 'High' },
+    110 : { protocol: 'POP3',   severity: 'High' },
+    143 : { protocol: 'IMAP',   severity: 'High' },
+    389 : { protocol: 'LDAP',   severity: 'Critical' },
+    512 : { protocol: 'rexec',  severity: 'Critical' },
+    513 : { protocol: 'rlogin', severity: 'Critical' },
+    514 : { protocol: 'rsh',    severity: 'Critical' },
+  };
+
+  const flowsRaw = await netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid);
+  if (!flowsRaw) return [];
+
+  const seen = new Map();
+  for (const r of flowsRaw) {
+    const port = r.remote_port ?? 0;
+    const info = CLEARTEXT_AUTH_PORTS[port];
+    if (!info) continue;
+
+    const key = `${r.local_ip?.address}:${r.remote_ip?.address}:${port}`;
+    if (!seen.has(key)) {
+      seen.set(key, {
+        detected_at : r.first_seen_at?.date ?? null,
+        ip_address  : r.local_ip?.address ?? null,
+        mac_address : r.local_mac ?? null,
+        dst_ip      : r.remote_ip?.address ?? null,
+        dst_port    : port,
+        protocol    : info.protocol,
+        username    : null,
+        download    : 0,
+        upload      : 0,
+        severity    : info.severity,
+      });
+    }
+    seen.get(key).download += r.download ?? 0;
+    seen.get(key).upload   += r.upload   ?? 0;
+  }
+
+  return Array.from(seen.values())
+    .sort((a, b) => (b.download + b.upload) - (a.download + a.upload))
+    .slice(0, limit);
+}
+
+// 30. VPN Detection — derive dari apps/protocols/hostnames yang mengindikasikan VPN
+async function fetchVPNDetection(limit = 50, agentUuid = null) {
+  const VPN_APPS = [
+    'openvpn', 'wireguard', 'nordvpn', 'expressvpn', 'surfshark', 'tunnelbear',
+    'mullvad', 'protonvpn', 'ipvanish', 'pia', 'private internet access',
+    'hotspot shield', 'cyberghost', 'vpn', 'pptp', 'l2tp', 'ipsec', 'sstp',
+    'shadowsocks', 'v2ray', 'trojan', 'outline',
+  ];
+  const VPN_PROTOCOLS = new Set(['OpenVPN', 'WireGuard', 'IPSec', 'PPTP', 'L2TP', 'GRE', 'SSTP']);
+  // Port yang umum digunakan VPN
+  const VPN_PORTS = new Set([1194, 51820, 500, 4500, 1701, 1723, 8388, 443]);
+
+  const [appData, protoData, flowsRaw] = await Promise.all([
+    netifyFetch('/data/stats/top/application/download', { filter_interval: 1440, settings_limit: 100 }, false, agentUuid),
+    netifyFetch('/data/stats/top/protocol/download', { filter_interval: 1440, settings_limit: 50 }, false, agentUuid),
+    netifyFetch('/data/flows', { settings_limit: 500 }, false, agentUuid),
+  ]);
+
+  const results = [];
+
+  if (appData) {
+    for (const r of appData) {
+      const name = (r.application?.label ?? '').toLowerCase();
+      const tag  = (r.application?.tag  ?? '').toLowerCase();
+      if (VPN_APPS.some(k => name.includes(k) || tag.includes(k))) {
+        results.push({
+          detected_at : null,
+          ip_address  : null,
+          mac_address : null,
+          vpn_type    : r.application?.label ?? 'Unknown VPN',
+          remote_ip   : null,
+          protocol    : null,
+          download    : r.download ?? 0,
+          upload      : r.upload ?? 0,
+          country     : null,
+          confidence  : 0.9,
+          source      : 'derived:app',
+        });
+      }
+    }
+  }
+
+  if (protoData) {
+    for (const r of protoData) {
+      const label = r.protocol?.label ?? '';
+      if (VPN_PROTOCOLS.has(label)) {
+        results.push({
+          detected_at : null,
+          ip_address  : null,
+          mac_address : null,
+          vpn_type    : label,
+          remote_ip   : null,
+          protocol    : label,
+          download    : r.download ?? 0,
+          upload      : r.upload ?? 0,
+          country     : null,
+          confidence  : 0.85,
+          source      : 'derived:protocol',
+        });
+      }
+    }
+  }
+
+  if (flowsRaw) {
+    const portSeen = new Set();
+    for (const r of flowsRaw) {
+      const port = r.remote_port ?? 0;
+      if (VPN_PORTS.has(port) && !portSeen.has(port)) {
+        portSeen.add(port);
+        results.push({
+          detected_at : r.first_seen_at?.date ?? null,
+          ip_address  : r.local_ip?.address ?? null,
+          mac_address : r.local_mac ?? null,
+          vpn_type    : `Port ${port}`,
+          remote_ip   : r.remote_ip?.address ?? null,
+          protocol    : r.ip_protocol?.label ?? null,
+          download    : r.download ?? 0,
+          upload      : r.upload ?? 0,
+          country     : null,
+          confidence  : 0.75,
+          source      : 'derived:port',
+        });
+      }
+    }
+  }
+
+  return results.slice(0, limit);
+}
+
+async function fetchAgents() {
+  const data = await netifyFetch('/data/stats/top/agent/download', { filter_interval: 43200, settings_limit: 100 }, false, null);
+  if (!data || !Array.isArray(data)) return [];
+  const list = data.map(r => ({
+    id: r.agent?.id,
+    uuid: r.agent?.uuid,
+    label: r.agent?.label,
+  }));
+  for (const a of list) {
+    if (a.uuid && a.id) {
+      agentMap[a.uuid] = a.id;
+    }
+  }
+  return list;
+}

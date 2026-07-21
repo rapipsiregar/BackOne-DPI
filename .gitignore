@@ -1,0 +1,71 @@
+# dependencies
+node_modules/
+**/node_modules/
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# logs
+*.log
+
+# next.js
+.next/
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# local databases & temporary files
+temp.json
+/scratch
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+backend/*.sqlite
+*.db
+*.db-shm
+*.db-wal
+
+# reports and temporary docx folders
+Laporan_*.docx
+temp_docx/
+*.zip
+
+# AI and confidential files
+AGENTS.md
+CLAUDE.md
+.agents/
+docs/
+plans/
+.env*
+
+# Local uploads
+backend/public/api/uploads/
