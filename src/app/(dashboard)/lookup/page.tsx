@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DropdownFilterSelect } from "@/components/ui/DropdownFilterSelect";
 import { Loader2, Search, AppWindow, HelpCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X, Info, Tag, Box, Shield, Server } from "lucide-react";
 
+import { HelpTrigger } from "@/components/help/HelpTrigger";
+
 export default function LookupPage() {
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,14 +56,17 @@ export default function LookupPage() {
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-      <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-          Application Database
-          {isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
-        </h1>
-        <p className="text-slate-400 mt-2">
-          Search BackOne's extensive classification database of over 2,500+ apps, protocols, and services.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+            App Lookup
+            {isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
+          </h1>
+          <p className="text-slate-400 mt-2">
+            Search BackOne's extensive classification database of over 2,500+ apps, protocols, and services.
+          </p>
+        </div>
+        <HelpTrigger pageId="lookup" />
       </div>
 
       {/* Search & Filter Bar */}

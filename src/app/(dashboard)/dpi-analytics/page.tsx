@@ -24,6 +24,8 @@ function ClickHint() {
   );
 }
 
+import { HelpTrigger } from "@/components/help/HelpTrigger";
+
 export default function DpiAnalyticsPage() {
   const { timeRange } = useTimeFilter();
   // Detail panel state
@@ -59,12 +61,15 @@ export default function DpiAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">BackOne Metadata</h1>
-        <p className="text-slate-400 mt-2">
-          Deep Packet Inspection metadata and fingerprinting.{" "}
-          <span className="text-blue-400 text-sm">Click any row to view device-level detail.</span>
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight">DPI MetaData</h1>
+          <p className="text-slate-400 mt-2">
+            Deep Packet Inspection metadata and fingerprinting.{" "}
+            <span className="text-blue-400 text-sm">Click any row to view device-level detail.</span>
+          </p>
+        </div>
+        <HelpTrigger pageId="dpi-analytics" />
       </div>
 
       <Tabs>

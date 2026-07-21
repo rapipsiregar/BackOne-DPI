@@ -11,6 +11,7 @@ import TlsVersionsChart from "@/components/security-audit/TlsVersionsChart";
 import TlsTables from "@/components/security-audit/TlsTables";
 import SslSanTable from "@/components/security-audit/SslSanTable";
 import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 export default function SecurityAuditPage() {
   const [mounted, setMounted] = useState(false);
@@ -53,11 +54,14 @@ export default function SecurityAuditPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white tracking-tight">Security & Encryption Audit</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          Monitor TLS versions distribution, cipher suites, active certificate properties, and device risk profiles.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-white tracking-tight">Encryption Audit</h2>
+          <p className="text-sm text-slate-400 mt-1">
+            Monitor TLS versions distribution, cipher suites, active certificate properties, and device risk profiles.
+          </p>
+        </div>
+        <HelpTrigger pageId="security-audit" />
       </div>
 
       <UniversalFilters

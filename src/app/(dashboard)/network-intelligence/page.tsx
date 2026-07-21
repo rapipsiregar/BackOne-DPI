@@ -13,6 +13,7 @@ import { useAppCategories, useContinents } from "@/lib/api-with-context";
 import { fmtBytes } from "@/lib/utils";
 import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
 import { CategoryDetailPanel } from "@/components/network/CategoryDetailPanel";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 const COLORS = ['#58a6ff', '#3fb950', '#f0883e', '#bc8cff', '#f85149'];
 
@@ -90,6 +91,7 @@ export default function NetworkIntelligencePage() {
           </h2>
           <p className="text-muted-foreground mt-1">Deep packet inspection analytics and geography.</p>
         </div>
+        <HelpTrigger pageId="network-intelligence" />
       </div>
       
       <UniversalFilters

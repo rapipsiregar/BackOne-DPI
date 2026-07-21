@@ -14,6 +14,7 @@ import { usePollingKey } from "@/lib/usePolling";
 import { AgentModals } from "@/components/admin/AgentModals";
 import ExternalAccountModal from "@/components/admin/ExternalAccountModal";
 import { getAgentColumns, getExternalAccountColumns } from "./columns";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 export default function AgentsPage() {
   const router = useRouter();
@@ -175,20 +176,25 @@ export default function AgentsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-          <Server className="w-6 h-6 text-primary" />
-          Agents Inventory
-          {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
-        </h2>
-        {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
-          <button 
-            onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-2 bg-primary hover:bg-primary/95 text-primary-foreground px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-blue-500/10"
-          >
-            <Plus className="w-4 h-4" />
-            Provision Agent
-          </button>
-        )}
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+            Agents Inventory
+            {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+          </h2>
+          <p className="text-muted-foreground mt-1">Managed DPI probes, remote collectors, and probe infrastructure.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
+            <button 
+              onClick={() => setIsCreateOpen(true)}
+              className="flex items-center gap-2 bg-primary hover:bg-primary/95 text-primary-foreground px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-blue-500/10"
+            >
+              <Plus className="w-4 h-4" />
+              Provision Agent
+            </button>
+          )}
+          <HelpTrigger pageId="agents" />
+        </div>
       </div>
 
       {error && (

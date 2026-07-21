@@ -11,6 +11,7 @@ import { fmtBytes } from "@/lib/utils";
 import { Loader2, ChevronRight, ChevronDown } from "lucide-react";
 
 import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 export default function DevicesPage() {
   const [mounted, setMounted] = useState(false);
@@ -171,6 +172,7 @@ export default function DevicesPage() {
             <span className="text-slate-500 text-xs">Click an IP to see app usage &amp; flows.</span>
           </p>
         </div>
+        <HelpTrigger pageId="devices" />
       </div>
 
       <UniversalFilters

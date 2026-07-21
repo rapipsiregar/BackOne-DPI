@@ -11,6 +11,7 @@ import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/compo
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 
 
@@ -158,10 +159,14 @@ function EventsContent() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-          Network Events
-          {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
-        </h2>
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+            Network Events
+            {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+          </h2>
+          <p className="text-muted-foreground mt-1">Real-time system, security, and interface network log events.</p>
+        </div>
+        <HelpTrigger pageId="events" />
       </div>
       
       <UniversalFilters
