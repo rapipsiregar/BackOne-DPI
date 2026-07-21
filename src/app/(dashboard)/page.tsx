@@ -85,7 +85,7 @@ export default function SummaryPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            Summary Overview
+            Overview Dashboard
             {isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
           </h2>
           <p className="text-muted-foreground mt-1">Real-time network traffic and intelligence summary.</p>
