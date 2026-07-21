@@ -11,7 +11,7 @@ const SessionSchema = new mongoose.Schema({
   user_agent: { type: String, default: 'Unknown' },
   session_token: { type: String, required: true, unique: true }, // JWT JTI or unique token hash
   last_active: { type: Date, default: Date.now },
-  expires_at: { type: Date, required: true, index: true }, // MongoDB TTL Index will auto-expire sessions
+  expires_at: { type: Date, required: true }, // MongoDB TTL Index specified below via SessionSchema.index
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
