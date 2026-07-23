@@ -38,41 +38,41 @@ export interface IntelVpnDetection { id: number; fetched_at: string; detected_at
 import { useTimeFilter } from '@/contexts/TimeFilterContext';
 import { useCtxFetch } from './api-context-core';
 
-function useGenericFetch<T>(endpoint: string, limit: number) {
+function useGenericFetch<T>(endpoint: string, limit: number = 1000000) {
   const { timeRange } = useTimeFilter();
   return useCtxFetch<T[]>(`${endpoint}?limit=${limit}`, timeRange, []);
 }
 
 // Network Infrastructure Hooks
-export const useRegions = (limit = 50) => useGenericFetch<RegionStat>('/regions', limit);
-export const useCities = (limit = 50) => useGenericFetch<CityStat>('/cities', limit);
-export const useVlans = (limit = 50) => useGenericFetch<VlanStat>('/vlans', limit);
-export const useInterfaces = (limit = 50) => useGenericFetch<InterfaceStat>('/interfaces', limit);
-export const useIpVersions = (limit = 50) => useGenericFetch<IpVersionStat>('/ip-versions', limit);
-export const useRemoteIps = (limit = 50) => useGenericFetch<RemoteIpStat>('/remote-ips', limit);
-export const useMacBandwidth = (limit = 50) => useGenericFetch<MacBandwidthStat>('/mac-bandwidth', limit);
-export const useFlowTypes = (limit = 50) => useGenericFetch<FlowTypeStat>('/flow-types', limit);
-export const useFlowOrigins = (limit = 50) => useGenericFetch<FlowOriginStat>('/flow-origins', limit);
+export const useRegions = (limit = 1000000) => useGenericFetch<RegionStat>('/regions', limit);
+export const useCities = (limit = 1000000) => useGenericFetch<CityStat>('/cities', limit);
+export const useVlans = (limit = 1000000) => useGenericFetch<VlanStat>('/vlans', limit);
+export const useInterfaces = (limit = 1000000) => useGenericFetch<InterfaceStat>('/interfaces', limit);
+export const useIpVersions = (limit = 1000000) => useGenericFetch<IpVersionStat>('/ip-versions', limit);
+export const useRemoteIps = (limit = 1000000) => useGenericFetch<RemoteIpStat>('/remote-ips', limit);
+export const useMacBandwidth = (limit = 1000000) => useGenericFetch<MacBandwidthStat>('/mac-bandwidth', limit);
+export const useFlowTypes = (limit = 1000000) => useGenericFetch<FlowTypeStat>('/flow-types', limit);
+export const useFlowOrigins = (limit = 1000000) => useGenericFetch<FlowOriginStat>('/flow-origins', limit);
 
 // DPI Analytics Hooks
-export const useNetbios = (limit = 50) => useGenericFetch<NetbiosStat>('/netbios', limit);
-export const useDiscoveryOs = (limit = 50) => useGenericFetch<DiscoveryOsStat>('/discovery-os', limit);
-export const useDhcpFingerprints = (limit = 50) => useGenericFetch<DhcpFingerprintStat>('/dhcp-fingerprints', limit);
-export const useHttpUserAgents = (limit = 50) => useGenericFetch<HttpUserAgentStat>('/http-user-agents', limit);
-export const useSniHostnames = (limit = 50) => useGenericFetch<SniHostnameStat>('/sni-hostnames', limit);
-export const useSslServerCn = (limit = 50) => useGenericFetch<SslServerCnStat>('/ssl-server-cn', limit);
-export const useQuicHostnames = (limit = 50) => useGenericFetch<QuicHostnameStat>('/quic-hostnames', limit);
-export const useBittorrentHashes = (limit = 50) => useGenericFetch<BittorrentHashStat>('/bittorrent-hashes', limit);
-export const useSshVersions = (limit = 50) => useGenericFetch<SshVersionStat>('/ssh-versions', limit);
-export const useMdnsHostnames = (limit = 50) => useGenericFetch<MdnsHostnameStat>('/mdns-hostnames', limit);
+export const useNetbios = (limit = 1000000) => useGenericFetch<NetbiosStat>('/netbios', limit);
+export const useDiscoveryOs = (limit = 1000000) => useGenericFetch<DiscoveryOsStat>('/discovery-os', limit);
+export const useDhcpFingerprints = (limit = 1000000) => useGenericFetch<DhcpFingerprintStat>('/dhcp-fingerprints', limit);
+export const useHttpUserAgents = (limit = 1000000) => useGenericFetch<HttpUserAgentStat>('/http-user-agents', limit);
+export const useSniHostnames = (limit = 1000000) => useGenericFetch<SniHostnameStat>('/sni-hostnames', limit);
+export const useSslServerCn = (limit = 1000000) => useGenericFetch<SslServerCnStat>('/ssl-server-cn', limit);
+export const useQuicHostnames = (limit = 1000000) => useGenericFetch<QuicHostnameStat>('/quic-hostnames', limit);
+export const useBittorrentHashes = (limit = 1000000) => useGenericFetch<BittorrentHashStat>('/bittorrent-hashes', limit);
+export const useSshVersions = (limit = 1000000) => useGenericFetch<SshVersionStat>('/ssh-versions', limit);
+export const useMdnsHostnames = (limit = 1000000) => useGenericFetch<MdnsHostnameStat>('/mdns-hostnames', limit);
 
 // Intelligence Detail Hooks
-export const useIntelCryptoMining = (limit = 50) => useGenericFetch<IntelCryptoMining>('/intelligence/crypto-mining', limit);
-export const useIntelDeviceDiscovery = (limit = 50) => useGenericFetch<IntelDeviceDiscovery>('/intelligence/device-discovery', limit);
-export const useIntelEncryptionAudit = (limit = 50) => useGenericFetch<IntelEncryptionAudit>('/intelligence/encryption-audit', limit);
-export const useIntelInsecureProtocols = (limit = 50) => useGenericFetch<IntelInsecureProtocol>('/intelligence/insecure-protocols', limit);
-export const useIntelIpReputation = (limit = 50) => useGenericFetch<IntelIpReputation>('/intelligence/ip-reputation', limit);
-export const useIntelServerDiscovery = (limit = 50) => useGenericFetch<IntelServerDiscovery>('/intelligence/server-discovery', limit);
-export const useIntelTorDetection = (limit = 50) => useGenericFetch<IntelTorDetection>('/intelligence/tor', limit);
-export const useIntelUnencryptedPasswords = (limit = 50) => useGenericFetch<IntelUnencryptedPassword>('/intelligence/unencrypted-passwords', limit);
-export const useIntelVpnDetection = (limit = 50) => useGenericFetch<IntelVpnDetection>('/intelligence/vpn', limit);
+export const useIntelCryptoMining = (limit = 1000000) => useGenericFetch<IntelCryptoMining>('/intelligence/crypto-mining', limit);
+export const useIntelDeviceDiscovery = (limit = 1000000) => useGenericFetch<IntelDeviceDiscovery>('/intelligence/device-discovery', limit);
+export const useIntelEncryptionAudit = (limit = 1000000) => useGenericFetch<IntelEncryptionAudit>('/intelligence/encryption-audit', limit);
+export const useIntelInsecureProtocols = (limit = 1000000) => useGenericFetch<IntelInsecureProtocol>('/intelligence/insecure-protocols', limit);
+export const useIntelIpReputation = (limit = 1000000) => useGenericFetch<IntelIpReputation>('/intelligence/ip-reputation', limit);
+export const useIntelServerDiscovery = (limit = 1000000) => useGenericFetch<IntelServerDiscovery>('/intelligence/server-discovery', limit);
+export const useIntelTorDetection = (limit = 1000000) => useGenericFetch<IntelTorDetection>('/intelligence/tor', limit);
+export const useIntelUnencryptedPasswords = (limit = 1000000) => useGenericFetch<IntelUnencryptedPassword>('/intelligence/unencrypted-passwords', limit);
+export const useIntelVpnDetection = (limit = 1000000) => useGenericFetch<IntelVpnDetection>('/intelligence/vpn', limit);

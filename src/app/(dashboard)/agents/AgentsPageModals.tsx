@@ -3,7 +3,7 @@
 import { AgentModals } from "@/components/admin/AgentModals";
 import ExternalAccountModal from "@/components/admin/ExternalAccountModal";
 import AgentLocationModal from "@/components/admin/AgentLocationModal";
-import { Agent } from "@/lib/actions/agents";
+import { Agent } from "@/lib/actions/agentsCore";
 import { type ManagedUser } from "@/lib/admin-api";
 
 interface AgentsPageModalsProps {

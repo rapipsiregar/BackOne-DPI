@@ -139,6 +139,7 @@ AppStatSchema.index({ agent_uuid: 1, timestamp: -1, download: -1 });
 DeviceStatSchema.index({ agent_uuid: 1, ip_address: 1 }, { unique: true });
 FlowSchema.index({ agent_uuid: 1, timestamp: -1 });
 FlowSchema.index({ agent_uuid: 1, flow_id: 1 });
+FlowSchema.index({ site_uuid: 1, timestamp: -1 });
 FlowSchema.index({ site_uuid: 1, app_label: 1, timestamp: -1 });
 ThreatSchema.index({ agent_uuid: 1, timestamp: -1 });
 AppCategoryStatSchema.index({ agent_uuid: 1, timestamp: -1 });
@@ -167,16 +168,30 @@ DeviceAppStatSchema.index({ site_uuid: 1, app_label: 1, timestamp: -1 });
 const telemetrySchemas = require('./SchemasTelemetry');
 const auxSchemas = require('./SchemasAux');
 
+// ─── Agent Registry (all agents registered in Netify, regardless of activity) ──
+// Upserted every collector cycle. Source of truth for the agents list page.
+const AgentRegistrySchema = new mongoose.Schema({
+  uuid:         { type: String, required: true, unique: true, index: true },
+  serial:       { type: String },
+  label:        { type: String },
+  site_uuid:    { type: String, index: true },
+  provisioned:  { type: Boolean, default: false },
+  activated:    { type: Boolean, default: false },
+  last_seen_at: { type: mongoose.Schema.Types.Mixed },
+  netify_id:    { type: Number },
+}, { ...baseOptions, collection: 'agent_registry' });
+
 module.exports = {
-  Summary:     mongoose.model('Summary',     SummarySchema),
-  AppStat:     mongoose.model('AppStat',     AppStatSchema),
-  ProtocolStat:mongoose.model('ProtocolStat',ProtocolStatSchema),
-  DeviceStat:  mongoose.model('DeviceStat',  DeviceStatSchema),
+  Summary:       mongoose.model('Summary',       SummarySchema),
+  AppStat:       mongoose.model('AppStat',       AppStatSchema),
+  ProtocolStat:  mongoose.model('ProtocolStat',  ProtocolStatSchema),
+  DeviceStat:    mongoose.model('DeviceStat',    DeviceStatSchema),
   DeviceAppStat: mongoose.model('DeviceAppStat', DeviceAppStatSchema),
-  Flow:        mongoose.model('Flow',        FlowSchema),
-  Threat:      mongoose.model('Threat',      ThreatSchema),
+  Flow:          mongoose.model('Flow',          FlowSchema),
+  Threat:        mongoose.model('Threat',        ThreatSchema),
   AppCategoryStat: mongoose.model('AppCategoryStat', AppCategoryStatSchema),
   Event:         mongoose.model('Event',         EventSchema),
+  AgentRegistry: mongoose.model('AgentRegistry', AgentRegistrySchema),
   ...auxSchemas,
   ...telemetrySchemas,
 };

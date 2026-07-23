@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Loader2 } from "lucide-react";
-import { createAgent, deleteAgent, Agent } from "@/lib/actions/agents";
+import { createAgent, deleteAgent } from "@/lib/actions/agents";
+import { Agent } from "@/lib/actions/agentsCore";
 import { AgentDetailModal } from "@/components/ui/AgentDetailModal";
 import AgentAccountModal from "@/components/admin/AgentAccountModal";
 import { resolveAgentLabel, type ManagedUser } from "@/lib/admin-api";

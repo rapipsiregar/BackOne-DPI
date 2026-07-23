@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HelpCircle, X, Search, PlayCircle, ChevronDown, ChevronUp, FileText, BookOpen } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { HelpCircle, X, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { useTenantConfig } from '@/contexts/TenantConfigContext';
+import { FAQS } from '@/lib/helpContent';
 
 const FAQItem = ({ question, answer }: { question: string, answer: string }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -38,25 +39,16 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
 export function HelpCenterFAB() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const { tenantConfig } = useTenantConfig();
 
-  const faqs = [
-    {
-      q: "Kenapa data Threats kosong (0)?",
-      a: "Jika indikator Threats menunjukkan angka 0, artinya jaringan Anda aman dalam rentang waktu yang dipilih. Sistem tidak mendeteksi adanya paket data yang cocok dengan profil serangan yang diketahui."
-    },
-    {
-      q: "Apa perbedaan Events dan Threats?",
-      a: "Events adalah semua log aktivitas koneksi biasa yang tercatat di jaringan Anda (termasuk yang aman). Threats adalah sekumpulan Events khusus yang telah difilter dan diklasifikasikan sebagai aktivitas berbahaya oleh sistem Deep Packet Inspection (DPI)."
-    },
-    {
-      q: "Bagaimana cara membaca Heatmap Geo Traffic?",
-      a: "Warna biru muda menunjukkan trafik rendah, sedangkan warna biru pekat/tua menunjukkan volume trafik (download/upload) yang sangat tinggi dari/ke negara tersebut."
-    },
-    {
-      q: "Berapa lama data disimpan?",
-      a: "Untuk menjaga performa sistem, database MongoDB dikonfigurasi untuk secara otomatis menghapus data telemetri jaringan yang usianya lebih dari 7 hari."
-    }
-  ];
+  const brandName = tenantConfig?.brandName || "System";
+  const footerCopyright = tenantConfig?.footerCopyright || `${brandName} &copy; 2026`;
+
+  const filteredFaqs = FAQS.filter(
+    faq =>
+      faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <>
@@ -97,7 +89,7 @@ export function HelpCenterFAB() {
               <div className="flex items-center justify-between border-b border-border/50 px-6 py-5">
                 <div>
                   <h2 className="text-lg font-bold text-foreground">Help & Resources</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">BackOne Guide & Documentation</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{brandName} Guide & Documentation</p>
                 </div>
                 <button
                   onClick={() => setIsOpen(false)}
@@ -122,45 +114,8 @@ export function HelpCenterFAB() {
                   />
                 </div>
 
-                {/* Getting Started Video Cards */}
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <PlayCircle className="h-4 w-4" /> Getting Started
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="group cursor-pointer space-y-2">
-                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-slate-800 dark:bg-slate-900 border border-border flex items-center justify-center group-hover:border-blue-500 transition-colors">
-                        <PlayCircle className="h-8 w-8 text-white/70 group-hover:text-blue-400 group-hover:scale-110 transition-all" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                      </div>
-                      <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">Dashboard Overview Tour</p>
-                    </div>
-                    <div className="group cursor-pointer space-y-2">
-                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-slate-800 dark:bg-slate-900 border border-border flex items-center justify-center group-hover:border-blue-500 transition-colors">
-                        <PlayCircle className="h-8 w-8 text-white/70 group-hover:text-blue-400 group-hover:scale-110 transition-all" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                      </div>
-                      <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">How to Analyze Metadata</p>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Documentation Links */}
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <BookOpen className="h-4 w-4" /> Quick Links
-                  </h3>
-                  <div className="flex flex-col gap-1.5">
-                    <button className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors text-left">
-                      <FileText className="h-4 w-4 text-blue-500" />
-                      Read the Full Documentation
-                    </button>
-                    <button className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors text-left">
-                      <FileText className="h-4 w-4 text-emerald-500" />
-                      Integration with BackOne API
-                    </button>
-                  </div>
-                </div>
+
 
                 {/* FAQs */}
                 <div className="space-y-3 pb-8">
@@ -168,9 +123,13 @@ export function HelpCenterFAB() {
                     <HelpCircle className="h-4 w-4" /> Frequently Asked Questions
                   </h3>
                   <div className="rounded-xl border border-border/50 bg-card px-4">
-                    {faqs.map((faq, index) => (
-                      <FAQItem key={index} question={faq.q} answer={faq.a} />
-                    ))}
+                    {filteredFaqs.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-4 text-center">No matching FAQs found</p>
+                    ) : (
+                      filteredFaqs.map((faq, index) => (
+                        <FAQItem key={index} question={faq.question} answer={faq.answer} />
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -178,10 +137,7 @@ export function HelpCenterFAB() {
               
               {/* Footer */}
               <div className="border-t border-border/50 bg-secondary/30 p-4 text-center">
-                <p className="text-xs text-muted-foreground">
-                  BackOne &copy; 2026<br/>
-                  PT. Data Bisnis Solusi
-                </p>
+                <p className="text-xs text-muted-foreground" dangerouslySetInnerHTML={{ __html: footerCopyright }} />
               </div>
 
             </motion.div>

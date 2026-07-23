@@ -15,7 +15,7 @@ import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 export default function DevicesPage() {
   const [mounted, setMounted] = useState(false);
-  const devices = useDevices(5000);
+  const devices = useDevices();
   const [selectedDevice, setSelectedDevice] = useState<DeviceStat | null>(null);
 
   const { 
@@ -26,6 +26,7 @@ export default function DevicesPage() {
 
   useEffect(() => {
     setMounted(true);
+    document.title = "Devices | BackOne - Deep Package Inspection";
   }, []);
 
   if (!mounted) return null;

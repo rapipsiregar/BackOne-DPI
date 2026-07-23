@@ -4,6 +4,7 @@
 
 const cron = require('node-cron');
 const { collectAllAgents, collectSpecificAgent, collectSpecificAgents } = require('./collector');
+const { syncApplicationDictionary } = require('./netifyClient');
 
 // Mode: 'all' = collect all agents, 'agent' = collect one specific agent, 'agents' = collect multiple agents
 const COLLECT_MODE    = process.env.PROXY_COLLECT_MODE || 'all';
@@ -97,7 +98,11 @@ function startScheduler() {
   // Initial run immediately on startup (async, do not block server start)
   setTimeout(async () => {
     // 1. Sync dictionary first
-    // await netifyClient.syncApplicationDictionary();
+    try {
+      await syncApplicationDictionary();
+    } catch (err) {
+      console.error('[Scheduler] Error syncing application dictionary:', err.message);
+    }
     
     // 2. Start normal telemetry collection
     runCollection().catch(err => console.error('[Scheduler] Initial run error:', err.message));

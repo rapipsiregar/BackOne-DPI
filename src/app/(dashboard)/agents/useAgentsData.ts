@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getAgents, Agent } from "@/lib/actions/agents";
+import { getAgents } from "@/lib/actions/agents";
+import { Agent } from "@/lib/actions/agentsCore";
 import { getAdminUsers, startViewAs, getViewAsHeaders, type ManagedUser } from "@/lib/admin-api";
 import { useTimeFilter } from "@/contexts/TimeFilterContext";
 import { usePollingKey } from "@/lib/usePolling";

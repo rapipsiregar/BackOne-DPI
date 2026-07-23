@@ -121,6 +121,17 @@ export function DateRangePicker({
             </button>
             <button
               onClick={() => {
+                const d = new Date();
+                d.setDate(d.getDate() - 29);
+                onChange(d.toISOString().slice(0, 10), today);
+                setOpen(false);
+              }}
+              className="flex-1 px-2 py-1.5 text-xs bg-secondary/50 text-white border border-border/50 rounded-lg hover:bg-secondary transition-colors"
+            >
+              30 Days
+            </button>
+            <button
+              onClick={() => {
                 onClear();
                 setOpen(false);
               }}

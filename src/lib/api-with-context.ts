@@ -102,7 +102,7 @@ export function useTimeline(points: number = 60, agentUuid?: string) {
   return { data, error, isLoading };
 }
 
-export function useTopApps(limit: number = 10) {
+export function useTopApps(limit: number = 1000000) {
   const { timeRange } = useTimeFilter();
   return useCtxFetch<AppStat[]>(`/apps?limit=${limit}`, timeRange, []);
 }
@@ -112,17 +112,17 @@ export function useTopProtocols() {
   return useCtxFetch<ProtocolStat[]>('/protocols', timeRange, []);
 }
 
-export function useSslSans(limit: number = 50) {
+export function useSslSans(limit: number = 1000000) {
   const { timeRange } = useTimeFilter();
   return useCtxFetch<SslSanStat[]>(`/ssl-subject-alt-names?limit=${limit}`, timeRange, []);
 }
 
-export function useDevices(limit: number = 0) {
+export function useDevices(limit: number = 1000000) {
   const { timeRange } = useTimeFilter();
   return useCtxFetch<DeviceStat[]>(`/devices?limit=${limit}`, timeRange, []);
 }
 
-export function useThreats(limit: number = 0) {
+export function useThreats(limit: number = 1000000) {
   const { timeRange } = useTimeFilter();
   return useCtxFetch<ThreatStat[]>(`/threats?limit=${limit}`, timeRange, []);
 }
@@ -137,76 +137,72 @@ export function useContinents() {
   return useCtxFetch<ContinentStat[]>('/continents', timeRange, []);
 }
 
-export function useFlows(limit: number = 0) {
+export function useFlows(page: number = 1, pageSize: number = 50, filters: any = {}) {
   const { timeRange } = useTimeFilter();
-  return useCtxFetch<FlowStat[]>(`/flows?limit=${limit}`, timeRange, []);
+  const queryParts = [
+    `limit=${pageSize}`,
+    `skip=${(page - 1) * pageSize}`
+  ];
+  if (filters.protocol) queryParts.push(`protocol=${encodeURIComponent(filters.protocol)}`);
+  if (filters.src_ip) queryParts.push(`src_ip=${encodeURIComponent(filters.src_ip)}`);
+  if (filters.dst_ip) queryParts.push(`dst_ip=${encodeURIComponent(filters.dst_ip)}`);
+  if (filters.dst_port) queryParts.push(`dst_port=${encodeURIComponent(filters.dst_port)}`);
+  if (filters.app) queryParts.push(`app=${encodeURIComponent(filters.app)}`);
+  if (filters.domain) queryParts.push(`domain=${encodeURIComponent(filters.domain)}`);
+  if (filters.sort_download) queryParts.push(`sort_download=${encodeURIComponent(filters.sort_download)}`);
+  if (filters.sort_upload) queryParts.push(`sort_upload=${encodeURIComponent(filters.sort_upload)}`);
+  if (filters.dateFrom) queryParts.push(`date_from=${encodeURIComponent(filters.dateFrom)}`);
+  if (filters.dateTo) queryParts.push(`date_to=${encodeURIComponent(filters.dateTo)}`);
+  if (filters.search) queryParts.push(`search=${encodeURIComponent(filters.search)}`);
+
+  const endpoint = `/flows?${queryParts.join('&')}`;
+  const { data: res, error, isLoading } = useCtxFetch<{ flows: FlowStat[], total: number }>(endpoint, timeRange, { flows: [], total: 0 });
+  return {
+    data: res.flows || [],
+    total: res.total || 0,
+    error,
+    isLoading
+  };
 }
 
-export function useCountries(limit: number = 0) {
+export interface FlowOptions {
+  protocols: string[];
+  srcIps: string[];
+  dstIps: string[];
+  dstPorts: string[];
+  apps: string[];
+  domains: string[];
+}
+
+export function useFlowsOptions() {
+  const { timeRange } = useTimeFilter();
+  return useCtxFetch<FlowOptions>('/flows-options', timeRange, {
+    protocols: [],
+    srcIps: [],
+    dstIps: [],
+    dstPorts: [],
+    apps: [],
+    domains: []
+  });
+}
+
+export function useCountries(limit: number = 1000000) {
   const { timeRange } = useTimeFilter();
   return useCtxFetch<CountryStat[]>(`/countries?limit=${limit}`, timeRange, []);
 }
 
-export function useDNS(limit: number = 0) {
+export function useDNS(limit: number = 1000000) {
   const { timeRange } = useTimeFilter();
   return useCtxFetch<DnsStat[]>(`/dns?limit=${limit}`, timeRange, []);
 }
 
-export function useEvents(limit: number = 0) {
+export function useEvents(limit: number = 1000000) {
   const { timeRange } = useTimeFilter();
   return useCtxFetch<EventStat[]>(`/events?limit=${limit}`, timeRange, []);
 }
 
-export function useTlsVersions(limit: number = 10) {
-  const { timeRange } = useTimeFilter();
-  return useCtxFetch<TlsVersionStat[]>(`/tls-versions?limit=${limit}`, timeRange, []);
-}
-
-export function useTlsCiphers(limit: number = 15) {
-  const { timeRange } = useTimeFilter();
-  return useCtxFetch<TlsCipherStat[]>(`/tls-ciphers?limit=${limit}`, timeRange, []);
-}
-
-export function useTlsSecurity(limit: number = 10) {
-  const { timeRange } = useTimeFilter();
-  return useCtxFetch<TlsSecurityStat[]>(`/tls-security?limit=${limit}`, timeRange, []);
-}
-
-export function useIntelligenceStats() {
-  const { timeRange } = useTimeFilter();
-  const endpoint = '/intelligence/stats';
-  const cacheKey = `${endpoint}:${timeRange}`;
-
-  const [data, setData] = useState<IntelligenceStats | null>(() => {
-    return (globalCache[cacheKey] as IntelligenceStats) ?? null;
-  });
-  const [error, setError] = useState<Error | null>(null);
-  const [isLoading, setIsLoading] = useState(() => {
-    return !globalCache[cacheKey];
-  });
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const t = setInterval(() => setTick(v => v + 1), REFRESH_INTERVAL_MS);
-    return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
-    if (!globalCache[cacheKey]) {
-      setIsLoading(true);
-    }
-    fetcher<IntelligenceStats>(endpoint, timeRange)
-      .then(res => {
-        globalCache[cacheKey] = res;
-        setData(res);
-      })
-      .catch(setError)
-      .finally(() => setIsLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeRange, tick]);
-
-  return { data, error, isLoading };
-}
+// Re-export security-specific hooks
+export { useTlsVersions, useTlsCiphers, useTlsSecurity, useIntelligenceStats } from './api-with-context-security';
 
 // Re-export utilities from api.ts
 export { fetcher, fetchAgentDetails, fetchDeviceDetails, fetchAppDetails, fetchSecurityDevices } from './api';

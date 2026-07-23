@@ -9,15 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { AppDetailModal } from "@/components/ui/AppDetailModal";
 import { Loader2, ChevronRight, Globe } from "lucide-react";
 import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 import { fmtBytes, getAppFavicon, formatAppLabel } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
-import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 export default function AppsPage() {
   const [mounted, setMounted] = useState(false);
   const [page, setPage] = useState(0);
   const pageSize = 20;
-  const { data, isLoading } = useTopApps(pageSize);
+  const { data, isLoading } = useTopApps();
   const [selectedApp, setSelectedApp] = useState<AppStat | null>(null);
 
   const { 
@@ -28,6 +28,7 @@ export default function AppsPage() {
 
   useEffect(() => {
     setMounted(true);
+    document.title = "Apps | BackOne - Deep Package Inspection";
   }, []);
 
   if (!mounted) return null;
@@ -126,13 +127,12 @@ export default function AppsPage() {
       accessor: (row) => <span className="font-medium text-white">{fmtBytes(row.download + row.upload)}</span>
     },
   ];
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            Applications
+          <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
+            Apps
             {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -141,7 +141,7 @@ export default function AppsPage() {
         </div>
         <HelpTrigger pageId="apps" />
       </div>
-      
+
       <UniversalFilters
         filters={filterConfigs}
         onChange={(id, val) => {

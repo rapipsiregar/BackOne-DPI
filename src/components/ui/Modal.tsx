@@ -49,7 +49,7 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
   if (!isMounted || !visible) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-0">
       {/* Backdrop */}
       <div 
         className={`fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`}
@@ -58,7 +58,7 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
       
       {/* Dialog */}
       <div className={cn(
-        "relative z-50 w-full max-w-md transform overflow-hidden rounded-xl border border-border bg-card shadow-2xl sm:my-8",
+        "relative z-[9999] w-full max-w-md transform overflow-hidden rounded-xl border border-border bg-card shadow-2xl sm:my-8",
         isClosing ? 'animate-modal-out' : 'animate-modal-in',
         className
       )}>

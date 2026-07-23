@@ -85,6 +85,7 @@ router.use(require('./dashboard/agents'));
 router.use(require('./dashboard/apps'));
 router.use(require('./dashboard/devices'));
 router.use(require('./dashboard/flows'));
+router.use(require('./dashboard/flowStats'));
 router.use(require('./dashboard/threats'));
 router.use(require('./dashboard/geo'));
 router.use(require('./dashboard/tls'));

@@ -148,7 +148,9 @@ async function uploadDirectory(sftp, localDir, remoteDir, options = {}) {
     if (item.name === '.env.production' || item.name === '.env.local') continue;
 
     const localItemPath = path.join(localPath, item.name);
-    const remoteItemPath = path.posix.join(CONFIG.remotePath, remoteDir, item.name);
+    // Force forward slashes for remote Linux path compatibility
+    const remoteDirNormalized = remoteDir.replace(/\\/g, '/');
+    const remoteItemPath = path.posix.join(CONFIG.remotePath, remoteDirNormalized, item.name);
 
     if (item.isDirectory()) {
       try {
@@ -158,7 +160,8 @@ async function uploadDirectory(sftp, localDir, remoteDir, options = {}) {
       }
       await uploadDirectory(sftp, path.join(localDir, item.name), path.join(remoteDir, item.name), options);
     } else {
-      process.stdout.write(`  [UP] ${path.join(remoteDir, item.name)} ... `);
+      const displayPath = path.posix.join(remoteDirNormalized, item.name);
+      process.stdout.write(`  [UP] ${displayPath} ... `);
       await sftp.put(localItemPath, remoteItemPath);
       process.stdout.write('done\n');
     }

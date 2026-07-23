@@ -20,9 +20,10 @@ function getTimeFilter(req) {
   const ms = {
     '5m':  5    * 60000,
     '30m': 30   * 60000,
-    '1h':  60   * 3600000,
+    '1h':  1    * 3600000,
     '1d':  24   * 3600000,
     '7d':  7    * 24 * 3600000,
+    '30d': 30   * 24 * 3600000,
   };
   const delta = ms[range] ?? ms['1d'];
   return { $gte: new Date(now.getTime() - delta) };

@@ -99,7 +99,12 @@ export function UniversalFilters({
                     value={f.value || "All"}
                     onChange={(val) => onChange(f.id, val)}
                     options={f.options || []}
-                    placeholder={f.placeholder || `All ${f.label}s`}
+                    placeholder={
+                      f.placeholder ||
+                      (f.label.toLowerCase().endsWith('y')
+                        ? `All ${f.label.slice(0, -1)}ies`
+                        : `All ${f.label}s`)
+                    }
                     optionFormatter={f.formatter}
                   />
                 </div>

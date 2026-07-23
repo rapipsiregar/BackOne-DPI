@@ -26,9 +26,7 @@ contract, not just a task description.
 
 **Responsibilities**
 - Implement API/data-layer logic.
-- Wire the mock-vs-live routing required by the Demo/Live switch (`AGENTS.md` §5) and
-  the Cloud/Local endpoint switch (`AGENTS.md` §6) — both must resolve through the
-  same contract so swapping either setting never changes calling code.
+- Ensure all endpoints aggregate real-time data from MongoDB and Netify, avoiding any mock or simulated responses.
 - Keep business logic out of route handlers; route handlers stay thin.
 
 **When invoked**: any task touching data, APIs, or service integration.
@@ -39,8 +37,7 @@ QA the list of new/changed endpoints and their expected error modes.
 ## 3. Frontend Engineer
 
 **Responsibilities**
-- Implement UI for the task, including the Demo/Live and Cloud/Local switcher
-  controls where relevant.
+- Implement UI for the task.
 - Consume the Backend's contract rather than reaching around it.
 - Keep components small and composable, respecting the 256-LOC rule.
 

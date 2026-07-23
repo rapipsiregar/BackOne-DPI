@@ -23,7 +23,7 @@ async function connectDB() {
         serverSelectionTimeoutMS: 10000,
         connectTimeoutMS: 10000,
       });
-      console.log('[MongoDB] ✓ Connected successfully');
+      console.log('[MongoDB] ✓ Connected successfully to', MONGODB_URI);
       const { logCapacityStats } = require('./capacityTracker');
       logCapacityStats('[MongoDB]').catch(err => console.warn('[MongoDB] Capacity log failed:', err.message));
       return;

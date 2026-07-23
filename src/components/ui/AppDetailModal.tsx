@@ -90,7 +90,7 @@ export function AppDetailModal({ appLabel, favicon, category, agentUuid, onClose
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleClose}>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={handleClose}>
         <div className={`absolute inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`} />
         <div
           className={`relative bg-card border border-border rounded-2xl w-full max-w-3xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}

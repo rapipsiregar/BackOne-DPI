@@ -1,5 +1,8 @@
+"use client";
+
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { TimeFilterProvider } from "@/contexts/TimeFilterContext";
+import { TenantConfigProvider } from "@/contexts/TenantConfigContext";
 
 export default function AppLayout({
   children,
@@ -7,8 +10,10 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <TimeFilterProvider>
-      <DashboardLayout>{children}</DashboardLayout>
-    </TimeFilterProvider>
+    <TenantConfigProvider>
+      <TimeFilterProvider>
+        <DashboardLayout>{children}</DashboardLayout>
+      </TimeFilterProvider>
+    </TenantConfigProvider>
   );
 }

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DataTable } from "@/components/ui/DataTable";
-import { ShieldCheck, Loader2, ArrowDownToLine } from "lucide-react";
+import { ShieldCheck, Loader2 } from "lucide-react";
 import { ThreatStat } from "@/lib/api";
 import { useThreats } from "@/lib/api-with-context";
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
@@ -38,6 +38,7 @@ export default function ThreatsContent() {
 
   useEffect(() => {
     setMounted(true);
+    document.title = "Detected Threats | BackOne - Deep Package Inspection";
   }, []);
 
   const all = threats.data || [];
@@ -100,12 +101,7 @@ export default function ThreatsContent() {
           second: "2-digit",
         }) + " WIB";
 
-      const doc = (
-        <ThreatsSummaryPdfDocument
-          threatsData={filtered}
-          reportDateStr={reportDateStr}
-        />
-      );
+      const doc = <ThreatsSummaryPdfDocument threatsData={filtered} reportDateStr={reportDateStr} />;
 
       const blob = await pdf(doc).toBlob();
       const url = URL.createObjectURL(blob);
@@ -122,24 +118,15 @@ export default function ThreatsContent() {
     }
   };
 
-  const columns = useMemo(() => {
-    return getThreatColumns(setSelectedIp, setSelectedMac, setSelectedThreat, highlightId);
-  }, [highlightId]);
+  const columns = useMemo(() => getThreatColumns(setSelectedIp, setSelectedMac, setSelectedThreat, highlightId), [highlightId]);
 
   const activeFilterCount =
     [fType, fSev, fSrcIp, fDstIp, fMac, fApp, fDomain].filter((v) => v !== "All").length +
     (dateFrom || dateTo ? 1 : 0);
 
   const resetFilters = () => {
-    setFType("All");
-    setFSev("All");
-    setFSrcIp("All");
-    setFDstIp("All");
-    setFMac("All");
-    setFApp("All");
-    setFDomain("All");
-    setDateFrom("");
-    setDateTo("");
+    setFType("All"); setFSev("All"); setFSrcIp("All"); setFDstIp("All");
+    setFMac("All"); setFApp("All"); setFDomain("All"); setDateFrom(""); setDateTo("");
   };
 
   if (!mounted) return null;
@@ -149,24 +136,12 @@ export default function ThreatsContent() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            Threat Intelligence
+            Detected Threats
             {threats.isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
           </h2>
           <p className="text-muted-foreground mt-1">Monitor and respond to network security threats.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={exportToPdf}
-            disabled={isExporting || threats.isLoading || filtered.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-md shadow-blue-600/15 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isExporting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <ArrowDownToLine className="w-3.5 h-3.5" />
-            )}
-            Export PDF
-          </button>
           <HelpTrigger pageId="intelligence" />
           <div className="flex items-center gap-2 text-sm font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.1)]">
             <ShieldCheck className="h-4 w-4" />
@@ -244,6 +219,10 @@ export default function ThreatsContent() {
                 row.app_label || "",
                 row.domain || "",
               ],
+            }}
+            pdfExport={{
+              onExport: exportToPdf,
+              isExporting,
             }}
           />
         </CardContent>

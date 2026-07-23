@@ -12,7 +12,7 @@ interface ContextualHelpModalProps {
   onClose: () => void;
 }
 
-function SectionBlock({ heading, content, columns, items }: PageGuide["sections"][0]) {
+function SectionBlock({ heading, content, steps, columns, items }: PageGuide["sections"][0]) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -35,6 +35,19 @@ function SectionBlock({ heading, content, columns, items }: PageGuide["sections"
         <div className="px-4 pb-4 pt-1 space-y-3 border-t border-white/5">
           {content && (
             <p className="text-xs text-slate-400 leading-relaxed">{content}</p>
+          )}
+
+          {steps && steps.length > 0 && (
+            <ol className="space-y-2">
+              {steps.map((step, i) => (
+                <li key={i} className="flex gap-2.5 items-start">
+                  <span className="shrink-0 flex h-4.5 w-4.5 min-w-[18px] items-center justify-center rounded-full bg-blue-600/30 border border-blue-500/40 text-[9px] font-bold text-blue-300 mt-0.5">
+                    {i + 1}
+                  </span>
+                  <span className="text-xs text-slate-300 leading-relaxed">{step}</span>
+                </li>
+              ))}
+            </ol>
           )}
 
           {columns && columns.length > 0 && (

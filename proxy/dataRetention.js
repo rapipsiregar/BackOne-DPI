@@ -11,9 +11,9 @@ const Schemas = require('./models/Schemas');
  * Prune all time-series documents older than 7 days.
  */
 async function pruneOldData() {
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const timeString = sevenDaysAgo.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
-  console.log(`[Collector] [Retention] Checking for telemetry data older than 7 days (before ${timeString})...`);
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const timeString = thirtyDaysAgo.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
+  console.log(`[Collector] [Retention] Checking for telemetry data older than 30 days (before ${timeString})...`);
 
   // Prune from all collections in Schemas except CustomDeviceLabel
   const collections = Object.keys(Schemas).filter(name => name !== 'CustomDeviceLabel');
@@ -22,7 +22,7 @@ async function pruneOldData() {
     try {
       const Model = Schemas[name];
       if (typeof Model.deleteMany === 'function') {
-        const res = await Model.deleteMany({ timestamp: { $lt: sevenDaysAgo } });
+        const res = await Model.deleteMany({ timestamp: { $lt: thirtyDaysAgo } });
         if (res.deletedCount > 0) {
           console.log(`[Collector] [Retention]   ✓ Cleaned up ${res.deletedCount} old records from ${name}`);
         }

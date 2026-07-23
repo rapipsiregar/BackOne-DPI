@@ -1,10 +1,10 @@
 "use client";
 
 import { Column } from "@/components/ui/DataTable";
-import { Agent } from "@/lib/actions/agents";
+import { Agent } from "@/lib/actions/agentsCore";
 import { Badge } from "@/components/ui/Badge";
 import { resolveAgentLabel, type ManagedUser } from "@/lib/admin-api";
-import { Loader2, Trash2, CheckCircle2, XCircle, ChevronRight, UserCog, Eye } from "lucide-react";
+import { Loader2, Trash2, CheckCircle2, XCircle, ChevronRight, UserCog, Eye, MapPin } from "lucide-react";
 
 interface GetColumnsProps {
   role: string | null;
@@ -17,6 +17,9 @@ interface GetColumnsProps {
   setAccountModalAgent: (agent: { uuid: string; label: string } | null) => void;
   handleViewAs: (uuid: string, label: string) => void;
   openDelete: (agent: Agent) => void;
+  handleEditLocation?: (agentUuid: string, agentLabel: string) => void;
+  /** Set of agent UUIDs that already have a location saved */
+  locationUuids?: Set<string>;
 }
 
 export function getAgentColumns({
@@ -30,11 +33,13 @@ export function getAgentColumns({
   setAccountModalAgent,
   handleViewAs,
   openDelete,
+  handleEditLocation,
+  locationUuids = new Set(),
 }: GetColumnsProps): Column<Agent>[] {
   const cols: Column<Agent>[] = [
     {
       header: "UUID / Serial",
-      className: "w-[16%] text-center",
+      className: "w-[12%] text-center",
       accessor: (row) => (
         <button onClick={() => setDetailAgent(row)} className="flex items-center justify-center gap-2 group text-center mx-auto" title="Click to view agent details">
           <span className="font-mono text-xs text-blue-400 group-hover:text-blue-300 transition-colors">{row.uuid || row.serial}</span>
@@ -44,14 +49,19 @@ export function getAgentColumns({
     },
     {
       header: "Label",
-      className: "w-[24%] text-center",
+      className: "w-[15%] text-center",
       accessor: (row) => {
         const uuid = row.uuid || row.serial;
         const dynamicLabel = resolveAgentLabel(uuid, managedUsers);
         const hasAccount = managedUsers.some(u => u.agent_uuid === uuid && u.role === 'AGENT_VIEWER');
+        const displayLabel = dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid);
         return (
           <div className="flex items-center justify-center gap-2 mx-auto max-w-full">
-            <button onClick={() => setDetailAgent(row)} className="text-center hover:text-white transition-colors truncate">
+            <button 
+              onClick={() => setDetailAgent(row)} 
+              className="text-center hover:text-white transition-colors truncate"
+              title={displayLabel}
+            >
               {dynamicLabel !== uuid ? dynamicLabel : (row.label || <span className="text-muted-foreground italic font-mono text-xs">{uuid}</span>)}
             </button>
             {!hasAccount && (role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
@@ -63,71 +73,93 @@ export function getAgentColumns({
     },
     { 
       header: "Provisioned", 
-      className: "w-[12%] text-center",
+      className: "w-[11%] text-center",
       accessor: (row) => row.provisioned ? <Badge variant="green"><CheckCircle2 className="w-3 h-3 mr-1" /> Yes</Badge> : <Badge variant="red"><XCircle className="w-3 h-3 mr-1" /> No</Badge> 
     },
     { 
       header: "Activated", 
-      className: "w-[12%] text-center",
+      className: "w-[11%] text-center",
       accessor: (row) => row.activated ? <Badge variant="green"><CheckCircle2 className="w-3 h-3 mr-1" /> Yes</Badge> : <Badge variant="red"><XCircle className="w-3 h-3 mr-1" /> No</Badge> 
     },
     { 
-      header: "Status", 
-      className: "w-[11%] text-center",
+      header: "Traffic Status", 
+      className: "w-[15%] text-center",
       accessor: (row) => {
         const statusText = row.last_seen_at?.human || '-';
-        if (statusText === 'Online') {
-          return <span className="text-emerald-400 font-medium flex items-center justify-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Online</span>;
-        } else if (statusText === 'Offline') {
-          return <span className="text-red-400 font-medium">Offline</span>;
+        if (statusText.startsWith('Last seen:')) {
+          return (
+            <span className="text-emerald-400 font-medium flex items-center justify-center gap-1.5 mx-auto">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              {statusText}
+            </span>
+          );
         } else {
-          return <span className="text-slate-400 text-xs">{statusText}</span>;
+          return <span className="text-slate-400 text-xs font-normal">{statusText}</span>;
         }
       }
     },
     {
-      header: "Historical Uptime",
-      className: "w-[12%] text-center",
+      header: "Avg Uptime",
+      className: "w-[10%] text-center",
       accessor: (row) => {
         const uuid = row.uuid || row.serial;
         const uptime = uptimeMap[uuid] ?? 100;
         let color = "text-emerald-400";
         if (uptime < 90) color = "text-red-400";
         else if (uptime < 98) color = "text-amber-400";
-        return <span className={`font-mono font-bold ${color}`}>{uptime.toFixed(1)}%</span>;
+        return <span className={`font-mono font-medium text-xs tracking-wide ${color}`}>{uptime.toFixed(1)}%</span>;
       }
     },
     { 
       header: "Actions", 
-      className: "w-[13%] text-center",
+      className: "w-[16%] text-center",
       accessor: (row) => {
         const uuid = row.uuid || row.serial;
         const dynamicLabel = resolveAgentLabel(uuid, managedUsers);
         const existingUser = managedUsers.find(u => u.agent_uuid === uuid && u.role === 'AGENT_VIEWER') || null;
         const isViewAsLoading = viewAsLoading === uuid;
         return (
-          <div className="flex items-center justify-center gap-1.5">
-            <button onClick={() => setDetailAgent(row)} className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded transition-colors" title="Detail Agent">
+          <div className="flex items-center justify-center gap-1 mx-auto">
+            <button onClick={() => setDetailAgent(row)} className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded transition-colors" title="Detail Agent">
               <ChevronRight className="w-4 h-4" />
             </button>
             {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
               <>
                 <button
                   onClick={(e) => { e.stopPropagation(); setAccountModalAgent({ uuid, label: dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid) }); setAccountModalOpen(true); }}
-                  className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30 rounded transition-colors"
+                  className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30 rounded transition-colors"
                   title={existingUser ? 'Edit Agent Account' : 'Create Agent Account'}
                 >
                   <UserCog className="w-4 h-4" />
                 </button>
+                {handleEditLocation && (() => {
+                    const hasLocation = locationUuids.has(uuid);
+                    return (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleEditLocation(uuid, dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid)); }}
+                        className={`relative p-1 rounded transition-colors ${
+                          hasLocation
+                            ? "text-teal-400 hover:text-teal-300 hover:bg-teal-950/30"
+                            : "text-slate-500 hover:text-indigo-400 hover:bg-indigo-950/30"
+                        }`}
+                        title={hasLocation ? "✅ Location set — click to update" : "⚠️ No location — click to set coordinates"}
+                      >
+                        <MapPin className="w-4 h-4" />
+                        {hasLocation && (
+                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-teal-400 border border-slate-900" />
+                        )}
+                      </button>
+                    );
+                  })()}
                 <button
                   onClick={(e) => { e.stopPropagation(); handleViewAs(uuid, dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid)); }}
                   disabled={isViewAsLoading}
-                  className="p-1.5 text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 rounded transition-colors disabled:opacity-50"
+                  className="p-1 text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 rounded transition-colors disabled:opacity-50"
                   title="View As Agent"
                 >
                   {isViewAsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); openDelete(row); }} className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded transition-colors" title="Delete">
+                <button onClick={(e) => { e.stopPropagation(); openDelete(row); }} className="p-1 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded transition-colors" title="Delete">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </>
@@ -141,11 +173,11 @@ export function getAgentColumns({
   if (role === 'SUPER_ADMIN') {
     cols.splice(cols.length - 1, 0, {
       header: "Data Size",
-      className: "w-[12%] text-center",
+      className: "w-[10%] text-center",
       accessor: (row) => {
         const uuid = row.uuid || row.serial;
         const sizeMB = storageMap[uuid] ?? 0;
-        return <span className="font-mono text-slate-300 font-semibold">{sizeMB.toFixed(2)} MB</span>;
+        return <span className="font-mono text-xs font-normal text-slate-300 tracking-wide">{sizeMB.toFixed(2)} MB</span>;
       }
     });
   }
@@ -153,75 +185,4 @@ export function getAgentColumns({
   return cols;
 }
 
-export function getExternalAccountColumns(
-  onManageAccount: (user: ManagedUser) => void
-): Column<ManagedUser>[] {
-  return [
-    {
-      header: "Account Name",
-      className: "w-[25%] text-left",
-      accessor: (row) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 shrink-0 overflow-hidden">
-            {row.profile_picture ? (
-              <img src={`/api/uploads/${row.profile_picture}`} alt={row.account_name || row.username} className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-xs font-bold text-slate-400">{(row.account_name || row.username).substring(0, 2).toUpperCase()}</span>
-            )}
-          </div>
-          <span className="font-medium text-white">{row.account_name || "-"}</span>
-        </div>
-      )
-    },
-    {
-      header: "Username",
-      className: "w-[25%] text-left",
-      accessor: (row) => <span className="text-slate-300 font-mono text-sm">{row.username}</span>
-    },
-    {
-      header: "Role",
-      className: "w-[20%] text-center",
-      accessor: (row) => {
-        let badgeColor = "bg-slate-500/20 text-slate-400 border-slate-500/30";
-        if (row.role === 'SUPER_ADMIN') badgeColor = "bg-purple-500/20 text-purple-400 border-purple-500/30";
-        if (row.role === 'SOC_ANALYST') badgeColor = "bg-amber-500/20 text-amber-400 border-amber-500/30";
-        if (row.role === 'ENGINEER') badgeColor = "bg-blue-500/20 text-blue-400 border-blue-500/30";
-        if (row.role === 'TENANT_ADMIN') badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-        
-        return (
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeColor}`}>
-            {row.role.replace('_', ' ')}
-          </span>
-        );
-      }
-    },
-    {
-      header: "Status",
-      className: "w-[15%] text-center",
-      accessor: (row) => (
-        <div className="flex items-center justify-center gap-2">
-          {/* Defaulting to active since we don't have is_active explicitly in ManagedUser interface yet, though API returns it. We'll check if it exists, else assume Active */}
-          {(row as any).is_active !== false ? (
-            <Badge variant="green"><CheckCircle2 className="w-3 h-3 mr-1" /> Active</Badge>
-          ) : (
-            <Badge variant="red"><XCircle className="w-3 h-3 mr-1" /> Inactive</Badge>
-          )}
-        </div>
-      )
-    },
-    {
-      header: "Actions",
-      className: "w-[15%] text-center",
-      accessor: (row) => (
-        <button 
-          onClick={() => onManageAccount(row)}
-          className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded transition-colors disabled:opacity-50"
-          title="Manage Account"
-          disabled={row.role === 'SUPER_ADMIN'}
-        >
-          <UserCog className="w-4 h-4" />
-        </button>
-      )
-    }
-  ];
-}
+

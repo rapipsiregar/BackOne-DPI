@@ -20,28 +20,35 @@ router.get('/summary', async (req, res) => {
 
     if (base.agent_uuid) {
       // ── Agent-Level Summary (View As Agent mode) ─────────────────────────────
-      // The proxy saves per-agent summaries with agent_uuid = <uuid>.
-      // Use the latest one for the scoped agent instead of site aggregates.
       const latestAgentSummary = await Summary
         .findOne(baseWithoutTime)
         .sort({ timestamp: -1 })
         .lean();
 
       if (latestAgentSummary) {
-        bandwidthDown    = latestAgentSummary.bandwidth_down  || 0;
-        bandwidthUp      = latestAgentSummary.bandwidth_up    || 0;
         activeFlowsCount = latestAgentSummary.active_flows    || 0;
         downloadSpeed    = latestAgentSummary.download_speed  || 0;
         uploadSpeed      = latestAgentSummary.upload_speed    || 0;
         latestTime       = latestAgentSummary.timestamp;
       }
+
+      const summaries = await Summary.find(base).lean();
+      bandwidthDown = summaries.reduce((s, x) => s + (x.bandwidth_down || 0), 0);
+      bandwidthUp   = summaries.reduce((s, x) => s + (x.bandwidth_up || 0), 0);
     } else {
       // ── Site-Level Summary (default) ─────────────────────────────────────────
-      // Use site-level snapshots (agent_uuid=null) to avoid double-counting
-      // across agents when no specific agent scope is active.
       const siteIds = baseWithoutTime.site_uuid
         ? [baseWithoutTime.site_uuid]
         : await Summary.distinct('site_uuid', { agent_uuid: null });
+
+      const siteSummaries = await Summary.find({
+        site_uuid: { $in: siteIds },
+        agent_uuid: null,
+        ...(timeFilter ? { timestamp: timeFilter } : {})
+      }).lean();
+
+      bandwidthDown = siteSummaries.reduce((s, x) => s + (x.bandwidth_down || 0), 0);
+      bandwidthUp   = siteSummaries.reduce((s, x) => s + (x.bandwidth_up || 0), 0);
 
       for (const siteId of siteIds) {
         const latestSiteSummary = await Summary
@@ -50,11 +57,6 @@ router.get('/summary', async (req, res) => {
           .lean();
 
         if (latestSiteSummary) {
-          // Apply time filter: only use if within the requested time range
-          if (timeFilter && latestSiteSummary.timestamp < timeFilter) continue;
-
-          bandwidthDown    += latestSiteSummary.bandwidth_down  || 0;
-          bandwidthUp      += latestSiteSummary.bandwidth_up    || 0;
           activeFlowsCount += latestSiteSummary.active_flows    || 0;
           downloadSpeed    += latestSiteSummary.download_speed  || 0;
           uploadSpeed      += latestSiteSummary.upload_speed    || 0;
@@ -66,12 +68,14 @@ router.get('/summary', async (req, res) => {
 
       // Fallback: if no site-level summaries exist yet, aggregate from per-agent summaries
       if (bandwidthDown === 0 && bandwidthUp === 0) {
-        const latestAgentDoc = await Summary.findOne(baseWithoutTime).sort({ timestamp: -1 });
+        const allAgentSummaries = await Summary.find(base).lean();
+        bandwidthDown = allAgentSummaries.reduce((s, r) => s + (r.bandwidth_down || 0), 0);
+        bandwidthUp   = allAgentSummaries.reduce((s, r) => s + (r.bandwidth_up || 0), 0);
+
+        const latestAgentDoc = await Summary.findOne(baseWithoutTime).sort({ timestamp: -1 }).lean();
         if (latestAgentDoc) {
           latestTime = latestAgentDoc.timestamp;
           const agentSummaries = await Summary.find({ ...baseWithoutTime, timestamp: latestAgentDoc.timestamp }).lean();
-          bandwidthDown    = agentSummaries.reduce((s, r) => s + (r.bandwidth_down ?? 0), 0);
-          bandwidthUp      = agentSummaries.reduce((s, r) => s + (r.bandwidth_up ?? 0), 0);
           activeFlowsCount = agentSummaries.reduce((s, r) => s + (r.active_flows ?? 0), 0);
           downloadSpeed    = agentSummaries.reduce((s, r) => s + (r.download_speed ?? 0), 0);
           uploadSpeed      = agentSummaries.reduce((s, r) => s + (r.upload_speed ?? 0), 0);

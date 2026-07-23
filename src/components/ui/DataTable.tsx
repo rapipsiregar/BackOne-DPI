@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Download } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Search, Download, ChevronDown, FileText, FileSpreadsheet } from "lucide-react";
+import { CsvExportOptions, downloadCsv } from "./DataTableCsvHelper";
 
 export interface Column<T> {
   header: React.ReactNode;
@@ -9,12 +10,7 @@ export interface Column<T> {
   className?: string;
   sortable?: boolean;
   sortAccessor?: (row: T) => number | string | null | undefined;
-}
-
-export interface CsvExportOptions<T> {
-  filename: string;
-  headers: string[];
-  rowSerializer: (row: T) => (string | number | null | undefined)[];
+  tooltip?: (row: T) => string;
 }
 
 interface DataTableProps<T> {
@@ -26,27 +22,12 @@ interface DataTableProps<T> {
   getRowClassName?: (row: T) => string;
   pageSize?: number;
   csvExport?: CsvExportOptions<T>;
+  pdfExport?: { onExport: () => void; isExporting?: boolean; };
   onRowClick?: (row: T) => void;
-}
-
-function escapeCsvCell(val: string | number | null | undefined): string {
-  const str = val == null ? "" : String(val);
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
-
-function downloadCsv(filename: string, rows: (string | number | null | undefined)[][]): void {
-  const bom = "\uFEFF";
-  const csv = bom + rows.map(row => row.map(escapeCsvCell).join(",")).join("\r\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+  serverSide?: boolean;
+  totalCount?: number;
+  currentPage?: number;
+  onPageChange?: (page: number) => void;
 }
 
 export function DataTable<T>({
@@ -58,11 +39,19 @@ export function DataTable<T>({
   getRowClassName,
   pageSize = 50,
   csvExport,
+  pdfExport,
   onRowClick,
+  serverSide = false,
+  totalCount = 0,
+  currentPage = 1,
+  onPageChange,
 }: DataTableProps<T>) {
   const [query, setQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [localCurrentPage, setLocalCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState<{ key: number; direction: 'asc' | 'desc' } | null>(null);
+
+  const activePage = serverSide ? currentPage : localCurrentPage;
+  const setActivePage = serverSide ? (onPageChange || (() => {})) : setLocalCurrentPage;
 
   const handleSort = (columnIndex: number) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -74,11 +63,11 @@ export function DataTable<T>({
 
   let processedData = [...data];
 
-  if (searchFilter && query.trim()) {
+  if (!serverSide && searchFilter && query.trim()) {
     processedData = processedData.filter(row => searchFilter(row, query.trim()));
   }
 
-  if (sortConfig !== null) {
+  if (!serverSide && sortConfig !== null) {
     const column = columns[sortConfig.key];
     if (column && column.sortable && column.sortAccessor) {
       processedData.sort((a, b) => {
@@ -96,9 +85,23 @@ export function DataTable<T>({
 
   const filteredData = processedData;
 
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
-  const startIndex = (currentPage - 1) * pageSize;
-  const paginatedData = filteredData.slice(startIndex, startIndex + pageSize);
+  const totalItems = serverSide ? totalCount : filteredData.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (activePage - 1) * pageSize;
+  const paginatedData = serverSide ? filteredData : filteredData.slice(startIndex, startIndex + pageSize);
+
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleCsvExport = () => {
     if (!csvExport) return;
@@ -107,12 +110,13 @@ export function DataTable<T>({
       ...filteredData.map(row => csvExport.rowSerializer(row)),
     ];
     downloadCsv(csvExport.filename, rows);
+    setExportOpen(false);
   };
 
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        {searchFilter && (
+        {!serverSide && searchFilter && (
           <div className="relative group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
             <input
@@ -121,45 +125,75 @@ export function DataTable<T>({
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
-                setCurrentPage(1);
+                setActivePage(1);
               }}
               className="w-full max-w-sm rounded-lg border border-border bg-card/30 backdrop-blur-sm pl-9 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-card/50 transition-all shadow-sm"
             />
           </div>
         )}
-        {csvExport && (
-          <button
-            onClick={handleCsvExport}
-            title={`Export ${filteredData.length} rows to CSV`}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/70 hover:text-emerald-300 transition-all shadow-sm whitespace-nowrap"
-          >
-            <Download className="w-4 h-4" />
-            Export CSV ({filteredData.length})
-          </button>
+        {(csvExport || pdfExport) && (
+          <div className="relative" ref={exportRef}>
+            <button
+              onClick={() => setExportOpen(prev => !prev)}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/70 hover:text-emerald-300 transition-all shadow-sm whitespace-nowrap"
+            >
+              <Download className="w-4 h-4" />
+              Export ({totalItems})
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 mt-1.5 w-44 rounded-xl border border-border/60 bg-slate-900/95 backdrop-blur-xl shadow-xl z-50 overflow-hidden">
+                {csvExport && (
+                  <button
+                    onClick={handleCsvExport}
+                    className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Export CSV
+                  </button>
+                )}
+                {pdfExport && (
+                  <button
+                    onClick={() => { pdfExport.onExport(); setExportOpen(false); }}
+                    disabled={pdfExport.isExporting}
+                    className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FileText className="w-4 h-4" />
+                    {pdfExport.isExporting ? 'Generating...' : 'Export PDF'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
       <div className="rounded-xl border border-border bg-card/50 backdrop-blur-xl shadow-sm overflow-hidden">
         <div className="w-full max-h-[400px] overflow-y-auto custom-scrollbar [&::-webkit-scrollbar-track]:mt-[48px]">
-          <table className="w-full text-sm text-left table-fixed">
+          <table className="w-full text-sm text-center table-fixed">
             <thead className="bg-slate-900 text-muted-foreground border-b border-border/50 sticky top-0 z-20">
               <tr>
-                {columns.map((col, i) => (
-                  <th 
-                    key={i} 
-                    onClick={() => col.sortable && handleSort(i)}
-                    className={`px-4 py-3.5 h-[48px] font-medium tracking-wide whitespace-nowrap ${col.className?.includes("text-") ? "" : "text-center"} ${col.className || ""} ${col.sortable ? "cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors group select-none" : ""}`}
-                  >
-                    <div className={`flex items-center gap-1 ${col.className?.includes("text-") && !col.className?.includes("text-center") ? "" : "justify-center"}`}>
-                      {col.header}
-                      {col.sortable && (
-                        <div className="flex flex-col text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">
-                          <span className={`${sortConfig?.key === i && sortConfig.direction === 'asc' ? 'text-primary opacity-100' : ''}`}>▲</span>
-                          <span className={`-mt-1 ${sortConfig?.key === i && sortConfig.direction === 'desc' ? 'text-primary opacity-100' : ''}`}>▼</span>
-                        </div>
-                      )}
-                    </div>
-                  </th>
-                ))}
+                {columns.map((col, i) => {
+                  const hasWidth = col.className?.split(' ').some(c => c.startsWith('w-[') || c.startsWith('w-'));
+                  const widthStyle = hasWidth ? undefined : { width: `${100 / columns.length}%` };
+                  return (
+                    <th 
+                      key={i} 
+                      onClick={() => col.sortable && handleSort(i)}
+                      className={`px-4 py-3.5 h-[48px] font-medium tracking-wide whitespace-nowrap text-center ${col.className || ""} ${col.sortable ? "cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors group select-none" : ""}`}
+                      style={widthStyle}
+                    >
+                      <div className="flex items-center gap-1 justify-center">
+                        {col.header}
+                        {col.sortable && (
+                          <div className="flex flex-col text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">
+                            <span className={`${sortConfig?.key === i && sortConfig.direction === 'asc' ? 'text-primary opacity-100' : ''}`}>▲</span>
+                            <span className={`-mt-1 ${sortConfig?.key === i && sortConfig.direction === 'desc' ? 'text-primary opacity-100' : ''}`}>▼</span>
+                          </div>
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
@@ -184,7 +218,6 @@ export function DataTable<T>({
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <Search className="h-8 w-8 mb-3 opacity-20" />
                       <span className="text-sm font-medium">No data found</span>
-                      {query && <span className="text-xs mt-1 opacity-70">Try adjusting your search query</span>}
                     </div>
                   </td>
                 </tr>
@@ -195,11 +228,24 @@ export function DataTable<T>({
                     onClick={() => onRowClick?.(row)}
                     className={`hover:bg-primary/5 border-b border-border/50 transition-colors duration-200 group h-[48px] ${onRowClick ? "cursor-pointer hover:bg-primary/10" : ""} ${getRowClassName ? getRowClassName(row) : ""}`}
                   >
-                    {columns.map((col, j) => (
-                      <td key={j} className={`px-2 py-3 h-[48px] max-h-[48px] overflow-hidden text-foreground transition-colors truncate whitespace-nowrap ${col.className?.includes("text-") ? "" : "text-center"} ${col.className || ""}`}>
-                        {col.accessor(row, i)}
-                      </td>
-                    ))}
+                    {columns.map((col, j) => {
+                      const hasWidth = col.className?.split(' ').some(c => c.startsWith('w-[') || c.startsWith('w-'));
+                      const widthStyle = hasWidth ? undefined : { width: `${100 / columns.length}%` };
+                      const content = col.accessor(row, (activePage - 1) * pageSize + i);
+                      const tooltipText = col.tooltip
+                        ? col.tooltip(row)
+                        : (typeof content === 'string' || typeof content === 'number' ? String(content) : undefined);
+                      return (
+                        <td 
+                          key={j} 
+                          className={`px-2 py-3 h-[48px] max-h-[48px] overflow-hidden text-foreground text-center transition-colors truncate whitespace-nowrap ${col.className || ""}`}
+                          style={widthStyle}
+                          title={tooltipText}
+                        >
+                          {content}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))
               )}
@@ -207,29 +253,29 @@ export function DataTable<T>({
           </table>
         </div>
 
-        {filteredData.length > pageSize && (
+        {totalItems > pageSize && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-border/50 bg-card/30">
             <div className="text-sm text-muted-foreground">
               Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
               <span className="font-medium text-foreground">
-                {Math.min(startIndex + pageSize, filteredData.length)}
+                {Math.min(startIndex + pageSize, totalItems)}
               </span>{" "}
-              of <span className="font-medium text-foreground">{filteredData.length}</span> results
+              of <span className="font-medium text-foreground">{totalItems}</span> results
             </div>
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
+                onClick={() => setActivePage(Math.max(1, activePage - 1))}
+                disabled={activePage === 1}
                 className="px-3 py-1.5 text-sm font-medium rounded-md bg-secondary/80 text-foreground hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-border/50"
               >
                 Previous
               </button>
               <div className="text-sm text-muted-foreground font-medium px-2">
-                Page {currentPage} of {totalPages}
+                Page {activePage} of {totalPages}
               </div>
               <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
+                onClick={() => setActivePage(Math.min(totalPages, activePage + 1))}
+                disabled={activePage === totalPages}
                 className="px-3 py-1.5 text-sm font-medium rounded-md bg-secondary/80 text-foreground hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-border/50"
               >
                 Next

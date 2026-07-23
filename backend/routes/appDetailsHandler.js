@@ -50,19 +50,25 @@ module.exports = async function appDetailsHandler(req, res, helpers) {
         const ip = da.ip_address;
         if (!ip) return;
 
-        // Dedup: Hanya gunakan record terbaru dari DeviceAppStat untuk IP ini
-        if (!ipsMap[ip] || new Date(da.timestamp) > new Date(ipsMap[ip].timestamp)) {
+        if (!ipsMap[ip]) {
           const tStr = da.timestamp ? new Date(da.timestamp).toISOString() : new Date().toISOString();
           ipsMap[ip] = {
             ip_address: ip,
-            download:   da.download || 0,
-            upload:     da.upload   || 0,
+            download:   0,
+            upload:     0,
             first_seen: da.created_at || tStr,
             last_seen:  da.updated_at || tStr,
-            timestamp:  da.timestamp,
             domain:     appMeta?.domain || null,
             protocol:   'HTTPS / TLS'
           };
+        }
+
+        ipsMap[ip].download += da.download || 0;
+        ipsMap[ip].upload   += da.upload   || 0;
+
+        const tStr = da.timestamp ? new Date(da.timestamp).toISOString() : null;
+        if (tStr && tStr > ipsMap[ip].last_seen) {
+          ipsMap[ip].last_seen = tStr;
         }
       });
 
@@ -81,15 +87,12 @@ module.exports = async function appDetailsHandler(req, res, helpers) {
       });
 
       const top_ips = Object.values(ipsMap)
-        .sort((a, b) => (b.download + b.upload) - (a.download + a.upload))
-        .map(({ timestamp, ...rest }) => rest); // remove temp timestamp field
+        .sort((a, b) => (b.download + b.upload) - (a.download + a.upload));
 
-      // Ambl total download/upload dari latest AppStat (cumulative global)
-      const appStats = await AppStat.find({ ...baseFilter, app_label: label }).sort({ timestamp: -1 }).limit(1).lean();
-      const topIpsDl = top_ips.reduce((s, x) => s + x.download, 0);
-      const topIpsUl = top_ips.reduce((s, x) => s + x.upload, 0);
-      const totalDl  = Math.max(appStats[0]?.download || 0, topIpsDl);
-      const totalUl  = Math.max(appStats[0]?.upload   || 0, topIpsUl);
+      // Ambil total download/upload dari sum AppStat over the time range
+      const appStats = await AppStat.find({ ...baseFilter, app_label: label }).lean();
+      const totalDl  = appStats.reduce((s, x) => s + (x.download || 0), 0);
+      const totalUl  = appStats.reduce((s, x) => s + (x.upload || 0), 0);
 
       console.log(`[AppDetails] DeviceAppStat: label=${label} deviceCount=${top_ips.length} dl=${(totalDl/1e9).toFixed(2)}GB time=${Date.now()-t0}ms`);
       return res.json({ ok: true, data: { label, total_download: totalDl, total_upload: totalUl, top_ips } });

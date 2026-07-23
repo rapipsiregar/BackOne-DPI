@@ -10,14 +10,10 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 
 const netify = require('./netifyClient');
 const { collectSecondaryTelemetry } = require('./collectorHelper');
-const {
-  collectDevicesAndApps,
-  collectFlows,
-  collectThreats,
-  collectEvents
-} = require('./collectorHelperDpi2');
+const { collectDevicesAndApps, collectFlows } = require('./collectorHelperDpi2');
+const { collectThreats, collectEvents } = require('./collectorHelperDpi3');
 
-const { Summary, AppStat } = require('./models/Schemas');
+const { Summary, AppStat, AgentRegistry } = require('./models/Schemas');
 const { pruneOldData } = require('./dataRetention');
 
 const SITE_UUIDS_STR = process.env.NETIFY_SITE_UUIDS || process.env.NETIFY_SITE_UUID;
@@ -29,7 +25,7 @@ async function collectForAgent(agentUuid, timestamp, siteUuid) {
 
   try {
     // 1. Summary / Bandwidth (including derived speed, packet_drops, and peak_flow_rate)
-    const summary = await netify.fetchBandwidthSummary(1440, agentUuid, siteUuid);
+    const summary = await netify.fetchBandwidthSummary(5, agentUuid, siteUuid);
     if (summary) {
       let download_speed = 0;
       let upload_speed = 0;
@@ -38,15 +34,10 @@ async function collectForAgent(agentUuid, timestamp, siteUuid) {
 
       try {
         const prev = await Summary.findOne({ agent_uuid: agentUuid }).sort({ timestamp: -1 }).lean();
-        if (prev && prev.timestamp) {
-          const timeDiffSec = (timestamp.getTime() - new Date(prev.timestamp).getTime()) / 1000;
-          if (timeDiffSec > 0) {
-            const bytesDiffDown = Math.max(0, summary.bandwidth_down - (prev.bandwidth_down || 0));
-            const bytesDiffUp   = Math.max(0, summary.bandwidth_up - (prev.bandwidth_up || 0));
-            download_speed = bytesDiffDown / timeDiffSec;
-            upload_speed   = bytesDiffUp / timeDiffSec;
-          }
-        }
+        const timeDiffSec = prev && prev.timestamp ? (timestamp.getTime() - new Date(prev.timestamp).getTime()) / 1000 : 300;
+        const activeTimeDiff = timeDiffSec > 0 ? timeDiffSec : 300;
+        download_speed = summary.bandwidth_down / activeTimeDiff;
+        upload_speed   = summary.bandwidth_up / activeTimeDiff;
       } catch (err) {
         console.error('[Collector] Error calculating summary speeds:', err.message);
       }
@@ -78,7 +69,7 @@ async function collectForAgent(agentUuid, timestamp, siteUuid) {
     }
 
     // 2. Top Apps
-    const apps = await netify.fetchTopApps(1440, 200, agentUuid, siteUuid);
+    const apps = await netify.fetchTopApps(5, 200, agentUuid, siteUuid);
     if (apps && apps.length > 0) {
       const appDocs = apps.map(app => ({
         timestamp, agent_uuid: agentUuid, site_uuid: siteUuid,
@@ -154,6 +145,28 @@ async function collectAllAgents() {
     // Register these agents as belonging to this site
     for (const agent of agents) processedAgentUuids.add(agent.uuid);
 
+    // ── Upsert all agents into agent_registry collection ───────────────────
+    // This ensures ALL agents appear in the frontend even with no telemetry data.
+    await Promise.allSettled(agents.map(a =>
+      AgentRegistry.findOneAndUpdate(
+        { uuid: a.uuid },
+        {
+          $set: {
+            uuid:         a.uuid,
+            serial:       a.serial || a.uuid,
+            label:        a.label,
+            site_uuid:    siteUuid,
+            provisioned:  a.provisioned ?? true,
+            activated:    a.activated ?? false,
+            last_seen_at: a.last_seen_at ?? null,
+            netify_id:    a.id ?? null,
+          }
+        },
+        { upsert: true, new: true }
+      )
+    ));
+    console.log(`[Collector]   ✓ ${agents.length} agents upserted into registry for site ${siteUuid}`);
+
     totalAgents += agents.length;
     console.log(`[Collector] Processing ${agents.length} agents for site ${siteUuid}: ${agents.map(a => a.uuid).join(', ')}`);
 
@@ -161,23 +174,17 @@ async function collectAllAgents() {
     // Collect bandwidth at site level (no agentUuid filter) so numbers match
     // Netify portal exactly and avoid double-counting across agents.
     try {
-      console.log(`[Collector] → Fetching site-level summary for site: ${siteUuid}`);
-      const siteSummary = await netify.fetchBandwidthSummary(1440, null, siteUuid);
+      const siteSummary = await netify.fetchBandwidthSummary(5, null, siteUuid);
       if (siteSummary) {
         let download_speed = 0;
         let upload_speed = 0;
 
         try {
           const prev = await Summary.findOne({ agent_uuid: null, site_uuid: siteUuid }).sort({ timestamp: -1 }).lean();
-          if (prev && prev.timestamp) {
-            const timeDiffSec = (timestamp.getTime() - new Date(prev.timestamp).getTime()) / 1000;
-            if (timeDiffSec > 0) {
-              const bytesDiffDown = Math.max(0, siteSummary.bandwidth_down - (prev.bandwidth_down || 0));
-              const bytesDiffUp   = Math.max(0, siteSummary.bandwidth_up - (prev.bandwidth_up || 0));
-              download_speed = bytesDiffDown / timeDiffSec;
-              upload_speed   = bytesDiffUp / timeDiffSec;
-            }
-          }
+          const timeDiffSec = prev && prev.timestamp ? (timestamp.getTime() - new Date(prev.timestamp).getTime()) / 1000 : 300;
+          const activeTimeDiff = timeDiffSec > 0 ? timeDiffSec : 300;
+          download_speed = siteSummary.bandwidth_down / activeTimeDiff;
+          upload_speed   = siteSummary.bandwidth_up / activeTimeDiff;
         } catch (err) {
           console.error('[Collector] Error calculating site summary speeds:', err.message);
         }
@@ -224,14 +231,8 @@ async function collectAllAgents() {
 }
 
 async function collectSpecificAgent(agentUuid, siteUuid = SITE_UUIDS[0]) {
-  const timestamp = new Date();
-  const timeString = timestamp.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB';
-  console.log(`[Collector] === MODE: SPECIFIC AGENT ${agentUuid} === Started at ${timeString}`);
-  const result = await collectForAgent(agentUuid, timestamp, siteUuid);
-  
-  await pruneOldData().catch(err => console.error('[Collector] [Retention] error:', err.message));
-  
-  return { success: result.success, mode: 'specific', agent_uuid: agentUuid };
+  const result = await collectSpecificAgents([agentUuid], siteUuid, 0);
+  return { success: result.successful > 0, mode: 'specific', agent_uuid: agentUuid };
 }
 
 async function collectSpecificAgents(agentUuids, siteUuid = SITE_UUIDS[0], delayMs = 5000) {

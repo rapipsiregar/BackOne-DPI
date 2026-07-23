@@ -3,10 +3,20 @@ import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
-// Bypass google font remote fetch during offline compilation
-const inter = {
-  variable: "font-sans",
-};
+// Inter font — local variable font file, matches demoplace.my.id
+// demoplace uses: --font-sans: var(--font-inter) which renders as Inter
+const inter = localFont({
+  src: [
+    {
+      path: "../../public/fonts/Inter-Variable.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+  ],
+  variable: "--font-inter",
+  display: "swap",
+  adjustFontFallback: false,
+});
 
 const backoneFont = localFont({
   src: "../../public/fonts/BackOneLogo-Regular.ttf",

@@ -11,28 +11,31 @@ import {
 } from "@/lib/api-advanced";
 import { IpDetails } from "@/components/ui/IpDetails";
 import { RemoteIpDetailModal } from "@/components/ui/RemoteIpDetailModal";
-
 import { HelpTrigger } from "@/components/help/HelpTrigger";
 
 export default function NetworkInfrastructurePage() {
   const [selectedRemoteIp, setSelectedRemoteIp] = useState<string | null>(null);
 
+  useEffect(() => {
+    document.title = "Network Topology | BackOne - Deep Package Inspection";
+  }, []);
+
   // Routing & Geography Tab
-  const { data: regions, isLoading: loadingRegions } = useRegions(20);
-  const { data: cities, isLoading: loadingCities } = useCities(20);
+  const { data: regions, isLoading: loadingRegions } = useRegions();
+  const { data: cities, isLoading: loadingCities } = useCities();
 
   // Interfaces & VLANs Tab
-  const { data: interfaces, isLoading: loadingInterfaces } = useInterfaces(20);
-  const { data: vlans, isLoading: loadingVlans } = useVlans(20);
+  const { data: interfaces, isLoading: loadingInterfaces } = useInterfaces();
+  const { data: vlans, isLoading: loadingVlans } = useVlans();
 
   // IP & MAC Tab
-  const { data: remoteIps, isLoading: loadingRemoteIps } = useRemoteIps(20);
-  const { data: ipVersions, isLoading: loadingIpVersions } = useIpVersions(20);
-  const { data: macBandwidth, isLoading: loadingMacBandwidth } = useMacBandwidth(20);
+  const { data: remoteIps, isLoading: loadingRemoteIps } = useRemoteIps();
+  const { data: ipVersions, isLoading: loadingIpVersions } = useIpVersions();
+  const { data: macBandwidth, isLoading: loadingMacBandwidth } = useMacBandwidth();
 
   // Flow Profiles Tab
-  const { data: flowTypes, isLoading: loadingFlowTypes } = useFlowTypes(20);
-  const { data: flowOrigins, isLoading: loadingFlowOrigins } = useFlowOrigins(20);
+  const { data: flowTypes, isLoading: loadingFlowTypes } = useFlowTypes();
+  const { data: flowOrigins, isLoading: loadingFlowOrigins } = useFlowOrigins();
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0 || !bytes) return "0 B";

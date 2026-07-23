@@ -28,7 +28,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   lookup:               <Search className="h-4 w-4" />,
 };
 
-function SectionBlock({ heading, content, columns, items }: PageGuide["sections"][0]) {
+function SectionBlock({ heading, content, steps, columns, items }: PageGuide["sections"][0]) {
   const [open, setOpen] = useState(true);
   return (
     <div className="rounded-2xl border border-white/8 bg-gradient-to-b from-slate-900/80 to-slate-900/40 overflow-hidden shadow-lg">
@@ -45,6 +45,18 @@ function SectionBlock({ heading, content, columns, items }: PageGuide["sections"
         <div className="px-5 pb-5 pt-1 space-y-3 border-t border-white/5">
           {content && (
             <p className="text-sm text-slate-400 leading-relaxed">{content}</p>
+          )}
+          {steps && (
+            <ol className="space-y-2">
+              {steps.map((step, i) => (
+                <li key={i} className="flex gap-3 items-start">
+                  <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600/30 border border-blue-500/40 text-[10px] font-bold text-blue-300 mt-0.5">
+                    {i + 1}
+                  </span>
+                  <span className="text-sm text-slate-300 leading-relaxed">{step}</span>
+                </li>
+              ))}
+            </ol>
           )}
           {columns && (
             <div className="rounded-xl overflow-hidden border border-white/8">

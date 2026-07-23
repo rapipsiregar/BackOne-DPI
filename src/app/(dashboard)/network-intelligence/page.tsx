@@ -31,6 +31,7 @@ export default function NetworkIntelligencePage() {
 
   useEffect(() => {
     setMounted(true);
+    document.title = "Traffic Categories | BackOne - Deep Package Inspection";
   }, []);
 
   if (!mounted) return null;

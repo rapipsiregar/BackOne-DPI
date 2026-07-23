@@ -13,7 +13,7 @@ import { HelpTrigger } from "@/components/help/HelpTrigger";
 export default function GeographyPage() {
   const [mounted, setMounted] = useState(false);
   const [showMap, setShowMap] = useState(false);
-  const { data, isLoading } = useCountries(50); // fetch 50 countries
+  const { data, isLoading } = useCountries();
 
   const { 
     filters,
@@ -34,6 +34,7 @@ export default function GeographyPage() {
 
   useEffect(() => {
     setMounted(true);
+    document.title = "Geo Traffic | BackOne - Deep Package Inspection";
   }, []);
 
   if (!mounted) return null;
@@ -109,7 +110,7 @@ export default function GeographyPage() {
             Geo Traffic
             {isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
           </h2>
-          <p className="text-muted-foreground mt-1">Geographic distribution of inbound and outbound traffic by country.</p>
+          <p className="text-muted-foreground mt-1">Visualize data flow and activity across the globe.</p>
         </div>
         <HelpTrigger pageId="geography" />
       </div>

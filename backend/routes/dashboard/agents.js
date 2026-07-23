@@ -19,13 +19,14 @@ router.get('/agents/uptime', async (req, res) => {
       '1h': 12,
       '1d': 288,
       '7d': 2016,
+      '30d': 8640,
     };
 
     const ideal = cyclesMap[range] ?? 12;
     let timeFilter = getTimeFilter(req);
     if (!timeFilter) {
       const now = new Date();
-      timeFilter = { $gte: new Date(now.getTime() - 7 * 24 * 3600000) };
+      timeFilter = { $gte: new Date(now.getTime() - 30 * 24 * 3600000) };
     }
 
     const query = { timestamp: timeFilter };

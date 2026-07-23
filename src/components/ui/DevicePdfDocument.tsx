@@ -1,6 +1,7 @@
 import React from "react";
 import { Document, Page, Text, View } from "@react-pdf/renderer";
 import { styles } from "./DevicePdfStyles";
+import { formatAppLabel } from "@/lib/utils";
 
 interface DevicePdfDocumentProps {
   data: any;
@@ -191,7 +192,7 @@ export default function DevicePdfDocument({
           title="Top Protocols"
           data={topProtocols}
           columns={[
-            { header: "Protocol / Port", width: "50%", cell: (r) => r.protocol || "—" },
+            { header: "Protocol / Port", width: "50%", cell: (r) => formatAppLabel(r.app_label) },
             { header: "Download", width: "25%", align: "right", cell: (r) => formatBytes(r.download) },
             { header: "Upload", width: "25%", align: "right", cell: (r) => formatBytes(r.upload) },
           ]}

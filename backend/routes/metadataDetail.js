@@ -192,23 +192,23 @@ router.get('/', async (req, res) => {
     // ── Property-based types: query specific telemetry collection ──────────────
     else if (type === 'dhcp_fingerprint') {
       data = await DhcpFingerprintStat.find({ fingerprint: value, ...agentFilter })
-        .sort({ download: -1 }).limit(200).lean();
+        .sort({ download: -1 }).limit(1000000).lean();
     }
 
     else if (type === 'http_useragent') {
       data = await HttpUserAgentStat.find({ user_agent: value, ...agentFilter })
-        .sort({ download: -1 }).limit(200).lean();
+        .sort({ download: -1 }).limit(1000000).lean();
     }
 
     else if (type === 'bittorrent_hash') {
       data = await BittorrentHashStat.find({ info_hash: value, ...agentFilter })
-        .sort({ download: -1 }).limit(200).lean();
+        .sort({ download: -1 }).limit(1000000).lean();
     }
 
     else if (type === 'ssh_version') {
       const [clients, servers] = await Promise.all([
-        SshClientStat.find({ ssh_client: value, ...agentFilter }).sort({ download: -1 }).limit(200).lean(),
-        SshServerStat.find({ ssh_server: value, ...agentFilter }).sort({ download: -1 }).limit(200).lean(),
+        SshClientStat.find({ ssh_client: value, ...agentFilter }).sort({ download: -1 }).limit(1000000).lean(),
+        SshServerStat.find({ ssh_server: value, ...agentFilter }).sort({ download: -1 }).limit(1000000).lean(),
       ]);
       // Merge clients + servers, label each with role
       data = [
@@ -219,7 +219,7 @@ router.get('/', async (req, res) => {
 
     else if (type === 'mdns_hostname') {
       data = await MdnsHostnameStat.find({ mdns_hostname: value, ...agentFilter })
-        .sort({ download: -1 }).limit(200).lean();
+        .sort({ download: -1 }).limit(1000000).lean();
     }
 
     else {
