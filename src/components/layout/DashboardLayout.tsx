@@ -6,81 +6,26 @@ import { getViewAsStatusSync, stopViewAs } from "@/lib/admin-api";
 import { AlertTriangle, LogOut, Clock, ShieldAlert, Loader2 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { HelpCenterFAB } from "@/components/ui/HelpCenterFAB";
+import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const [viewAs, setViewAs] = useState<{ active: boolean; agent_label?: string; agent_uuid?: string }>({ active: false });
   const [user, setUser] = useState<any>(null);
   
-  // Timeout dialog state
-  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(120);
-  const [isRenewing, setIsRenewing] = useState(false);
+  const {
+    showWarning: showTimeoutWarning,
+    timeLeft,
+    isRenewing,
+    handleRenewSession,
+    handleLogout
+  } = useInactivityTimeout({
+    timeoutSeconds: 60 * 60, // 1 hour inactivity
+    warningSeconds: 2 * 60   // 2 minutes warning
+  });
 
   useEffect(() => {
     setViewAs(getViewAsStatusSync());
-    
-    // Fetch initial user session to get token exp time
-    fetch('/api/auth/me')
-      .then(res => res.json())
-      .then(data => {
-        if (data.user) setUser(data.user);
-      })
-      .catch(console.error);
   }, []);
-
-  // Background timer to watch token expiration
-  useEffect(() => {
-    if (!user || !user.exp) return;
-
-    const timer = setInterval(() => {
-      const now = Math.floor(Date.now() / 1000);
-      const remaining = user.exp - now;
-
-      if (remaining <= 120 && remaining > 0) {
-        setTimeLeft(remaining);
-        setShowTimeoutWarning(true);
-      } else if (remaining <= 0) {
-        // Session expired, force logout immediately
-        clearInterval(timer);
-        setShowTimeoutWarning(false);
-        fetch('/api/auth/logout', { method: 'POST' })
-          .then(() => {
-            window.location.href = '/login';
-          });
-      } else {
-        setShowTimeoutWarning(false);
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [user]);
-
-  const handleRenewSession = async () => {
-    setIsRenewing(true);
-    try {
-      const res = await fetch('/api/auth/renew', { method: 'POST' });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.ok && json.user) {
-          setUser(json.user);
-          setShowTimeoutWarning(false);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to renew session:", err);
-    } finally {
-      setIsRenewing(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.href = '/login';
-    } catch (err) {
-      console.error("Failed to logout:", err);
-    }
-  };
 
   const formatCountdown = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -92,6 +37,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
     await stopViewAs();
     window.location.reload();
   };
+
 
   return (
     <div className="flex h-screen overflow-hidden bg-transparent transition-colors duration-500 relative">
