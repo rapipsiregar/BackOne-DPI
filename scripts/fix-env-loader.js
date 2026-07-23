@@ -23,6 +23,10 @@ function exec(conn, cmd, label) {
 
 // Konten start-with-env.js yang akan ditulis ke server
 const startWithEnvContent = `'use strict';
+// Polyfill global crypto for Node 18 compatibility (required by mongodb driver)
+if (typeof globalThis.crypto === 'undefined') {
+  globalThis.crypto = require('crypto');
+}
 /**
  * BackOne DPI - Safe Environment Loader for Next.js Standalone
  * Reads .env.production safely without bash glob expansion issues.
