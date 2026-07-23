@@ -37,6 +37,7 @@ const UPLOAD_MANIFEST = [
   { local: '.next/standalone', remote: '.next/standalone', type: 'dir' },
   { local: '.next/static', remote: '.next/static', type: 'dir' },
   { local: 'public', remote: 'public', type: 'dir' },
+  { local: 'public/api/uploads', remote: 'api/uploads', type: 'dir' },
 
   // Backend API server
   { local: 'backend/server.js', remote: 'backend/server.js', type: 'file' },
@@ -55,12 +56,14 @@ const UPLOAD_MANIFEST = [
   { local: 'proxy/collectorHelper.js', remote: 'proxy/collectorHelper.js', type: 'file' },
   { local: 'proxy/collectorHelperDpi.js', remote: 'proxy/collectorHelperDpi.js', type: 'file' },
   { local: 'proxy/collectorHelperDpi2.js', remote: 'proxy/collectorHelperDpi2.js', type: 'file' },
+  { local: 'proxy/collectorHelperDpi3.js', remote: 'proxy/collectorHelperDpi3.js', type: 'file' },
   { local: 'proxy/dataRetention.js', remote: 'proxy/dataRetention.js', type: 'file' },
   { local: 'proxy/db', remote: 'proxy/db', type: 'dir' },
   { local: 'proxy/deviceResolver.js', remote: 'proxy/deviceResolver.js', type: 'file' },
   { local: 'proxy/models', remote: 'proxy/models', type: 'dir' },
   { local: 'proxy/netifyClient.js', remote: 'proxy/netifyClient.js', type: 'file' },
   { local: 'proxy/netifyClientCore.js', remote: 'proxy/netifyClientCore.js', type: 'file' },
+  { local: 'proxy/netifyClientStats.js', remote: 'proxy/netifyClientStats.js', type: 'file' },
   { local: 'proxy/netifyTelemetry.js', remote: 'proxy/netifyTelemetry.js', type: 'file' },
   { local: 'proxy/routes.js', remote: 'proxy/routes.js', type: 'file' },
   { local: 'proxy/scheduler.js', remote: 'proxy/scheduler.js', type: 'file' },
@@ -69,6 +72,10 @@ const UPLOAD_MANIFEST = [
 
   // PM2 ecosystem config
   { local: 'ecosystem.config.js', remote: 'ecosystem.config.js', type: 'file' },
+
+  // Database migration temporary files
+  { local: 'migration-temp', remote: 'migration-temp', type: 'dir' },
+  { local: 'scripts/migrate-db-remote.js', remote: 'migration-temp/migrate-db-remote.js', type: 'file' },
 
   // Production environment (CONFIDENTIAL — uploaded via SFTP, not git)
   { local: '.env.production', remote: '.env.production', type: 'file' },
@@ -92,6 +99,11 @@ const POST_DEPLOY_COMMANDS = [
 
   // Install proxy dependencies (production only)
   'cd /home/adminbackend/web/demoplace.my.id/public_html/proxy && npm ci --omit=dev 2>&1 | tail -5',
+
+  // Execute database migration on remote server
+  'echo "=== RUNNING REMOTE DB MIGRATION ==="',
+  'node /home/adminbackend/web/demoplace.my.id/public_html/migration-temp/migrate-db-remote.js',
+  'rm -rf /home/adminbackend/web/demoplace.my.id/public_html/migration-temp && echo "Cleaned up migration temporary files"',
 
   // Copy Next.js static assets to standalone directory (required for standalone mode)
   // Fix standalone directory structure for Next.js
