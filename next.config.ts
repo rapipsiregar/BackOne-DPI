@@ -2,17 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  serverExternalPackages: ["mongoose"],
   experimental: {
     serverActions: {
-      allowedOrigins: ["demoplace.my.id", "www.demoplace.my.id"],
+      allowedOrigins: ["dev.demoplace.my.id", "www.dev.demoplace.my.id"],
     },
   },
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/api/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3011'}/api/:path*`,
       },
     ];
   },

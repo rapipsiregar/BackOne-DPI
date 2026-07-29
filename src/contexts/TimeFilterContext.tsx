@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-type TimeRange = '5m' | '30m' | '1h' | '1d' | '7d';
+type TimeRange = '5m' | '30m' | '1h' | '1d' | '7d' | '30d';
 
 interface TimeFilterContextType {
   timeRange: TimeRange;

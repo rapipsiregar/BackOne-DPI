@@ -1,0 +1,35 @@
+[
+  {
+    "_id": "6a584fdb36539224fa4cbfd6",
+    "site_uuid": "default",
+    "brand_name": "BackOne",
+    "brand_logo": "/backone-logo.png",
+    "footer_copyright": "PT. Data Bisnis Solusi",
+    "primary_color": "#E11D48",
+    "created_at": "2026-07-14T02:15:21.201Z",
+    "updated_at": "2026-07-27T01:03:28.716Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a584fdb36539224fa4cbfd7",
+    "site_uuid": "6681452d_9cae_4ff4_8ae8_0d504774265e",
+    "brand_name": "SIAB",
+    "brand_logo": "/siab-logo.png",
+    "footer_copyright": "PT. Data Bisnis Solusi",
+    "primary_color": "#3B82F6",
+    "created_at": "2026-07-14T02:15:21.204Z",
+    "updated_at": "2026-07-27T01:03:28.796Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a584fdb36539224fa4cbfd8",
+    "site_uuid": "d7902405_0dc2_458b_8584_ed4d24b64f24",
+    "brand_name": "Nexus",
+    "brand_logo": "/nexus-logo.png",
+    "footer_copyright": "PT. Nexus Solusi",
+    "primary_color": "#8B5CF6",
+    "created_at": "2026-07-14T02:15:21.206Z",
+    "updated_at": "2026-07-27T01:03:28.799Z",
+    "__v": 0
+  }
+]

@@ -4,7 +4,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from 'react';
-import { getViewAsHeaders } from './admin-api';
 
 const API_BASE = '';
 
@@ -53,10 +52,7 @@ export function useCategoryDetail(
       const params = new URLSearchParams({ category, timeRange });
       const response = await fetch(
         `${API_BASE}/api/dashboard/category-detail?${params}`,
-        {
-          headers: getViewAsHeaders(),
-          credentials: 'include'
-        }
+        { credentials: 'include' }
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const result: CategoryDetailResult = await response.json();

@@ -20,7 +20,7 @@ const {
 async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify, label) {
   try {
     // 2b. App Categories
-    const categories = await netify.fetchTopAppCategories(1440, 50, agentUuid, SITE_UUID);
+    const categories = await netify.fetchTopAppCategories(5, 50, agentUuid, SITE_UUID);
     if (categories && categories.length > 0) {
       const catDocs = categories.map(c => ({
         timestamp,
@@ -36,7 +36,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2c. TLS Versions
-    const tlsVersions = await netify.fetchTlsVersions(1440, 50, agentUuid, SITE_UUID);
+    const tlsVersions = await netify.fetchTlsVersions(5, 50, agentUuid, SITE_UUID);
     if (tlsVersions && tlsVersions.length > 0) {
       const tvDocs = tlsVersions.map(v => ({
         timestamp,
@@ -52,7 +52,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2d. TLS Ciphers
-    const tlsCiphers = await netify.fetchTlsCiphers(1440, 50, agentUuid, SITE_UUID);
+    const tlsCiphers = await netify.fetchTlsCiphers(5, 50, agentUuid, SITE_UUID);
     if (tlsCiphers && tlsCiphers.length > 0) {
       const tcDocs = tlsCiphers.map(c => ({
         timestamp,
@@ -68,7 +68,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2e. TLS Security
-    const tlsSecurity = await netify.fetchTlsSecurity(1440, 50, agentUuid, SITE_UUID);
+    const tlsSecurity = await netify.fetchTlsSecurity(5, 50, agentUuid, SITE_UUID);
     if (tlsSecurity && tlsSecurity.length > 0) {
       const tsDocs = tlsSecurity.map(s => ({
         timestamp,
@@ -84,7 +84,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2f. Top Countries
-    const countries = await netify.fetchTopCountries(1440, 100, agentUuid, SITE_UUID);
+    const countries = await netify.fetchTopCountries(5, 100, agentUuid, SITE_UUID);
     if (countries && countries.length > 0) {
       const coDocs = countries.map(c => ({
         timestamp,
@@ -101,7 +101,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2g. Top Protocols
-    const protocols = await netify.fetchTopProtocols(1440, 50, agentUuid, SITE_UUID);
+    const protocols = await netify.fetchTopProtocols(5, 50, agentUuid, SITE_UUID);
     if (protocols && protocols.length > 0) {
       const protoDocs = protocols.map(p => ({
         timestamp,
@@ -117,7 +117,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2h. SNI Hostnames
-    const snis = await netify.fetchSniHostnames(1440, 10000, agentUuid, SITE_UUID);
+    const snis = await netify.fetchSniHostnames(5, 10000, agentUuid, SITE_UUID);
     if (snis && snis.length > 0) {
       const sniDocs = snis.map(s => ({
         timestamp, agent_uuid: agentUuid, site_uuid: SITE_UUID,

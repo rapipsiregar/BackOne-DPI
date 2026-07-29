@@ -3,9 +3,11 @@
 export interface ManagedUser {
   id: number;
   username: string;
-  role: 'SUPER_ADMIN' | 'AGENT_VIEWER' | 'SOC_ANALYST' | 'ENGINEER' | 'TENANT_ADMIN' | string;
+  role: 'SUPER_ADMIN' | 'EXECUTIVE' | 'AGENT_VIEWER' | 'SOC_ANALYST' | 'ENGINEER' | 'TENANT_ADMIN' | string;
   site_uuid: string | null;
   agent_uuid: string | null;
+  company_name?: string | null;
+  agent_uuids?: string[];
   account_name: string | null;
   profile_picture: string | null;
   created_at: string;
@@ -14,9 +16,13 @@ export interface ManagedUser {
 export interface ViewAsStatus {
   active: boolean;
   agent_uuid?: string;
-  agent_label?: string;
+  agent_label?: string;  // Label agent (dari registry)
   token?: string;
+  view_as_type?: 'user' | 'agent'; // 'user' = view-as user tertentu, 'agent' = direct agent view
+  user_name?: string;   // Nama user yang di-view (hanya untuk view_as_type='user')
+  user_role?: string;   // Role user yang di-view (hanya untuk view_as_type='user')
 }
+
 
 // ─── localStorage key untuk view-as state ─────────────────────────────────────
 const VIEW_AS_KEY = 'backone_view_as';
@@ -102,7 +108,7 @@ export async function deleteAdminAgentUser(userId: number): Promise<void> {
   if (!json.ok) throw new Error(json.error || 'Failed to delete account');
 }
 
-// POST /api/auth/admin/view-as — simpan token di localStorage
+// POST /api/auth/admin/view-as — simpan token di localStorage (direct agent view-as)
 export async function startViewAs(agent_uuid: string, agent_label: string): Promise<void> {
   const res = await fetch('/api/auth/admin/view-as', {
     method: 'POST',
@@ -122,11 +128,49 @@ export async function startViewAs(agent_uuid: string, agent_label: string): Prom
     localStorage.setItem(VIEW_AS_KEY, JSON.stringify({
       active: true,
       agent_uuid: json.agent_uuid,
-      agent_label: json.agent_label,
+      agent_label: json.agent_label,   // Label agent dari registry
       token: json.view_token,
+      view_as_type: 'agent',           // Direct agent view-as
     }));
   }
 }
+
+// POST /api/auth/admin/view-as — view-as USER tertentu (COMPANY_ADMIN → OPERATOR/VIEWER)
+// userName: nama user yang di-view, userRole: role user, agentUuid: agent pertama user, agentLabel: label agent dari registry
+export async function startViewAsUser(
+  agentUuid: string,
+  agentLabel: string,
+  userName: string,
+  userRole: string,
+): Promise<void> {
+  const labelForToken = `${userName} (${userRole.replace(/_/g, ' ')})`;
+  const res = await fetch('/api/auth/admin/view-as', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ agent_uuid: agentUuid, agent_label: labelForToken }),
+  });
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`Server error (${res.status}): Backend mungkin perlu di-restart`);
+  }
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'Failed to enter view-as mode');
+
+  // Simpan token di localStorage dengan konteks user yang lebih kaya
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(VIEW_AS_KEY, JSON.stringify({
+      active: true,
+      agent_uuid: json.agent_uuid,
+      agent_label: agentLabel,         // Label AGENT dari registry (bukan nama user)
+      token: json.view_token,
+      view_as_type: 'user',            // User view-as mode
+      user_name: userName,             // Nama user yang di-view
+      user_role: userRole,             // Role user yang di-view
+    }));
+  }
+}
+
 
 // Keluar dari mode view-as — hapus dari localStorage dan server session
 export async function stopViewAs(): Promise<void> {

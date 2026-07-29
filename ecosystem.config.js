@@ -1,22 +1,64 @@
+// ecosystem.config.js — PM2 Configuration for Source 2 (dev.demoplace.my.id)
 module.exports = {
   apps: [
     {
-      name: "backone-proxy",
-      script: "./proxy/index.js",
-      env_file: ".env.production"
+      name: 'source2-proxy',
+      script: './proxy/index.js',
+      cwd: '/home/adminbackend/web/dev.demoplace.my.id/public_html',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      node_args: '--max-old-space-size=1024',
+      max_memory_restart: '1200M',
+      restart_delay: 5000,
+      max_restarts: 10,
+      env_file: '.env.production',
+      env: { NODE_ENV: 'production' },
+      error_file: './logs/proxy-error.log',
+      out_file: './logs/proxy-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
     },
     {
-      name: "backone-backend",
-      script: "./backend/server.js",
-      env_file: ".env.production"
+      name: 'source2-backend',
+      script: './backend/server.js',
+      cwd: '/home/adminbackend/web/dev.demoplace.my.id/public_html',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      node_args: '--max-old-space-size=256',
+      max_memory_restart: '400M',
+      restart_delay: 3000,
+      max_restarts: 10,
+      env_file: '.env.production',
+      env: { NODE_ENV: 'production' },
+      error_file: './logs/backend-error.log',
+      out_file: './logs/backend-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
     },
     {
-      name: "backone-frontend",
-      script: "server.js",
-      env_file: ".env.production",
+      name: 'source2-frontend',
+      script: 'start-with-env.js',
+      cwd: '/home/adminbackend/web/dev.demoplace.my.id/public_html',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      node_args: '--max-old-space-size=512',
+      max_memory_restart: '700M',
+      restart_delay: 3000,
+      max_restarts: 10,
+      env_file: '.env.production',
       env: {
-        PORT: 8009
-      }
-    }
-  ]
+        NODE_ENV: 'production',
+        PORT: 3010,
+        HOSTNAME: '127.0.0.1',
+        NEXT_TELEMETRY_DISABLED: '1',
+      },
+      error_file: './logs/frontend-error.log',
+      out_file: './logs/frontend-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+    },
+  ],
 };

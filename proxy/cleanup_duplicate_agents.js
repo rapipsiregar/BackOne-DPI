@@ -8,8 +8,8 @@ const mongoose = require('mongoose');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../../..', '.env.local') });
 
-const SIAB_UUID  = '6681452d_9cae_4ff4_8ae8_0d504774265e';
-const NEXUS_UUID = 'd7902405_0dc2_458b_8584_ed4d24b64f24';
+const SIAB_UUID   = '6681452d_9cae_4ff4_8ae8_0d504774265e';
+const OFFICE_UUID = '1959bb55_045b_47c7_bbdd_f33b7db197b9';
 
 // Definitive SIAB agent list (from most recent collector run)
 const SIAB_AGENTS = ['F6-2V-DT-8A', 'YW-6I-61-LL', '2F-TF-1D-GK', '1R-79-J9-YE', '8A-V3-PB-85'];
@@ -27,13 +27,13 @@ async function cleanup() {
   for (const colName of collections) {
     const col = db.collection(colName);
 
-    // 1. Delete SIAB agents that are stored under NEXUS site_uuid
+    // 1. Delete SIAB agents that are stored under OFFICE site_uuid
     const r1 = await col.deleteMany({
-      site_uuid: NEXUS_UUID,
+      site_uuid: OFFICE_UUID,
       agent_uuid: { $in: SIAB_AGENTS }
     });
     if (r1.deletedCount > 0) {
-      console.log(`[${colName}] Removed ${r1.deletedCount} docs (SIAB agents from NEXUS)`);
+      console.log(`[${colName}] Removed ${r1.deletedCount} docs (SIAB agents from OFFICE)`);
       totalDeleted += r1.deletedCount;
     }
 

@@ -1,0 +1,3 @@
+/home/adminbackend/web/demoplace.my.id/public_html/backend/server.js
+/home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/server.js
+/home/adminbackend/web/demoplace.my.id/public_html/server.js

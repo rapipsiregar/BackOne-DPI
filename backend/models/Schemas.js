@@ -82,7 +82,7 @@ const FlowSchema = new mongoose.Schema({
   site_uuid:  { type: String, index: true },
   flow_id:    String,
   src_ip:     { type: String, index: true },
-  src_mac:    String,
+  src_mac:    { type: String, index: true },
   dst_ip:     { type: String, index: true },
   dst_port:   Number,
   protocol:   String,
@@ -107,6 +107,7 @@ const ThreatSchema = new mongoose.Schema({
   protocol:    String,
   description: String,
   event_at:    String,
+  flow_id:     { type: String, index: true },
 }, baseOptions);
 
 // ─── App Categories (per agent) ───────────────────────────────────────────────
@@ -133,6 +134,7 @@ const EventSchema = new mongoose.Schema({
   ip_address:     String,
   mac_address:    String,
   event_at:       Date,
+  flow_id:        { type: String, index: true },
 }, baseOptions);
 
 // ─── Compound Indexes for common dashboard queries ─────────────────────────────
@@ -144,6 +146,7 @@ FlowSchema.index({ agent_uuid: 1, flow_id: 1 });
 FlowSchema.index({ agent_uuid: 1, protocol: 1, timestamp: -1 });
 FlowSchema.index({ agent_uuid: 1, domain: 1, timestamp: -1 });
 FlowSchema.index({ site_uuid: 1, app_label: 1, timestamp: -1 });
+FlowSchema.index({ site_uuid: 1, src_mac: 1, timestamp: -1 });
 ThreatSchema.index({ agent_uuid: 1, timestamp: -1 });
 AppCategoryStatSchema.index({ agent_uuid: 1, timestamp: -1 });
 EventSchema.index({ agent_uuid: 1, timestamp: -1 });

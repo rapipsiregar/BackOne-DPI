@@ -9,15 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { AppDetailModal } from "@/components/ui/AppDetailModal";
 import { Loader2, ChevronRight, Globe } from "lucide-react";
 import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
 import { fmtBytes, getAppFavicon, formatAppLabel } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
-import { HelpTrigger } from "@/components/help/HelpTrigger";
-import { getViewAsStatusSync } from "@/lib/admin-api";
 
 export default function AppsPage() {
   const [mounted, setMounted] = useState(false);
   const [page, setPage] = useState(0);
   const pageSize = 20;
+  const { data, isLoading } = useTopApps();
   const [selectedApp, setSelectedApp] = useState<AppStat | null>(null);
 
   const { 
@@ -26,12 +26,9 @@ export default function AppsPage() {
     handleReset, activeCount 
   } = useUniversalFilterState();
 
-  // Pass dateFrom/dateTo so the backend filters by the exact calendar date range
-  const { data, isLoading } = useTopApps(pageSize, dateFrom, dateTo);
-
-
   useEffect(() => {
     setMounted(true);
+    document.title = "Apps | BackOne - Deep Package Inspection";
   }, []);
 
   if (!mounted) return null;
@@ -54,12 +51,14 @@ export default function AppsPage() {
   const filteredData = all.filter((row: any) => {
     if (filters.app_label && filters.app_label !== "All" && row.app_label !== filters.app_label) return false;
     if (filters.category && filters.category !== "All" && row.category !== filters.category) return false;
-    // Date filtering is handled server-side via date_from/date_to params.
-    // AppStat records do not have a last_seen field, so client-side date
-    // filtering is intentionally omitted here.
+    
+    if (dateFrom || dateTo) {
+      const d = row.last_seen ? new Date(row.last_seen).toISOString().slice(0, 10) : "";
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo && d > dateTo) return false;
+    }
     return true;
   });
-
 
   let processedData = [...filteredData];
   const sortUpload = filters.sort_upload || "All";
@@ -74,10 +73,14 @@ export default function AppsPage() {
     processedData.sort((a, b) => sortDownload === "Descending" ? (b.download ?? 0) - (a.download ?? 0) : (a.download ?? 0) - (b.download ?? 0));
   }
 
-  // Use the data retention window (7 days) as the minimum selectable date.
-  // Dynamic computation from loaded data causes a circular dependency where
-  // the sidebar time filter (e.g., Last 24h) restricts the date picker range.
-  const minDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const minTime = all.reduce((min: number, r: any) => {
+    if (r.last_seen) {
+      const time = new Date(r.last_seen).getTime();
+      if (isFinite(time) && time < min) return time;
+    }
+    return min;
+  }, Infinity);
+  const minDate = minTime !== Infinity ? new Date(minTime).toISOString().slice(0, 10) : "2024-01-01";
 
   const top5 = processedData.slice(0, 5);
 
@@ -124,13 +127,12 @@ export default function AppsPage() {
       accessor: (row) => <span className="font-medium text-white">{fmtBytes(row.download + row.upload)}</span>
     },
   ];
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-            Applications
+            Apps
             {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -139,7 +141,7 @@ export default function AppsPage() {
         </div>
         <HelpTrigger pageId="apps" />
       </div>
-      
+
       <UniversalFilters
         filters={filterConfigs}
         onChange={(id, val) => {
@@ -182,7 +184,11 @@ export default function AppsPage() {
                   stroke="#8b949e"
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(value) => fmtBytes(value)}
+                  tickFormatter={(value) => {
+                    const gb = value / 1073741824;
+                    const mb = value / 1048576;
+                    return gb >= 1 ? `${gb.toFixed(1)}GB` : `${mb.toFixed(0)}MB`;
+                  }}
                 />
                 <RechartsTooltip
                   cursor={{ fill: "#21262d" }}
@@ -223,7 +229,6 @@ export default function AppsPage() {
           appLabel={selectedApp.app_label}
           favicon={selectedApp.favicon}
           category={selectedApp.category}
-          agentUuid={getViewAsStatusSync().agent_uuid}
           onClose={() => setSelectedApp(null)}
         />
       )}

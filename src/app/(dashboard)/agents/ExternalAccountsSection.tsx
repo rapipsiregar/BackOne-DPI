@@ -51,7 +51,7 @@ export default function ExternalAccountsSection({
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 rounded-lg transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              Add External Account
+              Add Technical Account
             </button>
           </CardHeader>
           <CardContent>
@@ -91,7 +91,7 @@ export default function ExternalAccountsSection({
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 rounded-lg transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              Add External Account
+              Add Technical Account
             </button>
           </CardHeader>
           <CardContent>
@@ -117,21 +117,21 @@ export default function ExternalAccountsSection({
           </CardContent>
         </Card>
 
-        {/* Table 3: Nexus Accounts */}
+        {/* Table 3: Office Accounts */}
         <Card className="bg-card/50 backdrop-blur-sm border-border/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-white">Nexus Tenant External Accounts ({nexusUsers.length})</CardTitle>
+            <CardTitle className="text-white">Office Tenant External Accounts ({nexusUsers.length})</CardTitle>
             <button
               onClick={() => {
                 setExternalModalUser(null);
-                setTargetSiteUuid('d7902405_0dc2_458b_8584_ed4d24b64f24');
-                setTargetCreatedBy('nexus');
+                setTargetSiteUuid('1959bb55_045b_47c7_bbdd_f33b7db197b9');
+                setTargetCreatedBy('office');
                 setExternalModalOpen(true);
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 rounded-lg transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              Add External Account
+              Add Technical Account
             </button>
           </CardHeader>
           <CardContent>
@@ -175,8 +175,43 @@ export default function ExternalAccountsSection({
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 rounded-lg transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            Add External Account
+            Add Technical Account
           </button>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <DataTable
+              data={externalUsers}
+              columns={externalColumns}
+              searchPlaceholder="Search accounts..."
+              searchFilter={(row, query) => {
+                const q = query.toLowerCase();
+                return (
+                  (row.username || "").toLowerCase().includes(q) ||
+                  (row.account_name || "").toLowerCase().includes(q) ||
+                  (row.role || "").toLowerCase().includes(q)
+                );
+              }}
+            />
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // EXECUTIVE: read-only view of all accounts, no create/edit buttons
+  if (role === 'EXECUTIVE') {
+    return (
+      <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-white flex items-center gap-2">
+            <span>External Accounts Directory ({externalUsers.length})</span>
+          </CardTitle>
+          <span className="text-xs text-slate-500 italic px-3 py-1.5 border border-slate-700/50 rounded-lg">Read-Only View</span>
         </CardHeader>
         <CardContent>
           {isLoading ? (

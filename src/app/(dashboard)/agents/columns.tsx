@@ -1,7 +1,7 @@
 "use client";
 
 import { Column } from "@/components/ui/DataTable";
-import { Agent } from "@/lib/actions/agents";
+import { Agent } from "@/lib/actions/agentsCore";
 import { Badge } from "@/components/ui/Badge";
 import { resolveAgentLabel, type ManagedUser } from "@/lib/admin-api";
 import { Loader2, Trash2, CheckCircle2, XCircle, ChevronRight, UserCog, Eye, MapPin } from "lucide-react";
@@ -17,8 +17,9 @@ interface GetColumnsProps {
   setAccountModalAgent: (agent: { uuid: string; label: string } | null) => void;
   handleViewAs: (uuid: string, label: string) => void;
   openDelete: (agent: Agent) => void;
-  onEditLocation?: (agentUuid: string, agentLabel: string) => void;
-  locations?: { agent_uuid: string; latitude: number; longitude: number; label?: string }[];
+  handleEditLocation?: (agentUuid: string, agentLabel: string) => void;
+  /** Set of agent UUIDs that already have a location saved */
+  locationUuids?: Set<string>;
 }
 
 export function getAgentColumns({
@@ -32,14 +33,13 @@ export function getAgentColumns({
   setAccountModalAgent,
   handleViewAs,
   openDelete,
-  onEditLocation,
-  locations = [],
+  handleEditLocation,
+  locationUuids = new Set(),
 }: GetColumnsProps): Column<Agent>[] {
-  const isSuperAdmin = role === 'SUPER_ADMIN';
   const cols: Column<Agent>[] = [
     {
       header: "UUID / Serial",
-      className: isSuperAdmin ? "w-[12%] text-center" : "w-[14%] text-center",
+      className: "w-[12%] text-center",
       accessor: (row) => (
         <button onClick={() => setDetailAgent(row)} className="flex items-center justify-center gap-2 group text-center mx-auto" title="Click to view agent details">
           <span className="font-mono text-xs text-blue-400 group-hover:text-blue-300 transition-colors">{row.uuid || row.serial}</span>
@@ -49,14 +49,19 @@ export function getAgentColumns({
     },
     {
       header: "Label",
-      className: isSuperAdmin ? "w-[18%] text-center" : "w-[24%] text-center",
+      className: "w-[15%] text-center",
       accessor: (row) => {
         const uuid = row.uuid || row.serial;
         const dynamicLabel = resolveAgentLabel(uuid, managedUsers);
         const hasAccount = managedUsers.some(u => u.agent_uuid === uuid && u.role === 'AGENT_VIEWER');
+        const displayLabel = dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid);
         return (
           <div className="flex items-center justify-center gap-2 mx-auto max-w-full">
-            <button onClick={() => setDetailAgent(row)} className="text-center hover:text-white transition-colors truncate">
+            <button 
+              onClick={() => setDetailAgent(row)} 
+              className="text-center hover:text-white transition-colors truncate"
+              title={displayLabel}
+            >
               {dynamicLabel !== uuid ? dynamicLabel : (row.label || <span className="text-muted-foreground italic font-mono text-xs">{uuid}</span>)}
             </button>
             {!hasAccount && (role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
@@ -68,30 +73,33 @@ export function getAgentColumns({
     },
     { 
       header: "Provisioned", 
-      className: isSuperAdmin ? "w-[10%] text-center" : "w-[11%] text-center",
+      className: "w-[11%] text-center",
       accessor: (row) => row.provisioned ? <Badge variant="green"><CheckCircle2 className="w-3 h-3 mr-1" /> Yes</Badge> : <Badge variant="red"><XCircle className="w-3 h-3 mr-1" /> No</Badge> 
     },
     { 
       header: "Activated", 
-      className: isSuperAdmin ? "w-[10%] text-center" : "w-[11%] text-center",
+      className: "w-[11%] text-center",
       accessor: (row) => row.activated ? <Badge variant="green"><CheckCircle2 className="w-3 h-3 mr-1" /> Yes</Badge> : <Badge variant="red"><XCircle className="w-3 h-3 mr-1" /> No</Badge> 
     },
     { 
-      header: "Status", 
-      className: "w-[12%] text-center",
+      header: "Traffic Status", 
+      className: "w-[15%] text-center",
       accessor: (row) => {
         const statusText = row.last_seen_at?.human || '-';
-        if (statusText === 'Online') {
-          return <span className="text-emerald-400 font-medium flex items-center justify-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Online</span>;
-        } else if (statusText === 'Offline') {
-          return <span className="text-red-400 font-medium">Offline</span>;
+        if (statusText.startsWith('Last seen:')) {
+          return (
+            <span className="text-emerald-400 font-medium flex items-center justify-center gap-1.5 mx-auto">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              {statusText}
+            </span>
+          );
         } else {
-          return <span className="text-slate-400 text-xs">{statusText}</span>;
+          return <span className="text-slate-400 text-xs font-normal">{statusText}</span>;
         }
       }
     },
     {
-      header: "Historical Uptime",
+      header: "Avg Uptime",
       className: "w-[10%] text-center",
       accessor: (row) => {
         const uuid = row.uuid || row.serial;
@@ -99,59 +107,74 @@ export function getAgentColumns({
         let color = "text-emerald-400";
         if (uptime < 90) color = "text-red-400";
         else if (uptime < 98) color = "text-amber-400";
-        return <span className={`font-mono font-bold ${color}`}>{uptime.toFixed(1)}%</span>;
+        return <span className={`font-mono font-medium text-xs tracking-wide ${color}`}>{uptime.toFixed(1)}%</span>;
       }
     },
     { 
       header: "Actions", 
-      className: "w-[18%] text-center",
+      className: "w-[16%] text-center",
       accessor: (row) => {
         const uuid = row.uuid || row.serial;
         const dynamicLabel = resolveAgentLabel(uuid, managedUsers);
         const existingUser = managedUsers.find(u => u.agent_uuid === uuid && u.role === 'AGENT_VIEWER') || null;
         const isViewAsLoading = viewAsLoading === uuid;
+        const agentLabel = dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid);
         return (
-          <div className="flex items-center justify-center gap-1.5">
-            <button onClick={() => setDetailAgent(row)} className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded transition-colors" title="Detail Agent">
+          <div className="flex items-center justify-center gap-1 mx-auto">
+            <button onClick={() => setDetailAgent(row)} className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded transition-colors" title="Detail Agent">
               <ChevronRight className="w-4 h-4" />
             </button>
             {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
               <>
-                {onEditLocation && (() => {
-                  const hasCoords = locations.some(l => l.agent_uuid === uuid);
-                  return (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onEditLocation(uuid, dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid)); }}
-                      className={`p-1.5 rounded transition-colors ${
-                        hasCoords 
-                          ? "text-blue-400 hover:text-blue-300 hover:bg-blue-950/30" 
-                          : "text-red-400/60 hover:text-red-400 hover:bg-red-950/30"
-                      }`}
-                      title={hasCoords ? "Edit Geolocation (Dikonfigurasi)" : "Configure Geolocation (Belum Dikonfigurasi)"}
-                    >
-                      <MapPin className="w-4 h-4" />
-                    </button>
-                  );
-                })()}
                 <button
-                  onClick={(e) => { e.stopPropagation(); setAccountModalAgent({ uuid, label: dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid) }); setAccountModalOpen(true); }}
-                  className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30 rounded transition-colors"
+                  onClick={(e) => { e.stopPropagation(); setAccountModalAgent({ uuid, label: agentLabel }); setAccountModalOpen(true); }}
+                  className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30 rounded transition-colors"
                   title={existingUser ? 'Edit Agent Account' : 'Create Agent Account'}
                 >
                   <UserCog className="w-4 h-4" />
                 </button>
+                {handleEditLocation && (() => {
+                    const hasLocation = locationUuids.has(uuid);
+                    return (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleEditLocation(uuid, agentLabel); }}
+                        className={`relative p-1 rounded transition-colors ${
+                          hasLocation
+                            ? "text-teal-400 hover:text-teal-300 hover:bg-teal-950/30"
+                            : "text-slate-500 hover:text-indigo-400 hover:bg-indigo-950/30"
+                        }`}
+                        title={hasLocation ? "✅ Location set — click to update" : "⚠️ No location — click to set coordinates"}
+                      >
+                        <MapPin className="w-4 h-4" />
+                        {hasLocation && (
+                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-teal-400 border border-slate-900" />
+                        )}
+                      </button>
+                    );
+                  })()}
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleViewAs(uuid, dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid)); }}
+                  onClick={(e) => { e.stopPropagation(); handleViewAs(uuid, agentLabel); }}
                   disabled={isViewAsLoading}
-                  className="p-1.5 text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 rounded transition-colors disabled:opacity-50"
+                  className="p-1 text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 rounded transition-colors disabled:opacity-50"
                   title="View As Agent"
                 >
                   {isViewAsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); openDelete(row); }} className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded transition-colors" title="Delete">
+                <button onClick={(e) => { e.stopPropagation(); openDelete(row); }} className="p-1 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded transition-colors" title="Delete">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </>
+            )}
+            {/* COMPANY_ADMIN dan COMPANY_OPERATOR: hanya View-As */}
+            {(role === 'COMPANY_ADMIN' || role === 'COMPANY_OPERATOR') && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleViewAs(uuid, agentLabel); }}
+                disabled={isViewAsLoading}
+                className="p-1 text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 rounded transition-colors disabled:opacity-50"
+                title="View As Agent — see dashboard from this agent's perspective"
+              >
+                {isViewAsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+              </button>
             )}
           </div>
         );
@@ -166,7 +189,15 @@ export function getAgentColumns({
       accessor: (row) => {
         const uuid = row.uuid || row.serial;
         const sizeMB = storageMap[uuid] ?? 0;
-        return <span className="font-mono text-slate-300 font-semibold">{formatStorageSize(sizeMB)}</span>;
+        let displaySize = "";
+        if (sizeMB >= 1024 * 1024) {
+          displaySize = `${(sizeMB / (1024 * 1024)).toFixed(2)} TB`;
+        } else if (sizeMB >= 1024) {
+          displaySize = `${(sizeMB / 1024).toFixed(2)} GB`;
+        } else {
+          displaySize = `${sizeMB.toFixed(2)} MB`;
+        }
+        return <span className="font-mono text-xs font-normal text-slate-300 tracking-wide">{displaySize}</span>;
       }
     });
   }
@@ -174,17 +205,4 @@ export function getAgentColumns({
   return cols;
 }
 
-function formatStorageSize(sizeMB: number): string {
-  if (sizeMB === 0) return "0.00 MB";
-  if (sizeMB >= 1024 * 1024) {
-    return `${(sizeMB / (1024 * 1024)).toFixed(2)} TB`;
-  }
-  if (sizeMB >= 1024) {
-    return `${(sizeMB / 1024).toFixed(2)} GB`;
-  }
-  if (sizeMB < 1) {
-    return `${(sizeMB * 1024).toFixed(2)} KB`;
-  }
-  return `${sizeMB.toFixed(2)} MB`;
-}
 

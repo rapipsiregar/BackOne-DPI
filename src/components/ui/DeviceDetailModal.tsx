@@ -1,16 +1,15 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { fetchDeviceDetails, DeviceDetails, DeviceStat } from "@/lib/api";
 import { fmtBytes } from "@/lib/utils";
 import { Loader2, X, Monitor, Activity, Shield, Box, Server, Cpu, Clock, HardDrive, ArrowDownToLine, ArrowUpFromLine, RefreshCcw, Globe, Link2 } from "lucide-react";
 import ActiveDurationDisplay from "./ActiveDurationDisplay";
-
 import DeviceAppsTab from "./DeviceAppsTab";
 import DeviceProtocolsTab from "./DeviceProtocolsTab";
 import DeviceDomainsTab from "./DeviceDomainsTab";
 import DeviceFlowsTab from "./DeviceFlowsTab";
 import DeviceThreatsTab from "./DeviceThreatsTab";
+import DeviceIdentityCard from "./DeviceIdentityCard";
 
 interface Props {
   ip: string;
@@ -20,6 +19,15 @@ interface Props {
 }
 
 type Tab = "info" | "apps" | "protocols" | "domains" | "flows" | "threats";
+
+const tabs: { id: Tab; label: string; icon: any }[] = [
+  { id: "info", label: "Overview", icon: Monitor },
+  { id: "apps", label: "Applications", icon: Box },
+  { id: "protocols", label: "Protocols", icon: Link2 },
+  { id: "domains", label: "Domains / Web", icon: Globe },
+  { id: "flows", label: "Network Flows", icon: Activity },
+  { id: "threats", label: "Threats", icon: Shield }
+];
 
 export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) {
   const [data, setData] = useState<DeviceDetails | null>(null);
@@ -54,14 +62,35 @@ export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) 
     loadData(false);
   }, [ip, mac]);
 
-  const tabs: { id: Tab; label: string; icon: any }[] = [
-    { id: "info", label: "Overview", icon: Monitor },
-    { id: "apps", label: "Applications", icon: Box },
-    { id: "protocols", label: "Protocols", icon: Link2 },
-    { id: "domains", label: "Domains / Web", icon: Globe },
-    { id: "flows", label: "Network Flows", icon: Activity },
-    { id: "threats", label: "Threats", icon: Shield }
-  ];
+  const [isExporting, setIsExporting] = useState(false);
+
+  const exportToPdf = async () => {
+    if (!data) return;
+    setIsExporting(true);
+    try {
+      const { pdf } = await import("@react-pdf/renderer");
+      const { default: DevicePdfDocument } = await import("./DevicePdfDocument");
+      const reportDateStr = new Date().toLocaleString("id-ID", {
+        timeZone: "Asia/Jakarta", day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit", second: "2-digit",
+      }) + " WIB";
+
+      const doc = <DevicePdfDocument data={data} ip={ip || data.ip_address || ""} mac={mac || data.mac_address || ""} deviceData={deviceData} reportDateStr={reportDateStr} />;
+
+      const blob = await pdf(doc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Device_DPI_Telemetry_Report_${ip || data.ip_address || "device"}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export PDF:", err);
+      alert("Failed to generate PDF report. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleClose}>
@@ -84,7 +113,7 @@ export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) 
             <div>
               <div className="flex items-center gap-3">
                 <h3 className="text-xl font-bold text-card-foreground tracking-tight">
-                  {ip || data?.ip_address || (isLoading ? 'Resolving IP...' : 'No IP Address')}
+                  {ip || data?.ip_address || 'Resolving IP...'}
                 </h3>
                 {isRefreshing && <RefreshCcw className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 animate-spin" />}
               </div>
@@ -101,9 +130,25 @@ export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) 
               )}
             </div>
           </div>
-          <button onClick={handleClose} className="p-2.5 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-xl transition-all">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            {data && (
+              <button
+                disabled={isExporting}
+                onClick={exportToPdf}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-md shadow-blue-600/15 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isExporting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <ArrowDownToLine className="w-3.5 h-3.5" />
+                )}
+                Export PDF
+              </button>
+            )}
+            <button onClick={handleClose} className="p-2.5 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-xl transition-all">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -172,29 +217,12 @@ export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) 
                       </div>
                     </div>
 
-                    <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-border rounded-2xl p-6">
-                      <h4 className="text-sm font-bold text-card-foreground uppercase tracking-wider mb-6 flex items-center gap-2">
-                        <Server className="w-4 h-4 text-blue-500" /> Identity & Metadata
-                      </h4>
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mb-1.5"><Cpu className="w-3.5 h-3.5" /> OS</p>
-                          <p className="text-card-foreground font-medium text-sm">{data.os_label || deviceData?.os_label || 'Unknown'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mb-1.5"><Monitor className="w-3.5 h-3.5" /> Type</p>
-                          <p className="text-card-foreground font-medium text-sm">{data.device_type || deviceData?.device_type || 'Unknown'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mb-1.5"><HardDrive className="w-3.5 h-3.5" /> Manufacturer</p>
-                          <p className="text-card-foreground font-medium text-sm">{data.manufacturer || deviceData?.manufacturer || 'Unknown'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5 mb-1.5"><Clock className="w-3.5 h-3.5" /> Last Seen</p>
-                          <p className="text-card-foreground font-medium text-sm">{data.last_seen || deviceData?.last_seen ? new Date(data.last_seen || deviceData?.last_seen || '').toLocaleString() : 'Never'}</p>
-                        </div>
-                      </div>
-                    </div>
+                    <DeviceIdentityCard
+                      osLabel={data.os_label || deviceData?.os_label || ""}
+                      deviceType={data.device_type || deviceData?.device_type || ""}
+                      manufacturer={data.manufacturer || deviceData?.manufacturer || ""}
+                      lastSeen={data.last_seen || deviceData?.last_seen || ""}
+                    />
                   </div>
                 )}
 

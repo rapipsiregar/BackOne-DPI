@@ -1,13 +1,17 @@
 {
-  "name": "netify-app",
-  "version": "0.1.0",
+  "name": "backone-dpi",
+  "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
-    "dev": "concurrently --names \"NEXT,BACKEND,PROXY\" --prefix-colors \"cyan,green,yellow\" \"next dev\" \"node backend/server.js\" \"node proxy/index.js\"",
-    "dev:next": "next dev",
+    "dev": "concurrently --names \"MONGO,NEXT,BACKEND,PROXY\" --prefix-colors \"magenta,cyan,green,yellow\" \"node scripts/start-mongo.js\" \"next dev -p 3010\" \"node backend/server.js\" \"node proxy/index.js\"",
+    "dev:central": "concurrently --names \"NEXT,BACKEND\" --prefix-colors \"cyan,green\" \"next dev -p 3010\" \"node backend/server.js\"",
+    "dev:next": "next dev -p 3010",
     "dev:backend": "node backend/server.js",
     "dev:proxy": "node proxy/index.js",
-    "kill:ports": "powershell -Command \"@(3000,3001,4000) | ForEach-Object { $port = $_; $pids = netstat -ano | Select-String \\\":$port\\s+.+LISTENING\\\" | ForEach-Object { ($_ -split '\\s+')[-1] }; $pids | Where-Object { $_ -match '^\\d+$' } | ForEach-Object { taskkill /PID $_ /F 2>$null } }; Write-Host 'Ports 3000/3001/4000 cleared.'\"",
+    "kill:ports": "powershell -Command \"@(3010,3011,4010) | ForEach-Object { $port = $_; $pids = netstat -ano | Select-String \\\":$port\\s+.+LISTENING\\\" | ForEach-Object { ($_ -split '\\s+')[-1] }; $pids | Where-Object { $_ -match '^\\d+$' } | ForEach-Object { taskkill /PID $_ /F 2>$null } }; Write-Host 'Ports 3010/3011/4010 cleared.'\"",
     "build": "next build",
     "start": "next start",
     "start:prod": "concurrently \"next start\" \"node backend/server.js\" \"node proxy/index.js\"",
@@ -15,9 +19,12 @@
     "backend": "node backend/server.js",
     "proxy": "node proxy/index.js",
     "proxy:bun": "bun proxy/index.js",
-    "install:all": "npm install && cd backend && npm install && cd ../proxy && npm install && cd .."
+    "install:all": "npm install && cd backend && npm install && cd ../proxy && npm install && cd ..",
+    "deploy": "npm run build && node scripts/deploy-sftp.js",
+    "deploy:sftp": "node scripts/deploy-sftp.js"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
     "@types/leaflet": "^1.9.21",
     "axios": "^1.18.1",
     "bcryptjs": "^3.0.3",
@@ -31,6 +38,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "framer-motion": "^12.42.2",
+    "isomorphic-git": "^1.40.0",
     "jsonwebtoken": "^9.0.3",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.21.0",
@@ -40,6 +48,7 @@
     "next": "16.2.9",
     "next-themes": "^0.4.6",
     "node-cron": "^4.6.0",
+    "node-fetch": "^3.3.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-globe.gl": "^2.38.0",

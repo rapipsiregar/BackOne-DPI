@@ -2,6 +2,7 @@
 
 import { Column } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
+import { SafeImage } from "@/components/ui/SafeImage";
 import { type ManagedUser } from "@/lib/admin-api";
 import { UserCog, CheckCircle2, XCircle } from "lucide-react";
 
@@ -16,7 +17,12 @@ export function getExternalAccountColumns(
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 shrink-0 overflow-hidden">
             {row.profile_picture ? (
-              <img src={`/api/uploads/${row.profile_picture}`} alt={row.account_name || row.username} className="w-full h-full object-cover" />
+              <SafeImage
+                src={`/api/uploads/${row.profile_picture}`}
+                alt={row.account_name || row.username}
+                fallbackName={row.account_name || row.username}
+                className="w-full h-full object-cover"
+              />
             ) : (
               <span className="text-xs font-bold text-slate-400">{(row.account_name || row.username).substring(0, 2).toUpperCase()}</span>
             )}
@@ -36,6 +42,7 @@ export function getExternalAccountColumns(
       accessor: (row) => {
         let badgeColor = "bg-slate-500/20 text-slate-400 border-slate-500/30";
         if (row.role === 'SUPER_ADMIN') badgeColor = "bg-purple-500/20 text-purple-400 border-purple-500/30";
+        if (row.role === 'EXECUTIVE') badgeColor = "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
         if (row.role === 'SOC_ANALYST') badgeColor = "bg-amber-500/20 text-amber-400 border-amber-500/30";
         if (row.role === 'ENGINEER') badgeColor = "bg-blue-500/20 text-blue-400 border-blue-500/30";
         if (row.role === 'TENANT_ADMIN') badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";

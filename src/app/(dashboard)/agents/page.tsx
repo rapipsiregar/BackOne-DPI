@@ -1,32 +1,22 @@
 "use client";
 
-import { Loader2, Plus, Server } from "lucide-react";
+import { useEffect } from "react";
+import { Plus, Loader2, MapPin } from "lucide-react";
+import { HelpTrigger } from "@/components/help/HelpTrigger";
+import { useAgentsData } from "./useAgentsData";
 import { getAgentColumns } from "./columns";
 import { getExternalAccountColumns } from "./externalColumns";
-import ExternalAccountsSection from "./ExternalAccountsSection";
 import UptimeStatsCards from "./UptimeStatsCards";
 import AgentsTableSection from "./AgentsTableSection";
+import ExternalAccountsSection from "./ExternalAccountsSection";
 import AgentsPageModals from "./AgentsPageModals";
-import { useAgentsData } from "./useAgentsData";
-import { HelpTrigger } from "@/components/help/HelpTrigger";
-import dynamic from "next/dynamic";
-
-const IndonesiaAgentMap = dynamic(
-  () => import("@/components/dashboard/IndonesiaAgentMap").then(m => ({ default: m.IndonesiaAgentMap })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-[320px] w-full rounded-2xl border border-white/5 bg-slate-900/40 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-xs text-slate-400">Loading Agent Location Map...</span>
-        </div>
-      </div>
-    ),
-  }
-);
+import AgentLocationMap from "@/components/admin/AgentLocationMap";
+import { resolveAgentLabel } from "@/lib/admin-api";
 
 export default function AgentsPage() {
+  useEffect(() => {
+    document.title = "Agents | BackOne - Deep Package Inspection";
+  }, []);
   const {
     role,
     agents,
@@ -82,46 +72,45 @@ export default function AgentsPage() {
     setAccountModalAgent,
     handleViewAs,
     openDelete,
-    onEditLocation: handleEditLocation,
-    locations,
+    handleEditLocation,
+    locationUuids: new Set(locations.map((l: any) => l.agent_uuid)),
   });
-
-  const totalAgents = agents.length;
-  const onlineAgents = agents.filter(a => a.last_seen_at?.human === 'Online').length;
-  const offlineAgents = totalAgents - onlineAgents;
-  const uptimeValues = agents.map(a => uptimeMap[a.uuid || a.serial] ?? 100);
-  const avgUptime = uptimeValues.length > 0 ? uptimeValues.reduce((s, v) => s + v, 0) / uptimeValues.length : 100;
-
-  const externalUsers = managedUsers.filter(u => u.role !== 'AGENT_VIEWER');
-  const superadminUsers = externalUsers.filter(u => u.role === 'SUPER_ADMIN' || !u.site_uuid || u.site_uuid === 'default' || (u.site_uuid !== '6681452d_9cae_4ff4_8ae8_0d504774265e' && u.site_uuid !== 'd7902405_0dc2_458b_8584_ed4d24b64f24'));
-  const siabUsers = externalUsers.filter(u => u.role !== 'SUPER_ADMIN' && u.site_uuid === '6681452d_9cae_4ff4_8ae8_0d504774265e');
-  const nexusUsers = externalUsers.filter(u => u.role !== 'SUPER_ADMIN' && u.site_uuid === 'd7902405_0dc2_458b_8584_ed4d24b64f24');
 
   const externalColumns = getExternalAccountColumns((user) => {
     setExternalModalUser(user);
     setExternalModalOpen(true);
   });
 
+  const totalAgents = agents.length;
+  const onlineAgents = agents.filter(a => {
+    const hum = a.last_seen_at?.human;
+    return hum === 'Online' || hum === 'Flows Detected' || (hum && hum.startsWith('Last seen:'));
+  }).length;
+  const offlineAgents = totalAgents - onlineAgents;
+  const uptimeValues = agents.map(a => uptimeMap[a.uuid || a.serial] ?? 100);
+  const avgUptime = uptimeValues.length > 0 ? uptimeValues.reduce((s, v) => s + v, 0) / uptimeValues.length : 100;
+
+  // External Accounts di halaman Agents = akun eksternal teknikal/operasional saja
+  // AGENT_VIEWER = akun network agent (sudah ada di tabel agents) → BUKAN akun eksternal
+  // COMPANY_* = akun customer/client → sudah ada di halaman User Accounts
+  const EXCLUDED_ROLES = ['COMPANY_ADMIN', 'COMPANY_OPERATOR', 'COMPANY_VIEWER', 'AGENT_VIEWER'];
+  const externalUsers = managedUsers.filter(u => !EXCLUDED_ROLES.includes(u.role || ''));
+  // Grouping by site — semua sudah dipastikan hanya SUPER_ADMIN, EXECUTIVE, TENANT_ADMIN, SOC_ANALYST, ENGINEER
+  const superadminUsers = externalUsers.filter(u => u.role === 'SUPER_ADMIN' || u.role === 'EXECUTIVE' || !u.site_uuid || u.site_uuid === 'default');
+  const siabUsers = externalUsers.filter(u => u.site_uuid === '6681452d_9cae_4ff4_8ae8_0d504774265e' && u.role !== 'SUPER_ADMIN' && u.role !== 'EXECUTIVE');
+  const nexusUsers = externalUsers.filter(u => u.site_uuid === '1959bb55_045b_47c7_bbdd_f33b7db197b9' && u.role !== 'SUPER_ADMIN' && u.role !== 'EXECUTIVE');
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-          <Server className="w-6 h-6 text-primary" />
-          Agents Inventory
-          {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
-        </h2>
-        <div className="flex items-center gap-3">
-          <HelpTrigger pageId="agents" />
-          {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
-            <button 
-              onClick={() => setIsCreateOpen(true)}
-              className="flex items-center gap-2 bg-primary hover:bg-primary/95 text-primary-foreground px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-blue-500/10"
-            >
-              <Plus className="w-4 h-4" />
-              Provision Agent
-            </button>
-          )}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight text-white flex items-center gap-3">
+            Agents Inventory
+            {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">Managed DPI probes, remote collectors, and probe infrastructure.</p>
         </div>
+        <HelpTrigger pageId="agents" />
       </div>
 
       {error && (
@@ -137,35 +126,79 @@ export default function AgentsPage() {
         avgUptime={avgUptime}
       />
 
-      {/* Indonesia Agent Geolocation & Flow Map */}
-      {!isLoading && (
-        <IndonesiaAgentMap
-          agents={agents}
-          locations={locations}
-          onEditLocation={handleEditLocation}
-          role={role}
-        />
+      {/* Agent Location Map — tampil untuk SUPER_ADMIN, TENANT_ADMIN, dan COMPANY_ADMIN */}
+      {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN' || role === 'COMPANY_ADMIN') && (
+        <div className="rounded-2xl border border-white/8 bg-slate-900/40 overflow-hidden relative z-0">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/8">
+            <div className="flex items-center gap-2.5">
+              <MapPin className="w-4 h-4 text-indigo-400" />
+              <span className="text-sm font-semibold text-white">Agent Network Map</span>
+              <span className="text-xs text-slate-500">
+                {locations.length > 0
+                  ? `${locations.length} of ${agents.length} agent${agents.length !== 1 ? 's' : ''} positioned`
+                  : 'No positions configured yet'}
+              </span>
+            </div>
+            {agents.length > locations.length && (
+              <span className="text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2.5 py-1 rounded-full">
+                {agents.length - locations.length} agent{agents.length - locations.length !== 1 ? 's' : ''} without location — click 📍 in the table
+              </span>
+            )}
+          </div>
+          <div className="p-3">
+            <AgentLocationMap
+              pins={locations
+                .filter(loc => agents.some(a => (a.uuid || a.serial) === loc.agent_uuid))
+                .map(loc => {
+                  const agent = agents.find(a => (a.uuid || a.serial) === loc.agent_uuid);
+                  const agentLabel = agent
+                    ? (resolveAgentLabel(loc.agent_uuid, managedUsers) !== loc.agent_uuid
+                        ? resolveAgentLabel(loc.agent_uuid, managedUsers)
+                        : (agent.label || loc.label || loc.agent_uuid))
+                    : (loc.label || loc.agent_uuid);
+                  const isOnline = !!(agent?.last_seen_at?.human === 'Online' ||
+                                     agent?.last_seen_at?.human === 'Flows Detected' ||
+                                     (agent?.last_seen_at?.human && agent.last_seen_at.human.startsWith('Last seen:')));
+                  const uptime = uptimeMap[loc.agent_uuid];
+                  return {
+                    agent_uuid: loc.agent_uuid,
+                    label: agentLabel,
+                    latitude: loc.latitude,
+                    longitude: loc.longitude,
+                    isOnline,
+                    uptimePercent: uptime,
+                  };
+                })}
+              onEditLocation={handleEditLocation}
+              canEdit={role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN'}
+            />
+          </div>
+        </div>
       )}
 
       <AgentsTableSection
         agents={agents}
         isLoading={isLoading}
         columns={columns}
+        role={role}
+        onProvisionClick={() => setIsCreateOpen(true)}
       />
 
-      <ExternalAccountsSection
-        role={role}
-        isLoading={isLoading}
-        externalUsers={externalUsers}
-        superadminUsers={superadminUsers}
-        siabUsers={siabUsers}
-        nexusUsers={nexusUsers}
-        externalColumns={externalColumns}
-        setExternalModalUser={setExternalModalUser}
-        setTargetSiteUuid={setTargetSiteUuid}
-        setTargetCreatedBy={setTargetCreatedBy}
-        setExternalModalOpen={setExternalModalOpen}
-      />
+      {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
+        <ExternalAccountsSection
+          role={role}
+          isLoading={isLoading}
+          externalUsers={externalUsers}
+          superadminUsers={superadminUsers}
+          siabUsers={siabUsers}
+          nexusUsers={nexusUsers}
+          externalColumns={externalColumns}
+          setExternalModalUser={setExternalModalUser}
+          setTargetSiteUuid={setTargetSiteUuid}
+          setTargetCreatedBy={setTargetCreatedBy}
+          setExternalModalOpen={setExternalModalOpen}
+        />
+      )}
 
       <AgentsPageModals
         isCreateOpen={isCreateOpen}

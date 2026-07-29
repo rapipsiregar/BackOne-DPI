@@ -66,3 +66,19 @@ CLAUDE.md
 docs/
 plans/
 .env*
+
+# Local uploads
+backend/public/api/uploads/
+
+# Sensitive helper scripts (contain hardcoded SSH/API credentials - local use only)
+compare-netify-vs-dashboard.js
+ssh-read-source1-proxy.js
+check-frontend-uri-now.js
+verify-final.js
+check-frontend-uri.js
+ssh-check-logs.js
+ssh-*.js
+
+# Sensitive documentation (contains production API keys / credentials)
+BUKTI-AKSES-MONGODB.txt
+DOKUMENTASI-PROXY-NETIFY.md

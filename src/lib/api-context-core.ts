@@ -16,14 +16,12 @@ export const REFRESH_INTERVAL_MS = 60 * 1000;
  *   - stale-while-revalidate caching (no spinner if cached data is present)
  *   - auto-refresh every 5 minutes
  */
-export function useCtxFetch<T>(endpoint: string, timeRange: string, defaultValue: T, extraParams?: Record<string, string>): {
+export function useCtxFetch<T>(endpoint: string, timeRange: string, defaultValue: T): {
   data: T;
   error: Error | null;
   isLoading: boolean;
 } {
-  // Include extraParams in cache key so different date ranges are cached separately
-  const extraKey = extraParams ? ':' + new URLSearchParams(extraParams).toString() : '';
-  const cacheKey = `${endpoint}:${timeRange}${extraKey}`;
+  const cacheKey = `${endpoint}:${timeRange}`;
 
   // Initial state reads from global memory cache if present
   const [data, setData] = useState<T>(() => {
@@ -60,7 +58,7 @@ export function useCtxFetch<T>(endpoint: string, timeRange: string, defaultValue
     }
     setError(null);
 
-    fetcher<T>(endpoint, timeRange, extraParams)
+    fetcher<T>(endpoint, timeRange)
       .then(res => {
         const val = res ?? defaultValue;
         globalCache[cacheKey] = val;
@@ -73,7 +71,7 @@ export function useCtxFetch<T>(endpoint: string, timeRange: string, defaultValue
         setIsLoading(false);
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endpoint, timeRange, extraKey, tick]);
+  }, [endpoint, timeRange, tick]);
 
   return { data, error, isLoading };
 }

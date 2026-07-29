@@ -5,17 +5,11 @@ import { useState, useEffect } from 'react';
 import { getViewAsHeaders } from '../admin-api';
 import { DashboardSummary, TimelinePoint } from '../api-types';
 
-export async function fetcher<T>(endpoint: string, timeRange?: string, extraParams?: Record<string, string>): Promise<T> {
+export async function fetcher<T>(endpoint: string, timeRange?: string): Promise<T> {
   let url = `/api/dashboard${endpoint}`;
-  const queryParts: string[] = [];
-  if (timeRange) queryParts.push(`timeRange=${encodeURIComponent(timeRange)}`);
-  if (extraParams) {
-    for (const [key, val] of Object.entries(extraParams)) {
-      if (val) queryParts.push(`${key}=${encodeURIComponent(val)}`);
-    }
-  }
-  if (queryParts.length > 0) {
-    url += (url.includes('?') ? '&' : '?') + queryParts.join('&');
+  if (timeRange) {
+    const sep = url.includes('?') ? '&' : '?';
+    url += sep + 'timeRange=' + timeRange;
   }
   const viewAsHeaders = getViewAsHeaders();
   const res = await fetch(url, { headers: viewAsHeaders });
@@ -28,7 +22,6 @@ export async function fetcher<T>(endpoint: string, timeRange?: string, extraPara
   }
   return json.data;
 }
-
 
 export function useDashboardSummary(timeRange?: string) {
   const [data, setData] = useState<DashboardSummary | null>(null);

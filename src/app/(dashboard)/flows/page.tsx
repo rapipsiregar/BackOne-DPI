@@ -2,89 +2,66 @@
 
 import { useState, useEffect } from "react";
 import { TimestampCell } from "@/components/ui/TimestampCell";
-import { useFlows } from "@/lib/api-with-context";
+import { useFlows, useFlowsOptions } from "@/lib/api-with-context";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download, Search } from "lucide-react";
 import { fmtBytes, formatAppLabel } from "@/lib/utils";
 import { IpDetails } from "@/components/ui/IpDetails";
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
 import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
+import { explainAppOrPort } from "./explainFlow";
+import { downloadCsv } from "@/components/ui/DataTableCsvHelper";
 import { HelpTrigger } from "@/components/help/HelpTrigger";
-
-function explainAppOrPort(appLabel: string | null, domain: string | null, port: number) {
-  const label = appLabel || domain || "";
-  const portStr = String(port);
-  
-  const matches: Record<string, string> = {
-    "1433": "MSSQL Database Server",
-    "1434": "MSSQL Monitor Server",
-    "3306": "MySQL/MariaDB Database Server",
-    "5432": "PostgreSQL Database Server",
-    "1521": "Oracle Database Server",
-    "27017": "Database Server",
-    "6379": "Redis Key-Value Cache",
-    "80": "Unencrypted Web Traffic (HTTP)",
-    "443": "Encrypted Web Traffic (HTTPS/TLS)",
-    "22": "SSH Remote Management / SFTP",
-    "21": "FTP File Upload/Download (Unencrypted)",
-    "23": "Telnet Command Shell (Insecure)",
-    "25": "SMTP Mail Delivery",
-    "587": "Secure SMTP Mail Delivery",
-    "110": "POP3 Mail Storage Retrieval",
-    "993": "Secure IMAP Mail Service",
-    "53": "DNS Server Query (Domain Lookup)",
-    "123": "NTP Network Clock Synchronizer",
-    "161": "SNMP Network Device Monitoring",
-    "3389": "RDP Remote Desktop Management",
-    "445": "SMB Windows File Sharing",
-    "137": "NetBIOS Name Service",
-    "138": "NetBIOS Datagram Service",
-    "139": "NetBIOS Session Service",
-    "1812": "RADIUS Authentication Server",
-    "1813": "RADIUS Accounting Server"
-  };
-
-  let mainLabel = label;
-  let subLabel = matches[portStr] || (label.toLowerCase().includes("tls") || label.toLowerCase().includes("https") ? "Encrypted Connection (SSL/TLS)" : "");
-
-  if (appLabel && appLabel.includes("(") && domain && domain.startsWith("Port ")) {
-    mainLabel = appLabel;
-    subLabel = domain;
-  }
-
-  return {
-    main: mainLabel || `Port ${port}`,
-    sub: subLabel
-  };
-}
 
 export default function FlowsPage() {
   const [mounted, setMounted] = useState(false);
   const [selectedIp, setSelectedIp] = useState<string | null>(null);
-
+  const [currentPage, setCurrentPage] = useState(1);
+  const [ipSearch, setIpSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  
   const { 
     filters, dateFrom, dateTo, 
     handleFilterChange, setDateFrom, setDateTo, 
     handleReset, activeCount 
   } = useUniversalFilterState();
 
-  // Pass dateFrom/dateTo so the backend filters by the exact calendar date range
-  const { data, isLoading } = useFlows(5000, dateFrom, dateTo);
+  // Debounce search query to prevent database query spamming
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(ipSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [ipSearch]);
+
+  // Reset page to 1 when filters, date picker, or search text changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, dateFrom, dateTo, debouncedSearch]);
+
+  const { data: optionsData } = useFlowsOptions();
+  const { data: flows = [], total = 0, isLoading } = useFlows(currentPage, 50, {
+    ...filters,
+    dateFrom,
+    dateTo,
+    search: debouncedSearch
+  });
 
   useEffect(() => {
     setMounted(true);
+    document.title = "Flows | BackOne - Deep Package Inspection";
   }, []);
 
   if (!mounted) return null;
 
-  const all = data || [];
-
-
-  // Extract unique options
   const opts = (key: string) => {
-    const raw = Array.from(new Set(all.map((r: any) => String(r[key] || "")).filter(Boolean)));
-    return raw.sort();
+    if (!optionsData) return [];
+    const mapping: Record<string, string[]> = {
+      protocol: optionsData.protocols, src_ip: optionsData.srcIps, dst_ip: optionsData.dstIps,
+      dst_port: optionsData.dstPorts, app_label: optionsData.apps, domain: optionsData.domains
+    };
+    return mapping[key] || [];
   };
 
   const filterConfigs: FilterConfig[] = [
@@ -98,42 +75,15 @@ export default function FlowsPage() {
     { id: "sort_upload", label: "Sort Upload", type: "select", value: filters.sort_upload, options: ["Descending", "Ascending"] },
   ];
 
-  const filteredData = all.filter((row: any) => {
-    if (filters.protocol && filters.protocol !== "All" && row.protocol !== filters.protocol) return false;
-    if (filters.src_ip && filters.src_ip !== "All" && row.src_ip !== filters.src_ip) return false;
-    if (filters.dst_ip && filters.dst_ip !== "All" && row.dst_ip !== filters.dst_ip) return false;
-    if (filters.dst_port && filters.dst_port !== "All" && String(row.dst_port) !== filters.dst_port) return false;
-    if (filters.app && filters.app !== "All" && row.app_label !== filters.app) return false;
-    if (filters.domain && filters.domain !== "All" && row.domain !== filters.domain) return false;
-    // Date filtering is handled server-side via date_from/date_to on timestamp.
-    // last_seen != timestamp (a flow collected July 13 can have last_seen=July 14)
-    // so client-side filtering by last_seen would incorrectly exclude valid records.
-    return true;
-  });
+  const minDate = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
 
+  const handleExport = () => {
+    const headers = ["Flow ID", "Src IP", "Dst IP", "Dst Port", "Protocol", "App / Domain", "Download (bytes)", "Upload (bytes)"];
+    const rows = [headers, ...flows.map(r => [r.flow_id || "", r.src_ip || "", r.dst_ip || "", r.dst_port ?? "", r.protocol || "", r.app_label || r.domain || `Port ${r.dst_port}`, r.bytes_download ?? 0, r.bytes_upload ?? 0])];
+    downloadCsv(`flows-${new Date().toISOString().slice(0,10)}.csv`, rows);
+  };
 
-  let processedData = [...filteredData];
-  const sortUpload = filters.sort_upload || "All";
-  const sortDownload = filters.sort_download || "All";
-  
-  if (sortUpload !== "All") {
-    processedData.sort((a, b) => sortUpload === "Descending" ? (b.bytes_upload ?? 0) - (a.bytes_upload ?? 0) : (a.bytes_upload ?? 0) - (b.bytes_upload ?? 0));
-  } else if (sortDownload !== "All") {
-    processedData.sort((a, b) => sortDownload === "Descending" ? (b.bytes_download ?? 0) - (a.bytes_download ?? 0) : (a.bytes_download ?? 0) - (b.bytes_download ?? 0));
-  } else {
-    processedData.sort((a, b) => {
-      const timeA = a.last_seen ? new Date(a.last_seen).getTime() : 0;
-      const timeB = b.last_seen ? new Date(b.last_seen).getTime() : 0;
-      return timeB - timeA;
-    });
-  }
-
-  // Use the data retention window (7 days) as the minimum selectable date.
-  // Dynamic computation from loaded data causes a circular dependency where
-  // the sidebar time filter (e.g., Last 24h) restricts the date picker range.
-  const minDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-  const columns: Column<typeof data[0]>[] = [
+  const columns: Column<any>[] = [
     { 
       header: "Last Seen", 
       accessor: (row) => (
@@ -143,70 +93,107 @@ export default function FlowsPage() {
           showActiveStatus={true} 
         />
       ),
-      className: "w-[120px]"
+      className: "w-[14%] text-center",
+      tooltip: (row) => new Date(row.last_seen).toLocaleString()
     },
-    { header: "#", accessor: (row, i) => i + 1 },
-    { header: "Flow ID", accessor: (row) => row.flow_id },
+    { 
+      header: "#", 
+      accessor: (row, i) => i + 1,
+      className: "w-[4%] text-center"
+    },
+    { 
+      header: "Flow ID", 
+      accessor: (row) => row.flow_id,
+      className: "w-[11%] text-center font-mono text-xs truncate"
+    },
     { 
       header: "Src IP", 
       accessor: (row) => (
-        <button
-          onClick={() => setSelectedIp(row.src_ip)}
-          className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-left focus:outline-none"
-        >
-          {row.src_ip}
-        </button>
-      ) 
+        <div className="flex flex-col items-center justify-center text-center">
+          <button
+            onClick={() => setSelectedIp(row.src_ip)}
+            className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-center focus:outline-none truncate w-full"
+          >
+            {row.src_ip}
+          </button>
+          {row.src_label && (
+            <span className="text-[10px] text-cyan-400 font-semibold tracking-wide mt-0.5 truncate w-full block">
+              {row.src_label}
+            </span>
+          )}
+        </div>
+      ),
+      className: "w-[11%] text-center",
+      tooltip: (row) => row.src_label ? `${row.src_ip} (${row.src_label})` : row.src_ip
     },
     { 
       header: "Dst IP", 
       accessor: (row) => (
-        <div className="flex flex-col items-start">
+        <div className="flex flex-col items-center justify-center">
           <button
             onClick={() => setSelectedIp(row.dst_ip)}
-            className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-left focus:outline-none"
+            className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-center focus:outline-none truncate w-full"
           >
             {row.dst_ip}
           </button>
           <IpDetails ip={row.dst_ip} />
         </div>
-      ) 
+      ),
+      className: "w-[13%] text-center",
+      tooltip: (row) => row.dst_ip
     },
-    { header: "Dst Port", accessor: (row) => row.dst_port },
-    { header: "Protocol", accessor: (row) => row.protocol },
+    { 
+      header: "Dst Port", 
+      accessor: (row) => row.dst_port,
+      className: "w-[7%] text-center font-mono text-xs"
+    },
+    { 
+      header: "Protocol", 
+      accessor: (row) => row.protocol,
+      className: "w-[7%] text-center text-xs"
+    },
     { 
       header: "App / Domain", 
       accessor: (row) => {
         const exp = explainAppOrPort(row.app_label, row.domain, row.dst_port);
         return (
-          <div className="flex flex-col">
-            <span className="font-semibold text-white truncate max-w-[200px]" title={exp.main}>
+          <div className="flex flex-col items-center justify-center">
+            <span className="font-semibold text-white truncate max-w-[200px] text-center" title={exp.main}>
               {exp.main}
             </span>
             {exp.sub && (
-              <span className="text-[10px] text-slate-400 italic">
+              <span className="text-[10px] text-slate-400 italic text-center truncate max-w-[200px]">
                 {exp.sub}
               </span>
             )}
           </div>
         );
+      },
+      className: "w-[18%] text-center",
+      tooltip: (row) => {
+        const exp = explainAppOrPort(row.app_label, row.domain, row.dst_port);
+        return exp.sub ? `${exp.main} (${exp.sub})` : exp.main;
       }
     },
     { 
       header: "Download", 
-      accessor: (row) => <span className="text-blue-400">{fmtBytes(row.bytes_download)}</span>
+      accessor: (row) => <span className="text-blue-400">{fmtBytes(row.bytes_download)}</span>,
+      className: "w-[8%] text-center",
+      tooltip: (row) => `${fmtBytes(row.bytes_download)} (${(row.bytes_download || 0).toLocaleString()} bytes)`
     },
     { 
       header: "Upload", 
-      accessor: (row) => <span className="text-green-500">{fmtBytes(row.bytes_upload)}</span>
+      accessor: (row) => <span className="text-green-500">{fmtBytes(row.bytes_upload)}</span>,
+      className: "w-[7%] text-center",
+      tooltip: (row) => `${fmtBytes(row.bytes_upload)} (${(row.bytes_upload || 0).toLocaleString()} bytes)`
     }
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-          Active Flows
+          Flows
           {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
         </h2>
         <HelpTrigger pageId="flows" />
@@ -235,38 +222,37 @@ export default function FlowsPage() {
       />
       
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-        <CardHeader>
-          <CardTitle className="text-white">Active Flows ({processedData.length})</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 gap-4 flex-wrap">
+          <div className="flex items-center gap-4 flex-wrap">
+            <CardTitle className="text-white">Active Flows ({total.toLocaleString()})</CardTitle>
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <input
+                type="text"
+                placeholder="Search IP (source or dest)..."
+                value={ipSearch}
+                onChange={(e) => setIpSearch(e.target.value)}
+                className="w-[240px] rounded-lg border border-border bg-card/30 backdrop-blur-sm pl-9 pr-4 py-1.5 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-card/50 transition-all shadow-sm"
+              />
+            </div>
+          </div>
+          <button
+            onClick={handleExport}
+            title="Export current page flows to CSV"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/70 hover:text-emerald-300 transition-all shadow-sm whitespace-nowrap"
+          >
+            <Download className="w-4 h-4" />
+            Export CSV ({total.toLocaleString()})
+          </button>
         </CardHeader>
         <CardContent>
           <DataTable
-            data={processedData}
+            data={flows}
             columns={columns}
-            searchPlaceholder="Search flows by IP, App, or Domain..."
-            searchFilter={(row, query) => {
-              const q = query.toLowerCase();
-              return (
-                (row.src_ip || "").toLowerCase().includes(q) ||
-                (row.dst_ip || "").toLowerCase().includes(q) ||
-                (row.app_label || "").toLowerCase().includes(q) ||
-                (row.domain || "").toLowerCase().includes(q) ||
-                (row.protocol || "").toLowerCase().includes(q)
-              );
-            }}
-            csvExport={{
-              filename: `flows-${new Date().toISOString().slice(0,10)}.csv`,
-              headers: ["Flow ID", "Src IP", "Dst IP", "Dst Port", "Protocol", "App / Domain", "Download (bytes)", "Upload (bytes)"],
-              rowSerializer: (row) => [
-                row.flow_id || "",
-                row.src_ip || "",
-                row.dst_ip || "",
-                row.dst_port ?? "",
-                row.protocol || "",
-                row.app_label || row.domain || `Port ${row.dst_port}`,
-                row.bytes_download ?? 0,
-                row.bytes_upload ?? 0,
-              ],
-            }}
+            serverSide={true}
+            totalCount={total}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
           />
         </CardContent>
       </Card>

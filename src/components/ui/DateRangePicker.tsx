@@ -68,7 +68,7 @@ export function DateRangePicker({
       {open && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-border/50 rounded-xl shadow-2xl z-50 p-4 min-w-[260px]">
           <p className="text-xs text-muted-foreground mb-3 font-medium">
-            Filter by Date Range
+            Filter Threats by Date
           </p>
           <div className="space-y-3">
             <div>
@@ -118,6 +118,17 @@ export function DateRangePicker({
               className="flex-1 px-2 py-1.5 text-xs bg-secondary/50 text-white border border-border/50 rounded-lg hover:bg-secondary transition-colors"
             >
               7 Days
+            </button>
+            <button
+              onClick={() => {
+                const d = new Date();
+                d.setDate(d.getDate() - 29);
+                onChange(d.toISOString().slice(0, 10), today);
+                setOpen(false);
+              }}
+              className="flex-1 px-2 py-1.5 text-xs bg-secondary/50 text-white border border-border/50 rounded-lg hover:bg-secondary transition-colors"
+            >
+              30 Days
             </button>
             <button
               onClick={() => {

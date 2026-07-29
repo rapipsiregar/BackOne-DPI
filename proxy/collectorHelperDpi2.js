@@ -14,7 +14,7 @@ const {
 } = require('./deviceResolver');
 
 async function collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, netify, label) {
-  const devices = await netify.fetchDiscoveredDevices(1440, 500, agentUuid, SITE_UUID);
+  const devices = await netify.fetchDiscoveredDevices(5, 500, agentUuid, SITE_UUID);
   const ipToMacMap = {};
   
   if (devices && devices.length > 0) {
@@ -56,7 +56,7 @@ async function collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, netify, la
       let deviceAppCount = 0;
       for (let i = 0; i < topDevices.length; i += 5) {
         const batch = topDevices.slice(i, i + 5);
-        const results = await Promise.allSettled(batch.map(d => netify.fetchDeviceApps(d.ip_address, 1440, 50, agentUuid, SITE_UUID)));
+        const results = await Promise.allSettled(batch.map(d => netify.fetchDeviceApps(d.ip_address, 5, 50, agentUuid, SITE_UUID)));
         const appDocs = [];
         results.forEach((res, idx) => {
           if (res.status === 'fulfilled' && Array.isArray(res.value)) {
@@ -81,7 +81,7 @@ async function collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, netify, la
 }
 
 async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipToMacMap) {
-  // Netify API has a hard limit of 1,000,000 for settings_limit.
+  // Netify API has a hard limit of 1,000,000 for settings_limit. Use 1000000 as default per rule.
   const flowLimit = parseInt(process.env.PROXY_FLOW_LIMIT || '1000000');
   const flows = await netify.fetchFlows(flowLimit, agentUuid, SITE_UUID);
   if (flows && flows.length > 0) {
@@ -115,16 +115,34 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
           const blacklistedCategories = new Set(blacklistRules.filter(r => r.type === 'category').map(r => r.value.toLowerCase()));
           const blacklistedDomains = new Set(blacklistRules.filter(r => r.type === 'domain').map(r => r.value.toLowerCase()));
 
+          const flowIdsInBatch = flowDocs.map(f => f.flow_id).filter(Boolean);
+          const existingFlowThreats = new Set(
+            await Threat.find({ flow_id: { $in: flowIdsInBatch } }).distinct('flow_id')
+          );
+
           const threatDocs = [];
+          const eventDocs = [];
+
           for (const f of flowDocs) {
             let isViolation = false;
             let categoryLabel = "";
 
             // Check if domain is blacklisted
-            if (f.domain && blacklistedDomains.has(f.domain.toLowerCase())) {
-              isViolation = true;
-            } else if (f.app_label && blacklistedDomains.has(f.app_label.toLowerCase())) {
-              isViolation = true;
+            for (const r of blacklistRules) {
+              if (r.type === 'domain') {
+                const val = r.value.toLowerCase();
+                // Direct domain match
+                if (f.domain && f.domain.toLowerCase().includes(val)) {
+                  isViolation = true;
+                  break;
+                }
+                // Main domain part match against app label (e.g. "google" from "google.com")
+                const mainDomainPart = val.split('.')[0];
+                if (mainDomainPart && f.app_label && f.app_label.toLowerCase().includes(mainDomainPart)) {
+                  isViolation = true;
+                  break;
+                }
+              }
             }
 
             // Look up app details to check category
@@ -138,7 +156,7 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
               }
             }
 
-            if (isViolation) {
+            if (isViolation && !existingFlowThreats.has(f.flow_id)) {
               threatDocs.push({
                 timestamp,
                 agent_uuid: f.agent_uuid,
@@ -150,7 +168,21 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
                 dst_port: f.dst_port,
                 protocol: f.protocol,
                 description: `Access to blacklisted app/domain: ${f.app_label} (${f.domain || 'N/A'})${categoryLabel ? ' - Category: ' + categoryLabel : ''}`,
-                event_at: new Date().toISOString()
+                event_at: new Date().toISOString(),
+                flow_id: f.flow_id
+              });
+
+              eventDocs.push({
+                timestamp,
+                agent_uuid: f.agent_uuid,
+                site_uuid: f.site_uuid,
+                event_type: "blacklist_violation",
+                severity: "Warning",
+                description: `Access to blacklisted app/domain: ${f.app_label} (${f.domain || 'N/A'})${categoryLabel ? ' - Category: ' + categoryLabel : ''}`,
+                ip_address: f.src_ip,
+                mac_address: f.src_mac,
+                event_at: new Date(),
+                flow_id: f.flow_id
               });
             }
           }
@@ -158,6 +190,10 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
           if (threatDocs.length > 0) {
             await Threat.insertMany(threatDocs);
             console.log(`[Collector]   ✓ ${threatDocs.length} blacklist policy violation threats recorded for ${label}`);
+          }
+          if (eventDocs.length > 0) {
+            await Event.insertMany(eventDocs);
+            console.log(`[Collector]   ✓ ${eventDocs.length} blacklist policy violation events recorded for ${label}`);
           }
         }
       } catch (err) {
@@ -169,58 +205,7 @@ async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipTo
   }
 }
 
-async function collectThreats(agentUuid, timestamp, SITE_UUID, netify, label) {
-  const threats = await netify.fetchCyberThreats(agentUuid, SITE_UUID);
-  if (threats && threats.length > 0) {
-    const threatDocs = threats.map(t => ({
-      timestamp, agent_uuid: agentUuid, site_uuid: SITE_UUID,
-      threat_type: t.threat_type || 'Unknown Threat', severity: t.severity || 'Medium',
-      src_ip: t.src_ip, dst_ip: t.dst_ip, dst_port: t.dst_port, protocol: t.protocol,
-      description: t.description, event_at: t.event_at || new Date().toISOString(),
-    }));
-    await Threat.insertMany(threatDocs);
-    console.log(`[Collector]   ✓ ${threatDocs.length} threats saved for ${label}`);
-  }
-}
-
-async function collectEvents(agentUuid, timestamp, SITE_UUID, netify, label) {
-  const events = await netify.fetchEvents(100, agentUuid, SITE_UUID);
-  if (events && events.length > 0) {
-    const eventIds = events.map(e => e.event_id).filter(id => id !== null);
-    const existing = await Event.find({ site_uuid: SITE_UUID, event_id: { $in: eventIds } }).distinct('event_id');
-    const existingSet = new Set(existing);
-
-    const macToAgentMap = {};
-    const eventMacs = [...new Set(events.map(e => e.mac_address).filter(Boolean))];
-    if (eventMacs.length > 0) {
-      const storedDevices = await DeviceStat.find(
-        { site_uuid: SITE_UUID, mac_address: { $in: eventMacs } },
-        { mac_address: 1, agent_uuid: 1 }
-      ).lean();
-      for (const d of storedDevices) {
-        if (d.mac_address && d.agent_uuid) macToAgentMap[d.mac_address] = d.agent_uuid;
-      }
-    }
-
-    const eventDocs = events.filter(e => e.event_id === null || !existingSet.has(e.event_id)).map(e => {
-      const resolvedAgentUuid = (e.mac_address && macToAgentMap[e.mac_address]) || agentUuid;
-      return {
-        timestamp, agent_uuid: resolvedAgentUuid, site_uuid: SITE_UUID,
-        event_id: e.event_id, event_type: e.event_type, severity: e.severity,
-        description: e.description, category_label: e.category_label,
-        ip_address: e.ip_address, mac_address: e.mac_address, event_at: e.event_at,
-      };
-    });
-    if (eventDocs.length > 0) {
-      await Event.insertMany(eventDocs);
-      console.log(`[Collector]   ✓ ${eventDocs.length} new events saved for ${label}`);
-    }
-  }
-}
-
 module.exports = {
   collectDevicesAndApps,
-  collectFlows,
-  collectThreats,
-  collectEvents
+  collectFlows
 };

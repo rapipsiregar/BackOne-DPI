@@ -1,5 +1,10 @@
 // backend/server.js
 // ─────────────────────────────────────────────────────────────────────────────
+// Polyfill global crypto for Node 18 compatibility (required by mongodb driver)
+if (typeof globalThis.crypto === 'undefined') {
+  globalThis.crypto = require('crypto');
+}
+
 // BackOne Backend API Server
 //
 // Tanggung jawab backend ini adalah READ-ONLY dari MongoDB.
@@ -15,7 +20,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.local';
+require('dotenv').config({ path: path.join(__dirname, '..', envFile) });
 
 const express     = require('express');
 const cors        = require('cors');
@@ -45,8 +51,25 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+
+app.use((req, res, next) => {
+  if (req.originalUrl && req.originalUrl.includes('/api/dashboard')) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const logPath = path.join(__dirname, '../scratch/http_requests.log');
+      const logLine = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - Query: ${JSON.stringify(req.query)}\n`;
+      fs.appendFileSync(logPath, logLine);
+    } catch (e) {
+      console.error('Logger error:', e.message);
+    }
+  }
+  next();
+});
+
 
 // ─── Public Routes ────────────────────────────────────────────────────────────
 const authRoutes = require('./routes/auth');
@@ -115,9 +138,26 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ─── Global JSON Error Handler ────────────────────────────────────────────────
+// Menangkap semua error yang tidak di-handle (termasuk multer, mongoose, dll.)
+// dan memastikan response selalu JSON, BUKAN HTML default Express.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('[Global Error Handler]', err.message || err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: err.message || 'Internal server error',
+    code: err.code || undefined,
+  });
+});
+
 // ─── Start Server ─────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n🚀 BackOne API Server berjalan di http://localhost:${PORT}`);
-  console.log(`🔌 API Health : http://localhost:${PORT}/api/health`);
-  console.log(`📡 Mode       : READ-ONLY dari MongoDB (data dikirim oleh Proxy Server)\n`);
+// Bind to 127.0.0.1 in production to prevent direct external access to port 3001.
+// All external traffic must go through the reverse proxy (Apache/Nginx) at port 80/443.
+const BIND_HOST = process.env.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0';
+app.listen(PORT, BIND_HOST, () => {
+  console.log(`\n🚀 BackOne API Server berjalan di http://${BIND_HOST}:${PORT}`);
+  console.log(`🔌 API Health : http://${BIND_HOST}:${PORT}/api/health`);
+  console.log(`📡 Mode       : READ-ONLY dari MongoDB (data dikirim oleh Proxy Server)`);
+  console.log(`🔒 Security   : Bound to ${BIND_HOST} (internal only in production)\n`);
 });

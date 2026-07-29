@@ -25,6 +25,7 @@ export default function DNSPage() {
 
   useEffect(() => {
     setMounted(true);
+    document.title = "DNS | BackOne - Deep Package Inspection";
   }, []);
 
   useEffect(() => {
@@ -96,9 +97,9 @@ export default function DNSPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-          DNS Intelligence
+          DNS
           {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
         </h2>
         <HelpTrigger pageId="dns" />

@@ -5,7 +5,8 @@
 
 const mongoose = require('mongoose');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../../.env.local') });
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.local';
+require('dotenv').config({ path: path.join(__dirname, '../../', envFile) });
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
 
@@ -22,7 +23,7 @@ async function connectDB() {
         serverSelectionTimeoutMS: 10000,
         connectTimeoutMS: 10000,
       });
-      console.log('[MongoDB] ✓ Connected successfully');
+      console.log('[MongoDB] ✓ Connected successfully to', MONGODB_URI);
       const { logCapacityStats } = require('./capacityTracker');
       logCapacityStats('[MongoDB]').catch(err => console.warn('[MongoDB] Capacity log failed:', err.message));
       return;

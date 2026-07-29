@@ -16,22 +16,26 @@ import { HelpTrigger } from "@/components/help/HelpTrigger";
 export default function NetworkInfrastructurePage() {
   const [selectedRemoteIp, setSelectedRemoteIp] = useState<string | null>(null);
 
+  useEffect(() => {
+    document.title = "Network Topology | BackOne - Deep Package Inspection";
+  }, []);
+
   // Routing & Geography Tab
-  const { data: regions, isLoading: loadingRegions } = useRegions(20);
-  const { data: cities, isLoading: loadingCities } = useCities(20);
+  const { data: regions, isLoading: loadingRegions } = useRegions();
+  const { data: cities, isLoading: loadingCities } = useCities();
 
   // Interfaces & VLANs Tab
-  const { data: interfaces, isLoading: loadingInterfaces } = useInterfaces(20);
-  const { data: vlans, isLoading: loadingVlans } = useVlans(20);
+  const { data: interfaces, isLoading: loadingInterfaces } = useInterfaces();
+  const { data: vlans, isLoading: loadingVlans } = useVlans();
 
   // IP & MAC Tab
-  const { data: remoteIps, isLoading: loadingRemoteIps } = useRemoteIps(20);
-  const { data: ipVersions, isLoading: loadingIpVersions } = useIpVersions(20);
-  const { data: macBandwidth, isLoading: loadingMacBandwidth } = useMacBandwidth(20);
+  const { data: remoteIps, isLoading: loadingRemoteIps } = useRemoteIps();
+  const { data: ipVersions, isLoading: loadingIpVersions } = useIpVersions();
+  const { data: macBandwidth, isLoading: loadingMacBandwidth } = useMacBandwidth();
 
   // Flow Profiles Tab
-  const { data: flowTypes, isLoading: loadingFlowTypes } = useFlowTypes(20);
-  const { data: flowOrigins, isLoading: loadingFlowOrigins } = useFlowOrigins(20);
+  const { data: flowTypes, isLoading: loadingFlowTypes } = useFlowTypes();
+  const { data: flowOrigins, isLoading: loadingFlowOrigins } = useFlowOrigins();
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0 || !bytes) return "0 B";
@@ -43,9 +47,9 @@ export default function NetworkInfrastructurePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Network Infrastructure</h1>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Network Topology</h1>
           <p className="text-slate-400 mt-2">Physical, logical, and geographic network topologies.</p>
         </div>
         <HelpTrigger pageId="network-infrastructure" />

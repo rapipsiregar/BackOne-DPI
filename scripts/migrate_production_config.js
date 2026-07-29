@@ -1,4 +1,7 @@
 // scripts/migrate_production_config.js
+if (typeof globalThis.crypto === 'undefined') {
+  globalThis.crypto = require('crypto');
+}
 const { MongoClient } = require('mongodb');
 const path = require('path');
 

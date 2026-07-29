@@ -19,6 +19,7 @@ function EventsContent() {
   const [mounted, setMounted] = useState(false);
   const [selectedIp, setSelectedIp] = useState<string | null>(null);
   const [selectedMac, setSelectedMac] = useState<string | null>(null);
+  const { data, isLoading } = useEvents();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
 
@@ -27,9 +28,6 @@ function EventsContent() {
     handleFilterChange, setDateFrom, setDateTo, 
     handleReset, activeCount 
   } = useUniversalFilterState();
-
-  // Pass dateFrom/dateTo so the backend filters by the exact calendar date range
-  const { data, isLoading } = useEvents(0, dateFrom, dateTo);
 
   useEffect(() => {
     setMounted(true);
@@ -65,10 +63,14 @@ function EventsContent() {
     return true;
   });
 
-  // Use the data retention window (7 days) as the minimum selectable date.
-  // Dynamic computation from loaded data causes a circular dependency where
-  // the sidebar time filter (e.g., Last 24h) restricts the date picker range.
-  const minDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const minTime = all.reduce((min: number, r: any) => {
+    if (r.timestamp) {
+      const time = new Date(r.timestamp).getTime();
+      if (isFinite(time) && time < min) return time;
+    }
+    return min;
+  }, Infinity);
+  const minDate = minTime !== Infinity ? new Date(minTime).toISOString().slice(0, 10) : "2024-01-01";
 
   const getSeverityIcon = (severity: string) => {
     switch (severity.toLowerCase()) {
@@ -84,11 +86,11 @@ function EventsContent() {
   };
 
   const columns: Column<typeof data[0]>[] = [
-    { header: "#", accessor: (row, i) => i + 1, className: "w-[60px] min-w-[60px] max-w-[60px]" },
+    { header: "#", accessor: (row, i) => i + 1, className: "w-[4%] text-center" },
     {
       header: "Timestamp (WIB)",
       accessor: (row) => <TimestampCell timestamp={row.timestamp} showActiveStatus={false} />,
-      className: "w-[180px] min-w-[180px] max-w-[180px]"
+      className: "w-[15%] text-center"
     },
     {
       header: "Severity",
@@ -98,32 +100,32 @@ function EventsContent() {
           <span className="capitalize">{row.severity}</span>
         </div>
       ),
-      className: "w-[120px] min-w-[120px] max-w-[120px]"
+      className: "w-[10%] text-center"
     },
-    { header: "Event Type", accessor: (row) => row.event_type, className: "w-[130px] min-w-[130px] max-w-[130px]" },
+    { header: "Event Type", accessor: (row) => row.event_type, className: "w-[12%] text-center" },
     {
       header: "MAC Address",
       accessor: (row) => row.mac_address ? (
         <button
           onClick={() => setSelectedMac(row.mac_address)}
-          className="font-mono text-xs text-emerald-400 hover:text-emerald-300 hover:underline text-center w-full focus:outline-none"
+          className="font-mono text-xs text-emerald-400 hover:text-emerald-300 hover:underline text-center w-full focus:outline-none truncate"
         >
           {row.mac_address}
         </button>
       ) : <span className="text-slate-500">-</span>,
-      className: "w-[160px] min-w-[160px] max-w-[160px]"
+      className: "w-[14%] text-center"
     },
     {
       header: "Source IP",
       accessor: (row) => row.source_ip ? (
         <button
           onClick={() => setSelectedIp(row.source_ip)}
-          className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs text-center w-full focus:outline-none"
+          className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs text-center w-full focus:outline-none truncate"
         >
           {row.source_ip}
         </button>
       ) : <span className="text-slate-500">-</span>,
-      className: "w-[140px] min-w-[140px] max-w-[140px]"
+      className: "w-[12%] text-center"
     },
     {
       header: "Message",
@@ -150,13 +152,13 @@ function EventsContent() {
           </div>
         );
       },
-      className: "text-center w-full min-w-0 max-w-full"
+      className: "w-[33%] text-center"
     }
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
           Network Events
           {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
@@ -223,3 +225,4 @@ export default function EventsPage() {
     </Suspense>
   );
 }
+export { EventsContent };

@@ -1,0 +1,159 @@
+:root {
+  /* Premium Dark Theme */
+  --background: #09090b;
+  /* Very dark zinc */
+  --foreground: #fafafa;
+
+  --card: rgba(24, 24, 27, 0.7);
+  /* Zinc 900 with transparency for glassmorphism */
+  --card-foreground: #fafafa;
+
+  --border: rgba(255, 255, 255, 0.1);
+
+  --primary: #3b82f6;
+  /* Blue 500 */
+  --primary-foreground: #ffffff;
+
+  --secondary: rgba(39, 39, 42, 0.8);
+  /* Zinc 800 */
+  --secondary-foreground: #fafafa;
+
+  --muted: rgba(39, 39, 42, 0.5);
+  --muted-foreground: #a1a1aa;
+  /* Zinc 400 */
+
+  --destructive: #ef4444;
+  /* Red 500 */
+  --destructive-foreground: #ffffff;
+
+  --sidebar: #09090b;
+
+  /* Overrides for hardcoded colors in Dark Mode (Normal) */
+  --t-white: #ffffff;
+  --t-black: #000000;
+  --slate-900: #0f172a;
+  --slate-800: #1e293b;
+  --slate-700: #334155;
+  --slate-600: #475569;
+  --slate-500: #64748b;
+  --slate-400: #94a3b8;
+  --slate-300: #cbd5e1;
+  --slate-200: #e2e8f0;
+  --slate-100: #f1f5f9;
+  --slate-50: #f8fafc;
+}
+
+.light {
+  /* Clean Light Theme */
+  --background: #f1f5f9;
+  /* Slate 100 */
+  --foreground: #0f172a;
+
+  --card: rgba(255, 255, 255, 0.9);
+  --card-foreground: #0f172a;
+
+  --border: rgba(0, 0, 0, 0.1);
+
+  --primary: #2563eb;
+  /* Blue 600 */
+  --primary-foreground: #ffffff;
+
+  --secondary: rgba(241, 245, 249, 0.8);
+  /* Slate 100 */
+  --secondary-foreground: #0f172a;
+
+  --muted: rgba(226, 232, 240, 0.5);
+  /* Slate 200 */
+  --muted-foreground: #64748b;
+  /* Slate 500 */
+
+  --sidebar: #ffffff;
+
+  /* Overrides for hardcoded colors in Light Mode (Inverted) */
+  --t-white: #0f172a;
+  /* Make text-white become very dark slate */
+  --t-black: #ffffff;
+  --slate-900: #ffffff;
+  --slate-800: #f8fafc;
+  --slate-700: #f1f5f9;
+  --slate-600: #e2e8f0;
+  --slate-500: #cbd5e1;
+  --slate-400: #64748b;
+  /* Keep 400 slightly dark so it stays readable */
+  --slate-300: #475569;
+  --slate-200: #334155;
+  --slate-100: #1e293b;
+  --slate-50: #0f172a;
+
+  /* Enhance contrast for colored text and backgrounds in Light Mode */
+
+  /* RED */
+  --color-red-300: #b91c1c;
+  /* red-700 */
+  --color-red-400: #dc2626;
+  /* red-600 */
+  --color-red-500: #b91c1c;
+  /* red-700 */
+  --color-red-950: #ef4444;
+  /* red-500 (so that 950/20 becomes a visible pink bg) */
+
+  /* ORANGE */
+  --color-orange-300: #c2410c;
+  /* orange-700 */
+  --color-orange-400: #ea580c;
+  /* orange-600 */
+  --color-orange-500: #c2410c;
+  /* orange-700 */
+  --color-orange-950: #f97316;
+  /* orange-500 */
+
+  /* YELLOW */
+  --color-yellow-300: #a16207;
+  /* yellow-700 */
+  --color-yellow-400: #ca8a04;
+  /* yellow-600 */
+  --color-yellow-500: #a16207;
+  /* yellow-700 */
+  --color-yellow-950: #eab308;
+  /* yellow-500 */
+
+  /* GREEN */
+  --color-green-300: #15803d;
+  /* green-700 */
+  --color-green-400: #16a34a;
+  /* green-600 */
+  --color-green-500: #15803d;
+  /* green-700 */
+  --color-green-950: #22c55e;
+  /* green-500 */
+
+  /* EMERALD */
+  --color-emerald-300: #047857;
+  /* emerald-700 */
+  --color-emerald-400: #059669;
+  /* emerald-600 */
+  --color-emerald-500: #047857;
+  /* emerald-700 */
+  --color-emerald-950: #10b981;
+  /* emerald-500 */
+
+  /* BLUE */
+  --color-blue-300: #1d4ed8;
+  /* blue-700 */
+  --color-blue-400: #2563eb;
+  /* blue-600 */
+  --color-blue-500: #1d4ed8;
+  /* blue-700 */
+  --color-blue-950: #3b82f6;
+  /* blue-500 */
+
+  /* PURPLE */
+  --color-purple-300: #7e22ce;
+  /* purple-700 */
+  --color-purple-400: #9333ea;
+  /* purple-600 */
+  --color-purple-500: #7e22ce;
+  /* purple-700 */
+  --color-purple-950: #a855f7;
+  /* purple-500 */
+}
