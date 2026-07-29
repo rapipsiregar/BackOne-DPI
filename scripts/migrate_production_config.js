@@ -6,7 +6,7 @@ const { MongoClient } = require('mongodb');
 const path = require('path');
 
 const LOCAL_URI = 'mongodb://127.0.0.1:27017';
-const REMOTE_URI = 'mongodb://backone_user:SusuKudaLiar@mongodb.prod.proit.id:27017/backone_dpi?authSource=backone_dpi';
+const REMOTE_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
 const DB_NAME = 'backone_dpi';
 
 async function migrate() {

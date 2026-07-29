@@ -3,10 +3,10 @@ const net = require('net');
 const { MongoClient } = require('mongodb');
 
 const sshConfig = {
-  host: '103.185.47.52',
-  port: 2222,
-  username: 'adminbackend',
-  password: 'htEo7x6LsBQiEHHH',
+  host: process.env.SSH_HOST || '127.0.0.1',
+  port: parseInt(process.env.SSH_PORT || '2222'),
+  username: process.env.SSH_USER || 'adminbackend',
+  password: process.env.SSH_PASSWORD || '',
   readyTimeout: 60000
 };
 
@@ -36,7 +36,7 @@ conn.on('ready', () => {
   server.listen(LOCAL_PORT, '127.0.0.1', async () => {
     console.log(`SSH Tunnel established on port ${LOCAL_PORT}`);
     try {
-      const REMOTE_URI = `mongodb://backone_user:SusuKudaLiar@127.0.0.1:${LOCAL_PORT}/backone_dpi?authSource=backone_dpi`;
+      const REMOTE_URI = process.env.MONGODB_URI || `mongodb://backone_user:password@127.0.0.1:${LOCAL_PORT}/backone_dpi?authSource=backone_dpi`;
       const client = new MongoClient(REMOTE_URI, { serverSelectionTimeoutMS: 5000 });
       await client.connect();
       const db = client.db('backone_dpi');

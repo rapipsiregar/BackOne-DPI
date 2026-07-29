@@ -1,7 +1,7 @@
 // test/get_db_date_range.js
 const mongoose = require('mongoose');
 
-const MONGODB_URI = 'mongodb://backone_user:SusuKudaLiar@mongodb.prod.proit.id:27017/backone_dpi?authSource=backone_dpi';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
 
 async function main() {
   try {

@@ -65,19 +65,19 @@ export default function NetworkIntelligencePage() {
   }
 
   const appCols: Column<AppCategoryStat>[] = [
-    { header: "#", accessor: (row, i) => i + 1, className: "w-[60px] min-w-[60px] max-w-[60px]" },
+    { header: "#", accessor: (row, i) => i + 1, className: "w-[10%] text-center" },
     { 
       header: "Category", 
       accessor: (row) => (
-        <div title={row.category_label || '-'} className="font-semibold text-white truncate w-full block text-center cursor-help">
+        <div title={row.category_label || '-'} className="font-semibold text-white truncate w-full block text-center cursor-help animate-pulse-subtle">
           <span className="border-b border-dashed border-white/30 pb-0.5">{row.category_label || '-'}</span>
         </div>
       ),
-      className: "w-[180px] min-w-[180px] max-w-[180px]"
+      className: "w-[35%] text-center"
     },
-    { header: "Download", accessor: (row) => <span className="text-cyan-400">{fmtBytes(row.download)}</span>, className: "w-[120px] min-w-[120px] max-w-[120px]" },
-    { header: "Upload", accessor: (row) => <span className="text-green-400">{fmtBytes(row.upload)}</span>, className: "w-[120px] min-w-[120px] max-w-[120px]" },
-    { header: "Total", accessor: (row) => fmtBytes(row.total), className: "w-[120px] min-w-[120px] max-w-[120px]" },
+    { header: "Download", accessor: (row) => <span className="text-cyan-400">{fmtBytes(row.download)}</span>, className: "w-[18%] text-center" },
+    { header: "Upload", accessor: (row) => <span className="text-green-400">{fmtBytes(row.upload)}</span>, className: "w-[18%] text-center" },
+    { header: "Total", accessor: (row) => fmtBytes(row.total), className: "w-[19%] text-center" },
   ];
 
   const isLoading = appCategories.isLoading || continents.isLoading;

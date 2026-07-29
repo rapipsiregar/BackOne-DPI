@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Server, Activity, Globe, Radio,
   ShieldAlert, Shield, AppWindow, Search, Router,
-  PieChart, Database, Network, Zap
+  PieChart, Database, Network, Zap, Tag, Users
 } from "lucide-react";
 
 export const NAVIGATION_GROUPS = [
@@ -17,6 +17,8 @@ export const NAVIGATION_GROUPS = [
       { name: "Network Topology", href: "/network-infrastructure", icon: Network },
       { name: "Agents", href: "/agents", icon: Server },
       { name: "Devices", href: "/devices", icon: Router },
+      { name: "Device Labeling", href: "/device-labeling", icon: Tag },
+      { name: "User Account", href: "/user-accounts", icon: Users },
     ]
   },
   {

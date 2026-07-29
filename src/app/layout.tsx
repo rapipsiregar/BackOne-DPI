@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ViewportScaler } from "@/components/layout/ViewportScaler";
 import "./globals.css";
 
 // Inter font — local variable font file, matches demoplace.my.id
@@ -43,6 +44,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <ViewportScaler />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

@@ -37,6 +37,7 @@ function getBaseFilter(req, timeFilter = null) {
   const requestedSiteUuid = req.headers['x-backone-site-uuid'];
   
   const isGlobalUser = req.user?.role === 'SUPER_ADMIN' ||
+    req.user?.role === 'EXECUTIVE' ||
     ((!req.user?.site_uuid || req.user?.site_uuid === 'default') && ['SOC_ANALYST', 'ENGINEER'].includes(req.user?.role));
   
   if (isGlobalUser && requestedSiteUuid) {
@@ -45,7 +46,10 @@ function getBaseFilter(req, timeFilter = null) {
     filter.site_uuid = req.user.site_uuid;
   }
 
-  if (req.user?.role === 'AGENT_VIEWER' && req.user?.agent_uuid) {
+  // Company-based roles: restrict to their assigned list of agents
+  if (req.user?.role && ['COMPANY_ADMIN', 'COMPANY_OPERATOR', 'COMPANY_VIEWER'].includes(req.user.role)) {
+    filter.agent_uuid = { $in: req.user.agent_uuids || [] };
+  } else if (req.user?.role === 'AGENT_VIEWER' && req.user?.agent_uuid) {
     filter.agent_uuid = req.user.agent_uuid;
   } else if (req.query?.agent_uuid) {
     filter.agent_uuid = req.query.agent_uuid;

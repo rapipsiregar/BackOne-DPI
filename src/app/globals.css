@@ -2,9 +2,19 @@
 @import "./theme.css";
 @import "./variables.css";
 
+/* ── Zero Horizontal Scrollbar – Global Enforcement ── */
+/* Per AGENTS.md §9: horizontal scrollbar strictly prohibited at any level. */
+html {
+  overflow-x: hidden;
+}
+
 body {
-  /* Use Georgia font style globally */
-  font-family: Georgia, serif, var(--font-sans);
+  overflow-x: hidden;
+  width: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
   color: var(--foreground);
   /* Optical sizing + smoothing */
   font-optical-sizing: auto;

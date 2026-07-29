@@ -1,7 +1,7 @@
 // test/check_prod_after_migration.js
 const { MongoClient } = require('mongodb');
 
-const REMOTE_URI = 'mongodb://backone_user:SusuKudaLiar@mongodb.prod.proit.id:27017/backone_dpi?authSource=backone_dpi';
+const REMOTE_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
 const DB_NAME = 'backone_dpi';
 
 async function main() {

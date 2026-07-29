@@ -110,7 +110,7 @@ export function drawMarkers(
         padding:4px 10px 4px 8px; border-radius:8px; white-space:nowrap;
         background:rgba(10,18,36,0.93); border:1.5px solid ${colorL};
         color:${colorL}; font-size:11px; font-weight:700;
-        font-family:Georgia,serif; letter-spacing:0.02em;
+        font-family:var(--font-sans),sans-serif; letter-spacing:0.02em;
         box-shadow:0 0 10px ${color}55, 0 2px 12px rgba(0,0,0,0.7);
         display:flex; align-items:center; gap:6px;">
         <span style="width:7px;height:7px;border-radius:50%;background:${color};
@@ -133,13 +133,13 @@ export function drawMarkers(
         ? `<button id="el-${pin.agent_uuid.replace(/\W/g, "")}"
            style="margin-top:10px;width:100%;padding:6px;background:rgba(99,102,241,0.15);
                   border:1px solid rgba(99,102,241,0.35);border-radius:8px;color:#818cf8;
-                  font-size:11px;font-weight:700;cursor:pointer;font-family:Georgia,serif;"
+                   font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font-sans),sans-serif;"
            onmouseover="this.style.background='rgba(99,102,241,0.3)'"
            onmouseout="this.style.background='rgba(99,102,241,0.15)'">✎ Update Location</button>`
         : "";
 
     marker.bindPopup(
-      `<div style="background:#0d1526;border:1px solid ${colorL}44;border-radius:14px;padding:14px 16px;min-width:200px;font-family:Georgia,serif;box-shadow:0 20px 60px rgba(0,0,0,0.85);">
+      `<div style="background:#0d1526;border:1px solid ${colorL}44;border-radius:14px;padding:14px 16px;min-width:200px;font-family:var(--font-sans),sans-serif;box-shadow:0 20px 60px rgba(0,0,0,0.85);">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="width:9px;height:9px;border-radius:50%;background:${color};${
         online ? `box-shadow:0 0 8px ${color};` : ""

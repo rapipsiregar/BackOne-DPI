@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, Download, ChevronDown, FileText, FileSpreadsheet } from "lucide-react";
 import { CsvExportOptions, downloadCsv } from "./DataTableCsvHelper";
+import { DataTablePagination } from "./DataTablePagination";
 
 export interface Column<T> {
   header: React.ReactNode;
@@ -53,12 +54,9 @@ export function DataTable<T>({
   const activePage = serverSide ? currentPage : localCurrentPage;
   const setActivePage = serverSide ? (onPageChange || (() => {})) : setLocalCurrentPage;
 
-  const handleSort = (columnIndex: number) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === columnIndex && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key: columnIndex, direction });
+  const handleSort = (key: number) => {
+    const direction = sortConfig?.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc';
+    setSortConfig({ key, direction });
   };
 
   let processedData = [...data];
@@ -71,14 +69,12 @@ export function DataTable<T>({
     const column = columns[sortConfig.key];
     if (column && column.sortable && column.sortAccessor) {
       processedData.sort((a, b) => {
-        const valA = column.sortAccessor!(a);
-        const valB = column.sortAccessor!(b);
+        const valA = column.sortAccessor!(a), valB = column.sortAccessor!(b);
         if (valA === valB) return 0;
-        if (valA === null || valA === undefined) return 1;
-        if (valB === null || valB === undefined) return -1;
-        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
+        if (valA == null) return 1;
+        if (valB == null) return -1;
+        const asc = sortConfig.direction === 'asc';
+        return valA < valB ? (asc ? -1 : 1) : (asc ? 1 : -1);
       });
     }
   }
@@ -94,22 +90,14 @@ export function DataTable<T>({
   const exportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
-        setExportOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    const onClick = (e: MouseEvent) => exportRef.current && !exportRef.current.contains(e.target as Node) && setExportOpen(false);
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
   const handleCsvExport = () => {
     if (!csvExport) return;
-    const rows = [
-      csvExport.headers,
-      ...filteredData.map(row => csvExport.rowSerializer(row)),
-    ];
-    downloadCsv(csvExport.filename, rows);
+    downloadCsv(csvExport.filename, [csvExport.headers, ...filteredData.map(csvExport.rowSerializer)]);
     setExportOpen(false);
   };
 
@@ -179,7 +167,7 @@ export function DataTable<T>({
                     <th 
                       key={i} 
                       onClick={() => col.sortable && handleSort(i)}
-                      className={`px-4 py-3.5 h-[48px] font-medium tracking-wide whitespace-nowrap text-center ${col.className || ""} ${col.sortable ? "cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors group select-none" : ""}`}
+                      className={`px-4 py-3.5 h-[48px] font-medium tracking-wide text-center ${col.className || ""} ${col.sortable ? "cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors group select-none" : ""}`}
                       style={widthStyle}
                     >
                       <div className="flex items-center gap-1 justify-center">
@@ -238,7 +226,7 @@ export function DataTable<T>({
                       return (
                         <td 
                           key={j} 
-                          className={`px-2 py-3 h-[48px] max-h-[48px] overflow-hidden text-foreground text-center transition-colors truncate whitespace-nowrap ${col.className || ""}`}
+                          className={`px-2 py-3 h-[48px] max-h-[48px] overflow-hidden text-foreground text-center transition-colors ${col.className || ""}`}
                           style={widthStyle}
                           title={tooltipText}
                         >
@@ -253,36 +241,13 @@ export function DataTable<T>({
           </table>
         </div>
 
-        {totalItems > pageSize && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border/50 bg-card/30">
-            <div className="text-sm text-muted-foreground">
-              Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
-              <span className="font-medium text-foreground">
-                {Math.min(startIndex + pageSize, totalItems)}
-              </span>{" "}
-              of <span className="font-medium text-foreground">{totalItems}</span> results
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setActivePage(Math.max(1, activePage - 1))}
-                disabled={activePage === 1}
-                className="px-3 py-1.5 text-sm font-medium rounded-md bg-secondary/80 text-foreground hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-border/50"
-              >
-                Previous
-              </button>
-              <div className="text-sm text-muted-foreground font-medium px-2">
-                Page {activePage} of {totalPages}
-              </div>
-              <button
-                onClick={() => setActivePage(Math.min(totalPages, activePage + 1))}
-                disabled={activePage === totalPages}
-                className="px-3 py-1.5 text-sm font-medium rounded-md bg-secondary/80 text-foreground hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-border/50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+        <DataTablePagination
+          totalItems={totalItems}
+          pageSize={pageSize}
+          currentPage={activePage}
+          totalPages={totalPages}
+          onPageChange={setActivePage}
+        />
       </div>
     </div>
   );

@@ -61,7 +61,7 @@ async function run() {
         site_uuid: '6681452d_9cae_4ff4_8ae8_0d504774265e',
         brand_name: 'SIAB',
         brand_logo: '/siab-logo.png',
-        footer_copyright: 'PT. SIAB Indonesia',
+        footer_copyright: 'PT. Data Bisnis Solusi',
         primary_color: '#3B82F6',
       },
       {
@@ -74,13 +74,8 @@ async function run() {
     ];
 
     for (const config of defaultConfigs) {
-      const existing = await TenantConfig.findOne({ site_uuid: config.site_uuid });
-      if (!existing) {
-        await TenantConfig.create(config);
-        console.log(`✓ Seeded TenantConfig for: ${config.brand_name}`);
-      } else {
-        console.log(`TenantConfig for ${config.brand_name} already exists`);
-      }
+      await TenantConfig.findOneAndUpdate({ site_uuid: config.site_uuid }, config, { upsert: true });
+      console.log(`✓ Seeded/Updated TenantConfig for: ${config.brand_name}`);
     }
 
     // Seed default agent locations

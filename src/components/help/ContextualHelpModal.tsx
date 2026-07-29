@@ -150,9 +150,6 @@ export function ContextualHelpModal({ pageId, isOpen, onClose }: ContextualHelpM
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-bold text-white">Guide: {guide.title}</h3>
-                    <code className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-white/5 text-slate-400 border border-white/5">
-                      {guide.url}
-                    </code>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">Metric columns and data layout guide</p>
                 </div>

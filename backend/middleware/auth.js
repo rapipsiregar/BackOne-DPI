@@ -26,17 +26,32 @@ async function requireAuth(req, res, next) {
 
     // ── VIEW-AS MODE ──────────────────────────────────────────────────────────
     const viewAsHeader = req.headers['x-view-as-agent'];
-    if (viewAsHeader && (req.user.role === 'SUPER_ADMIN' || req.user.role === 'TENANT_ADMIN')) {
+    const isAllowedViewAs = req.user.role === 'SUPER_ADMIN' || 
+      req.user.role === 'TENANT_ADMIN' || 
+      req.user.role === 'COMPANY_ADMIN' || 
+      req.user.role === 'COMPANY_OPERATOR';
+
+    if (viewAsHeader && isAllowedViewAs) {
       try {
         const viewDecoded = jwt.verify(viewAsHeader, JWT_SECRET);
         if (viewDecoded.type === 'view-as' && viewDecoded.adminId === req.user.id && viewDecoded.viewAs) {
-          const targetAgentUser = await User.findOne({ agent_uuid: viewDecoded.viewAs, role: 'AGENT_VIEWER' }).lean();
+          const targetAgent = viewDecoded.viewAs;
+
+          // Validation: COMPANY_ADMIN and COMPANY_OPERATOR can only view-as their assigned agents
+          if (['COMPANY_ADMIN', 'COMPANY_OPERATOR'].includes(req.user.role)) {
+            const hasAccess = req.user.agent_uuids && req.user.agent_uuids.includes(targetAgent);
+            if (!hasAccess) {
+              throw new Error('Unauthorized view-as agent access');
+            }
+          }
+
+          const targetAgentUser = await User.findOne({ agent_uuid: targetAgent, role: 'AGENT_VIEWER' }).lean();
           
           let targetSiteUuid = req.user.site_uuid;
           if (targetAgentUser && targetAgentUser.site_uuid) {
             targetSiteUuid = targetAgentUser.site_uuid;
           } else {
-            const summaryDoc = await Summary.findOne({ agent_uuid: viewDecoded.viewAs }).lean();
+            const summaryDoc = await Summary.findOne({ agent_uuid: targetAgent }).lean();
             if (summaryDoc && summaryDoc.site_uuid) {
               targetSiteUuid = summaryDoc.site_uuid;
             }
@@ -45,7 +60,7 @@ async function requireAuth(req, res, next) {
           req.user = {
             ...req.user,
             role:          'AGENT_VIEWER',
-            agent_uuid:    viewDecoded.viewAs,
+            agent_uuid:    targetAgent,
             agent_label:   viewDecoded.viewAsLabel,
             site_uuid:     targetSiteUuid,
             _viewAsMode:   true,
@@ -80,7 +95,8 @@ async function requireAdmin(req, res, next) {
       await activeSession.save();
     }
 
-    if (decoded.role !== 'SUPER_ADMIN' && decoded.role !== 'TENANT_ADMIN' && decoded.role !== 'SOC_ANALYST') {
+    const validAdminRoles = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'COMPANY_OPERATOR', 'TENANT_ADMIN', 'SOC_ANALYST'];
+    if (!validAdminRoles.includes(decoded.role)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     req.adminUser = decoded;

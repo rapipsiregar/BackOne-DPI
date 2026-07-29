@@ -90,13 +90,18 @@ export default function AgentsPage() {
   const uptimeValues = agents.map(a => uptimeMap[a.uuid || a.serial] ?? 100);
   const avgUptime = uptimeValues.length > 0 ? uptimeValues.reduce((s, v) => s + v, 0) / uptimeValues.length : 100;
 
-  const externalUsers = managedUsers.filter(u => u.role !== 'AGENT_VIEWER');
-  const superadminUsers = externalUsers.filter(u => u.role === 'SUPER_ADMIN' || !u.site_uuid);
-  const siabUsers = externalUsers.filter(u => u.site_uuid === '6681452d_9cae_4ff4_8ae8_0d504774265e');
-  const nexusUsers = externalUsers.filter(u => u.site_uuid === 'd7902405_0dc2_458b_8584_ed4d24b64f24');
+  // External Accounts di halaman Agents = akun eksternal teknikal/operasional saja
+  // AGENT_VIEWER = akun network agent (sudah ada di tabel agents) → BUKAN akun eksternal
+  // COMPANY_* = akun customer/client → sudah ada di halaman User Accounts
+  const EXCLUDED_ROLES = ['COMPANY_ADMIN', 'COMPANY_OPERATOR', 'COMPANY_VIEWER', 'AGENT_VIEWER'];
+  const externalUsers = managedUsers.filter(u => !EXCLUDED_ROLES.includes(u.role || ''));
+  // Grouping by site — semua sudah dipastikan hanya SUPER_ADMIN, EXECUTIVE, TENANT_ADMIN, SOC_ANALYST, ENGINEER
+  const superadminUsers = externalUsers.filter(u => u.role === 'SUPER_ADMIN' || u.role === 'EXECUTIVE' || !u.site_uuid || u.site_uuid === 'default');
+  const siabUsers = externalUsers.filter(u => u.site_uuid === '6681452d_9cae_4ff4_8ae8_0d504774265e' && u.role !== 'SUPER_ADMIN' && u.role !== 'EXECUTIVE');
+  const nexusUsers = externalUsers.filter(u => u.site_uuid === 'd7902405_0dc2_458b_8584_ed4d24b64f24' && u.role !== 'SUPER_ADMIN' && u.role !== 'EXECUTIVE');
 
   return (
-    <div className="space-y-6" style={{ fontFamily: "Georgia, serif" }}>
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-white flex items-center gap-3">
@@ -121,8 +126,8 @@ export default function AgentsPage() {
         avgUptime={avgUptime}
       />
 
-      {/* Agent Location Map */}
-      {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
+      {/* Agent Location Map — tampil untuk SUPER_ADMIN, TENANT_ADMIN, dan COMPANY_ADMIN */}
+      {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN' || role === 'COMPANY_ADMIN') && (
         <div className="rounded-2xl border border-white/8 bg-slate-900/40 overflow-hidden relative z-0">
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/8">
             <div className="flex items-center gap-2.5">

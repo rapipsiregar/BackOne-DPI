@@ -28,7 +28,7 @@ export default function SidebarSiteSelector({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  if (!user || !['SUPER_ADMIN', 'SOC_ANALYST', 'ENGINEER'].includes(user.role || '')) {
+  if (!user || !['SUPER_ADMIN', 'EXECUTIVE', 'SOC_ANALYST', 'ENGINEER'].includes(user.role || '')) {
     return null;
   }
 

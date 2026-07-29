@@ -30,7 +30,16 @@ router.get('/agents/uptime', async (req, res) => {
     }
 
     const query = { timestamp: timeFilter };
-    if (req.user?.site_uuid) query.site_uuid = req.user.site_uuid;
+    const requestedSiteUuid = req.headers['x-backone-site-uuid'];
+    const isGlobalUser = req.user?.role === 'SUPER_ADMIN' ||
+      req.user?.role === 'EXECUTIVE' ||
+      ((!req.user?.site_uuid || req.user?.site_uuid === 'default') && ['SOC_ANALYST', 'ENGINEER'].includes(req.user?.role));
+    
+    if (isGlobalUser && requestedSiteUuid) {
+      query.site_uuid = requestedSiteUuid;
+    } else if (req.user?.site_uuid) {
+      query.site_uuid = req.user.site_uuid;
+    }
 
     const stats = await Summary.aggregate([
       { $match: query },
@@ -55,6 +64,7 @@ router.get('/agents/uptime', async (req, res) => {
 router.get('/agents', async (req, res) => {
   try {
     const isAuthorized = req.user?.role === 'SUPER_ADMIN' ||
+      req.user?.role === 'EXECUTIVE' ||
       req.user?.role === 'TENANT_ADMIN' ||
       req.user?._originalRole === 'SUPER_ADMIN' ||
       req.user?._originalRole === 'TENANT_ADMIN';
@@ -89,9 +99,41 @@ router.get('/agents/storage', async (req, res) => {
       return res.status(403).json({ ok: false, error: 'Forbidden: Admin access only' });
     }
 
+    const requestedSiteUuid = req.headers['x-backone-site-uuid'];
+    const isGlobalUser = req.user?.role === 'SUPER_ADMIN' ||
+      req.user?.role === 'EXECUTIVE' ||
+      ((!req.user?.site_uuid || req.user?.site_uuid === 'default') && ['SOC_ANALYST', 'ENGINEER'].includes(req.user?.role));
+    
+    let siteUuid = null;
+    if (isGlobalUser && requestedSiteUuid) {
+      siteUuid = requestedSiteUuid;
+    } else if (req.user?.site_uuid) {
+      siteUuid = req.user.site_uuid;
+    }
+
     const { agentSizesCache, lastCacheUpdate } = require('../../db/capacityTracker');
-    const storage  = agentSizesCache();
+    const allStorage = agentSizesCache();
     const cachedAt = lastCacheUpdate();
+
+    let storage = allStorage;
+    if (siteUuid) {
+      const registryAgents = await mongoose.connection.db.collection('agent_registry')
+        .find({ site_uuid: siteUuid })
+        .toArray();
+      const siteAgentUuids = new Set(registryAgents.map(a => a.uuid));
+
+      const summaryAgents = await Summary.distinct('agent_uuid', { site_uuid: siteUuid });
+      summaryAgents.forEach(uuid => {
+        if (uuid) siteAgentUuids.add(uuid);
+      });
+
+      storage = {};
+      Object.keys(allStorage).forEach(uuid => {
+        if (siteAgentUuids.has(uuid)) {
+          storage[uuid] = allStorage[uuid];
+        }
+      });
+    }
 
     res.json({ ok: true, storage, cached_at: cachedAt });
   } catch (err) {
@@ -99,5 +141,45 @@ router.get('/agents/storage', async (req, res) => {
   }
 });
 
+
+
+// ─── GET /api/dashboard/agents/list ──────────────────────────────────────────
+// Lightweight endpoint: kembalikan list agents (uuid + label) untuk user saat ini
+// Digunakan frontend untuk lookup label agent pada View-As banner
+router.get('/agents/list', async (req, res) => {
+  try {
+    const db = mongoose.connection.db;
+    const user = req.user;
+    
+    const companyRoles = ['COMPANY_ADMIN', 'COMPANY_OPERATOR', 'COMPANY_VIEWER'];
+    const isCompanyRole = companyRoles.includes(user?.role);
+    
+    let filter = {};
+    
+    if (isCompanyRole) {
+      // Company roles: hanya kembalikan agent yang di-assign ke user
+      const agentUuids = user?.agent_uuids || [];
+      if (agentUuids.length === 0) {
+        return res.json({ ok: true, data: [] });
+      }
+      filter.uuid = { $in: agentUuids };
+    } else {
+      // Admin/SUPER_ADMIN: filter berdasarkan site UUID dari header
+      const requestedSiteUuid = req.headers['x-backone-site-uuid'];
+      if (requestedSiteUuid) filter.site_uuid = requestedSiteUuid;
+      else if (user?.site_uuid) filter.site_uuid = user.site_uuid;
+    }
+    
+    const agents = await db.collection('agent_registry')
+      .find(filter)
+      .project({ uuid: 1, label: 1, _id: 0 })
+      .sort({ uuid: 1 })
+      .toArray();
+    
+    res.json({ ok: true, data: agents });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 module.exports = router;

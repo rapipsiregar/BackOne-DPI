@@ -4,7 +4,7 @@ const { MongoClient } = require('mongodb');
 const fs = require('fs');
 const path = require('path');
 
-const REMOTE_URI = 'mongodb://backone_user:SusuKudaLiar@103.80.237.29:27017/backone_dpi?authSource=backone_dpi';
+const REMOTE_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
 const DB_NAME = 'backone_dpi';
 const DATA_DIR = __dirname;
 

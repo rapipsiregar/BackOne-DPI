@@ -69,3 +69,7 @@ plans/
 
 # Local uploads
 backend/public/api/uploads/
+
+# Database migration temporary files
+migration-temp/
+

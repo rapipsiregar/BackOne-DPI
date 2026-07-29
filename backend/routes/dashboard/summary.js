@@ -26,7 +26,6 @@ router.get('/summary', async (req, res) => {
         .lean();
 
       if (latestAgentSummary) {
-        activeFlowsCount = latestAgentSummary.active_flows    || 0;
         downloadSpeed    = latestAgentSummary.download_speed  || 0;
         uploadSpeed      = latestAgentSummary.upload_speed    || 0;
         latestTime       = latestAgentSummary.timestamp;
@@ -35,6 +34,7 @@ router.get('/summary', async (req, res) => {
       const summaries = await Summary.find(base).lean();
       bandwidthDown = summaries.reduce((s, x) => s + (x.bandwidth_down || 0), 0);
       bandwidthUp   = summaries.reduce((s, x) => s + (x.bandwidth_up || 0), 0);
+      activeFlowsCount = summaries.reduce((s, x) => s + (x.active_flows || 0), 0);
     } else {
       // ── Site-Level Summary (default) ─────────────────────────────────────────
       const siteIds = baseWithoutTime.site_uuid
@@ -49,6 +49,7 @@ router.get('/summary', async (req, res) => {
 
       bandwidthDown = siteSummaries.reduce((s, x) => s + (x.bandwidth_down || 0), 0);
       bandwidthUp   = siteSummaries.reduce((s, x) => s + (x.bandwidth_up || 0), 0);
+      activeFlowsCount = siteSummaries.reduce((s, x) => s + (x.active_flows || 0), 0);
 
       for (const siteId of siteIds) {
         const latestSiteSummary = await Summary
@@ -57,7 +58,6 @@ router.get('/summary', async (req, res) => {
           .lean();
 
         if (latestSiteSummary) {
-          activeFlowsCount += latestSiteSummary.active_flows    || 0;
           downloadSpeed    += latestSiteSummary.download_speed  || 0;
           uploadSpeed      += latestSiteSummary.upload_speed    || 0;
           if (!latestTime || latestSiteSummary.timestamp > latestTime) {
@@ -71,25 +71,63 @@ router.get('/summary', async (req, res) => {
         const allAgentSummaries = await Summary.find(base).lean();
         bandwidthDown = allAgentSummaries.reduce((s, r) => s + (r.bandwidth_down || 0), 0);
         bandwidthUp   = allAgentSummaries.reduce((s, r) => s + (r.bandwidth_up || 0), 0);
+        activeFlowsCount = allAgentSummaries.reduce((s, r) => s + (r.active_flows || 0), 0);
 
         const latestAgentDoc = await Summary.findOne(baseWithoutTime).sort({ timestamp: -1 }).lean();
         if (latestAgentDoc) {
           latestTime = latestAgentDoc.timestamp;
           const agentSummaries = await Summary.find({ ...baseWithoutTime, timestamp: latestAgentDoc.timestamp }).lean();
-          activeFlowsCount = agentSummaries.reduce((s, r) => s + (r.active_flows ?? 0), 0);
           downloadSpeed    = agentSummaries.reduce((s, r) => s + (r.download_speed ?? 0), 0);
           uploadSpeed      = agentSummaries.reduce((s, r) => s + (r.upload_speed ?? 0), 0);
         }
       }
     }
 
-    // Device count, Threats, Events — always use the scoped base filter
+    // Fallback: if bandwidth is still 0, aggregate from AppCategoryStat or Flow
+    if (bandwidthDown === 0 && bandwidthUp === 0) {
+      const { AppCategoryStat } = require('../../models/Schemas');
+      const cats = await AppCategoryStat.find(base).lean();
+      if (cats.length > 0) {
+        bandwidthDown = cats.reduce((s, x) => s + (x.download || 0), 0);
+        bandwidthUp   = cats.reduce((s, x) => s + (x.upload || 0), 0);
+      } else {
+        const flows = await Flow.find(base).select('download upload').lean();
+        bandwidthDown = flows.reduce((s, x) => s + (x.download || 0), 0);
+        bandwidthUp   = flows.reduce((s, x) => s + (x.upload || 0), 0);
+      }
+    }
+
+    // Device count, Threats, Events, Flows — always use the scoped base filter
     // (already contains agent_uuid when in AGENT_VIEWER mode)
-    const [uniqueDevices, realThreatsCount, realEventsCount] = await Promise.all([
+    let [uniqueDevices, realThreatsCount, realEventsCount, realFlowsCount] = await Promise.all([
       DeviceStat.distinct('ip_address', base).then(r => r.length),
       Threat.countDocuments(base),
       Event.countDocuments(base),
+      Flow.countDocuments(base),
     ]);
+
+    if (uniqueDevices === 0) {
+      uniqueDevices = await Flow.distinct('src_ip', base).then(r => r.length);
+    }
+
+    // Fall back to critical/cybersecurity events if no real threats exist (aligned with threats route)
+    if (realThreatsCount === 0) {
+      const baseEventFilter = {};
+      if (base.agent_uuid) baseEventFilter.agent_uuid = base.agent_uuid;
+      if (base.site_uuid)  baseEventFilter.site_uuid  = base.site_uuid;
+      if (timeFilter) {
+        baseEventFilter.$and = [
+          { $or: [{ event_at: timeFilter }, { timestamp: timeFilter }] }
+        ];
+      }
+      realThreatsCount = await Event.countDocuments({
+        ...baseEventFilter,
+        $or: [
+          { severity: { $in: ['Critical', 'High'] } },
+          { category_label: 'Cybersecurity' }
+        ]
+      });
+    }
 
     res.json({
       ok: true,
@@ -100,7 +138,7 @@ router.get('/summary', async (req, res) => {
         last_fetch:     latestTime || new Date(),
         bandwidth_down: bandwidthDown,
         bandwidth_up:   bandwidthUp,
-        active_flows:   activeFlowsCount,
+        active_flows:   realFlowsCount,
         download_speed: downloadSpeed,
         upload_speed:   uploadSpeed,
         flow_speed:     0,

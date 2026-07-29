@@ -101,6 +101,7 @@ export default function AgentsPageModals({
         user={externalModalUser}
         targetSiteUuid={targetSiteUuid}
         targetCreatedBy={targetCreatedBy}
+        modalContext="agents"
       />
 
       <AgentLocationModal

@@ -24,7 +24,24 @@ router.get('/apps', async (req, res) => {
       { $limit: limit }
     ];
 
-    const result = await AppStat.aggregate(pipeline);
+    let result = await AppStat.aggregate(pipeline);
+
+    // Fallback: if no AppStat records exist, aggregate from Flow
+    if (result.length === 0) {
+      const { Flow } = require('../../models/Schemas');
+      const flowPipeline = [
+        { $match: { ...base, app_label: { $ne: null, $ne: '' } } },
+        { $group: {
+            _id:      '$app_label',
+            download: { $sum: '$download' },
+            upload:   { $sum: '$upload' },
+            flows:    { $sum: 1 },
+        }},
+        { $sort: { download: -1 } },
+        { $limit: limit }
+      ];
+      result = await Flow.aggregate(flowPipeline);
+    }
     
     // Fetch lookup metadata (category and favicon) to enrich apps list
     const labels = result.map(r => r._id);
@@ -69,7 +86,23 @@ router.get('/protocols', async (req, res) => {
       { $sort: { download: -1 } }
     ];
 
-    const result = await ProtocolStat.aggregate(pipeline);
+    let result = await ProtocolStat.aggregate(pipeline);
+
+    // Fallback: if no ProtocolStat records exist, aggregate from Flow
+    if (result.length === 0) {
+      const { Flow } = require('../../models/Schemas');
+      const flowPipeline = [
+        { $match: { ...base, protocol: { $ne: null, $ne: '' } } },
+        { $group: {
+            _id:      '$protocol',
+            download: { $sum: '$download' },
+            upload:   { $sum: '$upload' },
+            flows:    { $sum: 1 },
+        }},
+        { $sort: { download: -1 } }
+      ];
+      result = await Flow.aggregate(flowPipeline);
+    }
     const formatted = result.map(r => ({
       protocol_label: r._id,
       download:       r.download || 0,

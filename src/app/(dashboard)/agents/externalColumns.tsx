@@ -42,6 +42,7 @@ export function getExternalAccountColumns(
       accessor: (row) => {
         let badgeColor = "bg-slate-500/20 text-slate-400 border-slate-500/30";
         if (row.role === 'SUPER_ADMIN') badgeColor = "bg-purple-500/20 text-purple-400 border-purple-500/30";
+        if (row.role === 'EXECUTIVE') badgeColor = "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
         if (row.role === 'SOC_ANALYST') badgeColor = "bg-amber-500/20 text-amber-400 border-amber-500/30";
         if (row.role === 'ENGINEER') badgeColor = "bg-blue-500/20 text-blue-400 border-blue-500/30";
         if (row.role === 'TENANT_ADMIN') badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";

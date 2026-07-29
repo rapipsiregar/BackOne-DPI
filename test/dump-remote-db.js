@@ -1,10 +1,10 @@
 const { Client } = require('ssh2');
 
 const SSH = {
-  host: '103.185.47.52',
-  port: 2222,
-  username: 'adminbackend',
-  password: 'htEo7x6LsBQiEHHH',
+  host: process.env.SSH_HOST || '127.0.0.1',
+  port: parseInt(process.env.SSH_PORT || '2222'),
+  username: process.env.SSH_USER || 'adminbackend',
+  password: process.env.SSH_PASSWORD || '',
   readyTimeout: 60000
 };
 
@@ -13,7 +13,7 @@ const mongoose = require('/home/adminbackend/web/demoplace.my.id/public_html/bac
 
 async function main() {
   console.log('Remote: Requiring mongoose succeeded. Connecting...');
-  const URI = 'mongodb://backone_user:SusuKudaLiar@103.80.237.29:27017/backone_dpi?authSource=backone_dpi';
+  const URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
   try {
     await mongoose.connect(URI, {
       serverSelectionTimeoutMS: 10000,

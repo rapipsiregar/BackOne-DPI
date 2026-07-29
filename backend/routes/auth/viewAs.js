@@ -6,7 +6,7 @@ const { requireAdmin, requireAuth, JWT_SECRET } = require('./helpers');
 
 const router = express.Router();
 
-// Helper to block SOC_ANALYST from starting view-as sessions
+// Block SOC_ANALYST from starting view-as sessions; EXECUTIVE is allowed (read-only viewer)
 function blockAnalyst(req, res, next) {
   if (req.adminUser.role === 'SOC_ANALYST') {
     return res.status(403).json({ ok: false, error: 'Aksi ini tidak diizinkan untuk peran SOC Analyst' });
@@ -60,11 +60,19 @@ router.get('/admin/view-as/logs', requireAdmin, async (req, res) => {
     const ViewAsLog = mongoose.model('ViewAsLog');
     
     // Role-based visibility logic:
-    // If the requesting user is a SOC_ANALYST, filter out logs performed by a SUPER_ADMIN.
     const query = {};
     if (req.adminUser.role === 'SOC_ANALYST') {
       query.admin_role = { $ne: 'SUPER_ADMIN' };
       query.admin_username = { $ne: 'admin' };
+    } else if (req.adminUser.role === 'TENANT_ADMIN') {
+      const Summary = mongoose.model('Summary');
+      const siteAgents = await Summary.distinct('agent_uuid', { site_uuid: req.adminUser.site_uuid });
+      query.agent_uuid = { $in: siteAgents };
+      query.admin_role = { $ne: 'SUPER_ADMIN' };
+      query.admin_username = { $ne: 'admin' };
+    } else if (req.adminUser.role === 'COMPANY_ADMIN' || req.adminUser.role === 'COMPANY_OPERATOR') {
+      // COMPANY_ADMIN/OPERATOR hanya lihat log mereka sendiri
+      query.admin_id = req.adminUser.id;
     }
 
     const logs = await ViewAsLog.find(query).sort({ timestamp: -1 }).lean();

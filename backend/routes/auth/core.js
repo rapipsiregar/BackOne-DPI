@@ -129,7 +129,7 @@ router.post('/renew', requireAuth, async (req, res) => {
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────
 router.get('/me', requireAuth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id).lean();
     if (!user) return res.json({ user: req.user });
 
     const isViewAs = req.user._viewAsMode;
@@ -137,12 +137,19 @@ router.get('/me', requireAuth, async (req, res) => {
       user: {
         id: user._id.toString(),
         username: user.username,
-        account_name: isViewAs ? req.user.agent_label : user.account_name,
+        account_name: user.account_name,
         profile_picture: user.profile_picture,
-        role: isViewAs ? 'AGENT_VIEWER' : user.role,
+        // 🔑 Selalu kembalikan role ASLI dari database — frontend butuh role asli untuk navigasi dan filter
+        role: user.role,
         site_uuid: user.site_uuid,
-        agent_uuid: isViewAs ? req.user.agent_uuid : user.agent_uuid,
-        _originalRole: isViewAs ? 'SUPER_ADMIN' : undefined,
+        agent_uuid: user.agent_uuid,
+        // 🔑 agent_uuids SELALU dari database — bukan dari token (yang bisa stale/expired)
+        agent_uuids: user.agent_uuids || [],
+        company_name: user.company_name || null,
+        // Informasi view-as (jika aktif)
+        _isViewAsMode: isViewAs || false,
+        _viewAsAgentUuid: isViewAs ? req.user.agent_uuid : undefined,
+        _viewAsLabel: isViewAs ? req.user.agent_label : undefined,
         iat: req.user.iat,
         exp: req.user.exp,
       }
@@ -151,6 +158,7 @@ router.get('/me', requireAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // ─── POST /api/auth/logout ────────────────────────────────────────────────────
 router.post('/logout', requireAuth, async (req, res) => {

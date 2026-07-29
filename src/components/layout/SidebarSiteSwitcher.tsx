@@ -24,6 +24,7 @@ export function SidebarSiteSwitcher({
   getSiteLabel,
 }: SidebarSiteSwitcherProps) {
   const isGlobalUser = user?.role === 'SUPER_ADMIN' ||
+    user?.role === 'EXECUTIVE' ||
     ((!user?.site_uuid || user?.site_uuid === 'default') && ['SOC_ANALYST', 'ENGINEER'].includes(user?.role || ''));
 
   if (!user || !isGlobalUser) {

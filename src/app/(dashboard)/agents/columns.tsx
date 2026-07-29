@@ -118,6 +118,7 @@ export function getAgentColumns({
         const dynamicLabel = resolveAgentLabel(uuid, managedUsers);
         const existingUser = managedUsers.find(u => u.agent_uuid === uuid && u.role === 'AGENT_VIEWER') || null;
         const isViewAsLoading = viewAsLoading === uuid;
+        const agentLabel = dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid);
         return (
           <div className="flex items-center justify-center gap-1 mx-auto">
             <button onClick={() => setDetailAgent(row)} className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded transition-colors" title="Detail Agent">
@@ -126,7 +127,7 @@ export function getAgentColumns({
             {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
               <>
                 <button
-                  onClick={(e) => { e.stopPropagation(); setAccountModalAgent({ uuid, label: dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid) }); setAccountModalOpen(true); }}
+                  onClick={(e) => { e.stopPropagation(); setAccountModalAgent({ uuid, label: agentLabel }); setAccountModalOpen(true); }}
                   className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30 rounded transition-colors"
                   title={existingUser ? 'Edit Agent Account' : 'Create Agent Account'}
                 >
@@ -136,7 +137,7 @@ export function getAgentColumns({
                     const hasLocation = locationUuids.has(uuid);
                     return (
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleEditLocation(uuid, dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid)); }}
+                        onClick={(e) => { e.stopPropagation(); handleEditLocation(uuid, agentLabel); }}
                         className={`relative p-1 rounded transition-colors ${
                           hasLocation
                             ? "text-teal-400 hover:text-teal-300 hover:bg-teal-950/30"
@@ -152,7 +153,7 @@ export function getAgentColumns({
                     );
                   })()}
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleViewAs(uuid, dynamicLabel !== uuid ? dynamicLabel : (row.label || uuid)); }}
+                  onClick={(e) => { e.stopPropagation(); handleViewAs(uuid, agentLabel); }}
                   disabled={isViewAsLoading}
                   className="p-1 text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 rounded transition-colors disabled:opacity-50"
                   title="View As Agent"
@@ -163,6 +164,17 @@ export function getAgentColumns({
                   <Trash2 className="w-4 h-4" />
                 </button>
               </>
+            )}
+            {/* COMPANY_ADMIN dan COMPANY_OPERATOR: hanya View-As */}
+            {(role === 'COMPANY_ADMIN' || role === 'COMPANY_OPERATOR') && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleViewAs(uuid, agentLabel); }}
+                disabled={isViewAsLoading}
+                className="p-1 text-amber-400 hover:text-amber-300 hover:bg-amber-950/30 rounded transition-colors disabled:opacity-50"
+                title="View As Agent — see dashboard from this agent's perspective"
+              >
+                {isViewAsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+              </button>
             )}
           </div>
         );
@@ -177,7 +189,15 @@ export function getAgentColumns({
       accessor: (row) => {
         const uuid = row.uuid || row.serial;
         const sizeMB = storageMap[uuid] ?? 0;
-        return <span className="font-mono text-xs font-normal text-slate-300 tracking-wide">{sizeMB.toFixed(2)} MB</span>;
+        let displaySize = "";
+        if (sizeMB >= 1024 * 1024) {
+          displaySize = `${(sizeMB / (1024 * 1024)).toFixed(2)} TB`;
+        } else if (sizeMB >= 1024) {
+          displaySize = `${(sizeMB / 1024).toFixed(2)} GB`;
+        } else {
+          displaySize = `${sizeMB.toFixed(2)} MB`;
+        }
+        return <span className="font-mono text-xs font-normal text-slate-300 tracking-wide">{displaySize}</span>;
       }
     });
   }

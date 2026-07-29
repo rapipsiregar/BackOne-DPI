@@ -33,11 +33,14 @@ const LOCAL_ROOT = path.resolve(__dirname, '..');
 // Files/dirs to upload (relative to LOCAL_ROOT)
 // These are the minimum required for production deployment
 const UPLOAD_MANIFEST = [
-  // Next.js standalone build output
-  { local: '.next/standalone', remote: '.next/standalone', type: 'dir' },
+  // Next.js standalone server build output (entire .next folder with manifests and server files)
+  { local: '.next/standalone/.next', remote: '.next/standalone/.next', type: 'dir' },
+
+  // Next.js static assets and chunks (CRITICAL to prevent 404 chunk errors)
   { local: '.next/static', remote: '.next/static', type: 'dir' },
+
+  // Public assets (images, icons)
   { local: 'public', remote: 'public', type: 'dir' },
-  { local: 'public/api/uploads', remote: 'api/uploads', type: 'dir' },
 
   // Backend API server
   { local: 'backend/server.js', remote: 'backend/server.js', type: 'file' },

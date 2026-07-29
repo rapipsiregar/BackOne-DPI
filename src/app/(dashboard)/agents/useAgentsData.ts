@@ -11,6 +11,7 @@ import { usePollingKey } from "@/lib/usePolling";
 export function useAgentsData() {
   const router = useRouter();
   const [role, setRole] = useState<string | null>(null);
+  const [myAgentUuids, setMyAgentUuids] = useState<string[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [uptimeMap, setUptimeMap] = useState<Record<string, number>>({});
   const [storageMap, setStorageMap] = useState<Record<string, number>>({});
@@ -90,7 +91,7 @@ export function useAgentsData() {
     }
   };
 
-  const loadAgents = async () => {
+  const loadAgents = async (allowedUuids?: string[], currentRole?: string) => {
     setIsLoading(true);
     try {
       const siteUuid = localStorage.getItem("backone_site_uuid") || undefined;
@@ -98,8 +99,18 @@ export function useAgentsData() {
         getAgents(siteUuid),
         getAdminUsers(),
       ]);
-      if (agentData.status === 'fulfilled') setAgents(agentData.value);
-      else setError((agentData.reason as Error).message);
+      if (agentData.status === 'fulfilled') {
+        let allAgents = agentData.value;
+        // Filter agents untuk COMPANY_ADMIN dan COMPANY_OPERATOR — hanya tampilkan yang di-assign
+        const uuids = allowedUuids ?? myAgentUuids;
+        const r = currentRole ?? role;
+        if ((r === 'COMPANY_ADMIN' || r === 'COMPANY_OPERATOR') && uuids.length > 0) {
+          allAgents = allAgents.filter(a => uuids.includes(a.uuid || a.serial));
+        }
+        setAgents(allAgents);
+      } else {
+        setError((agentData.reason as Error).message);
+      }
       if (userData.status === 'fulfilled') setManagedUsers(userData.value);
       await loadUptime();
       await loadLocations();
@@ -128,11 +139,14 @@ export function useAgentsData() {
       .then(data => {
         if (data.user) {
           const userRole = data.user.role || null;
+          const uuids: string[] = data.user.agent_uuids || [];
           setRole(userRole);
-          if (userRole !== 'SUPER_ADMIN' && userRole !== 'TENANT_ADMIN') {
+          setMyAgentUuids(uuids);
+          const allowed = ['SUPER_ADMIN', 'TENANT_ADMIN', 'EXECUTIVE', 'COMPANY_ADMIN', 'COMPANY_OPERATOR'];
+          if (!allowed.includes(userRole || '')) {
             router.push('/');
           } else {
-            loadAgents();
+            loadAgents(uuids, userRole);
           }
         } else {
           setIsLoading(false);
@@ -149,7 +163,7 @@ export function useAgentsData() {
   }, [timeRange]);
 
   useEffect(() => {
-    if (role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') {
+    if (role === 'SUPER_ADMIN') {
       loadStorage();
     }
     if (role && role !== 'AGENT_VIEWER') {
@@ -159,13 +173,8 @@ export function useAgentsData() {
 
   useEffect(() => {
     if (role && role !== 'AGENT_VIEWER' && refreshKey > 0) {
-      const siteUuid = localStorage.getItem("backone_site_uuid") || undefined;
-      getAgents(siteUuid)
-        .then(data => setAgents(data))
-        .catch(err => console.warn("Failed to auto-refresh agents:", err));
-      loadUptime();
-      loadLocations();
-      if (role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') {
+      loadAgents();
+      if (role === 'SUPER_ADMIN') {
         loadStorage();
       }
     }

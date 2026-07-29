@@ -11,8 +11,50 @@ const axios   = require('axios');
 const PROXY_URL = process.env.PROXY_URL || 'http://localhost:4000';
 
 // ─── Rebranding Helper (Memory Safe & Fast) ──────────────────────────────────
-function rebrandString(str) {
+const BRAND_NAMES = {
+  'd7902405_0dc2_458b_8584_ed4d24b64f24': 'Nexus',
+  '6681452d_9cae_4ff4_8ae8_0d504774265e': 'SIAB',
+  'default': 'BackOne'
+};
+
+function getBrandNameForRequest(req) {
+  const requestedSiteUuid = req.headers['x-backone-site-uuid'];
+  const userSiteUuid = req.user?.site_uuid;
+  
+  const siteUuid = (req.user?.role === 'SUPER_ADMIN' || !userSiteUuid || userSiteUuid === 'default')
+    ? (requestedSiteUuid || 'default')
+    : userSiteUuid;
+
+  return BRAND_NAMES[siteUuid] || 'BackOne';
+}
+
+function rebrandString(str, brandName) {
   if (typeof str !== 'string') return str;
+  
+  if (brandName === 'Nexus') {
+    return str
+      .replace(/netify\.unclassified/gi, 'nexus.unclassified')
+      .replace(/netify\.(?!ai)/gi, 'nexus.')
+      .replace(/Netify's/g, "Nexus'")
+      .replace(/netify's/g, "nexus'")
+      .replace(/Netify(?!(\.ai))/g, 'Nexus')
+      .replace(/netify(?!(\.ai))/g, 'nexus')
+      .replace(/BackOne's/g, "Nexus'")
+      .replace(/backone's/g, "nexus'")
+      .replace(/BackOne/g, 'Nexus')
+      .replace(/backone/g, 'nexus')
+      .replace(/PT\.?\s*Data\s*Bisnis\s*Solusi/g, 'PT. Nexus Solusi');
+  } else if (brandName === 'SIAB') {
+    return str
+      .replace(/netify\.unclassified/gi, 'siab.unclassified')
+      .replace(/netify\.(?!ai)/gi, 'siab.')
+      .replace(/Netify's/g, "SIAB's")
+      .replace(/netify's/g, "siab's")
+      .replace(/Netify(?!(\.ai))/g, 'SIAB')
+      .replace(/netify(?!(\.ai))/g, 'siab');
+  }
+
+  // Default (BackOne)
   return str
     .replace(/netify\.unclassified/gi, 'backone.unclassified')
     .replace(/netify\.(?!ai)/gi, 'backone.')
@@ -22,12 +64,12 @@ function rebrandString(str) {
     .replace(/netify(?!(\.ai))/g, 'backone');
 }
 
-function rebrandObj(obj) {
+function rebrandObj(obj, brandName) {
   if (obj === null || obj === undefined) return obj;
 
   if (Array.isArray(obj)) {
     for (let i = 0; i < obj.length; i++) {
-      obj[i] = rebrandObj(obj[i]);
+      obj[i] = rebrandObj(obj[i], brandName);
     }
     return obj;
   }
@@ -36,9 +78,9 @@ function rebrandObj(obj) {
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
         if (typeof obj[key] === 'string') {
-          obj[key] = rebrandString(obj[key]);
+          obj[key] = rebrandString(obj[key], brandName);
         } else if (typeof obj[key] === 'object') {
-          obj[key] = rebrandObj(obj[key]);
+          obj[key] = rebrandObj(obj[key], brandName);
         }
       }
     }
@@ -46,7 +88,7 @@ function rebrandObj(obj) {
   }
 
   if (typeof obj === 'string') {
-    return rebrandString(obj);
+    return rebrandString(obj, brandName);
   }
 
   return obj;
@@ -54,11 +96,12 @@ function rebrandObj(obj) {
 
 // ─── Rebranding Middleware ────────────────────────────────────────────────────
 router.use((req, res, next) => {
+  const brandName = getBrandNameForRequest(req);
   const originalJson = res.json.bind(res);
   res.json = function (body) {
     if (body) {
       try {
-        body = rebrandObj(body);
+        body = rebrandObj(body, brandName);
       } catch (err) {
         console.error('[Dashboard] Rebrand error:', err.message);
       }
@@ -84,6 +127,7 @@ router.use(require('./dashboard/summary'));
 router.use(require('./dashboard/agents'));
 router.use(require('./dashboard/apps'));
 router.use(require('./dashboard/devices'));
+router.use(require('./dashboard/deviceLabeling'));
 router.use(require('./dashboard/flows'));
 router.use(require('./dashboard/flowStats'));
 router.use(require('./dashboard/threats'));

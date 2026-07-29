@@ -16,6 +16,8 @@ function makeToken(user, sessionId) {
       role: user.role,
       site_uuid: user.site_uuid,
       agent_uuid: user.agent_uuid,
+      company_name: user.company_name,
+      agent_uuids: user.agent_uuids,
       session_id: sessionId ? sessionId.toString() : undefined,
     },
     JWT_SECRET,
@@ -28,7 +30,6 @@ function setCookieToken(res, token) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 24 * 60 * 60 * 1000,
   });
 }
 

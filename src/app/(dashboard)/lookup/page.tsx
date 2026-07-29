@@ -6,13 +6,16 @@ import { ApplicationCatalog } from "@/components/lookup/ApplicationCatalog";
 import { BlacklistConfiguration } from "@/components/lookup/BlacklistConfiguration";
 import { HelpTrigger } from "@/components/help/HelpTrigger";
 
+import { getSiteBranding } from "@/lib/branding";
+
 export default function LookupPage() {
   const [mounted, setMounted] = useState(false);
+  const branding = getSiteBranding();
 
   useEffect(() => {
     setMounted(true);
-    document.title = "App Lookup | BackOne - Deep Package Inspection";
-  }, []);
+    document.title = `App Lookup | ${branding.name} - Deep Package Inspection`;
+  }, [branding.name]);
 
   if (!mounted) return null;
 
@@ -24,7 +27,7 @@ export default function LookupPage() {
             App Lookup
           </h1>
           <p className="text-slate-400 mt-2">
-            Search BackOne's extensive classification database of over 2,500+ apps, protocols, and services, and manage your blacklist configuration.
+            Search {branding.name === "BackOne" ? "BackOne's" : `${branding.name}'s`} extensive classification database of over 2,500+ apps, protocols, and services, and manage your blacklist configuration.
           </p>
         </div>
         <HelpTrigger pageId="lookup" />

@@ -1,7 +1,7 @@
 const express = require('express');
 const router  = express.Router();
-const { Flow } = require('../../models/Schemas');
-const { getTimeFilter, getBaseFilter, topFlowField } = require('./helpers');
+const { Flow, DeviceStat } = require('../../models/Schemas');
+const { getTimeFilter, getBaseFilter, topFlowField, getCustomLabelsMap } = require('./helpers');
 
 // GET /api/dashboard/flows-options
 router.get('/flows-options', async (req, res) => {
@@ -97,15 +97,25 @@ router.get('/flows', async (req, res) => {
 
     console.log('[BACKEND /flows] Constructed MongoDB query:', JSON.stringify(query));
 
-    const raw = await Flow
-      .find(query)
-      .sort(sortObj)
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    const deviceFilter = {};
+    if (query.site_uuid) deviceFilter.site_uuid = query.site_uuid;
+
+    const [raw, customLabelsMap, devicesList] = await Promise.all([
+      Flow.find(query).sort(sortObj).skip(skip).limit(limit).lean(),
+      getCustomLabelsMap(),
+      DeviceStat.find(deviceFilter, { ip_address: 1, mac_address: 1 }).lean()
+    ]);
 
     const total = await Flow.countDocuments(query);
     console.log(`[BACKEND /flows] Found total: ${total}, returning slice length: ${raw.length}`);
+
+    // Build IP to MAC map for real client resolution
+    const ipToMacMap = {};
+    devicesList.forEach(d => {
+      if (d.ip_address && d.mac_address && d.mac_address !== '-') {
+        ipToMacMap[d.ip_address] = d.mac_address.toLowerCase();
+      }
+    });
 
     const data = raw.map(f => {
       const port = f.dst_port ?? 0;
@@ -126,12 +136,18 @@ router.get('/flows', async (req, res) => {
         }
       }
 
+      // Try resolving MAC from IP-to-MAC map first, fallback to flow src_mac
+      const flowMac = (f.src_mac || '').toLowerCase();
+      const realMac = ipToMacMap[f.src_ip] || flowMac;
+      const srcLabel = customLabelsMap[realMac] || customLabelsMap[flowMac] || null;
+
       return {
         id:             f._id?.toString(),
         fetched_at:     f.timestamp,
         flow_id:        f.flow_id,
         src_ip:         f.src_ip,
         src_mac:        f.src_mac,
+        src_label:      srcLabel,
         dst_ip:         f.dst_ip,
         dst_port:       port,
         protocol:       proto,

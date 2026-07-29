@@ -1,7 +1,7 @@
 // test/check-ip-mongo.js
 const { MongoClient } = require('mongodb');
 
-const URI = 'mongodb://backone_user:SusuKudaLiar@103.80.237.29:27017/backone_dpi?authSource=backone_dpi';
+const URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
 
 async function main() {
   console.log('Connecting to MongoDB via IP 103.80.237.29...');

@@ -12,19 +12,46 @@ import SidebarProfile from "./SidebarProfile";
 import SidebarNotifications from "./SidebarNotifications";
 import SidebarSiteSelector from "./SidebarSiteSelector";
 import SidebarTimeSelector from "./SidebarTimeSelector";
+import { getSiteBranding } from "@/lib/branding";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [user, setUser] = useState<{ username?: string; account_name?: string; profile_picture?: string; role?: string; agent_uuid?: string } | null>(null);
+  const [user, setUser] = useState<{ username?: string; account_name?: string; profile_picture?: string; role?: string; agent_uuid?: string; agent_uuids?: string[]; company_name?: string; _isViewAsMode?: boolean } | null>(null);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [intervalText, setIntervalText] = useState<string>("");
   const [selectedSite, setSelectedSite] = useState<string>("6681452d_9cae_4ff4_8ae8_0d504774265e");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     fetch('/api/auth/me', { headers: getViewAsHeaders() })
       .then(res => res.json())
       .then(data => {
-        if (data.user) setUser(data.user);
+        if (data.user) {
+          setUser(data.user);
+          
+          // Role-aware site UUID logic:
+          // - Global roles (SUPER_ADMIN, EXECUTIVE, SOC_ANALYST, ENGINEER):
+          //   Prioritaskan pilihan yang TERSIMPAN di localStorage.
+          //   Hanya set dari DB jika belum ada pilihan tersimpan.
+          //   Ini agar site switcher tidak reset ke SIAB setiap page reload.
+          // - Restricted roles (TENANT_ADMIN, AGENT_VIEWER, COMPANY_*):
+          //   Selalu pakai site_uuid dari DB (mereka tidak bisa ganti site).
+          const globalRoles = ['SUPER_ADMIN', 'EXECUTIVE', 'SOC_ANALYST', 'ENGINEER'];
+          const isGlobalRole = globalRoles.includes(data.user.role || '');
+          const storedSiteUuid = localStorage.getItem('backone_site_uuid');
+          
+          if (isGlobalRole) {
+            // Pakai localStorage jika sudah ada, fallback ke DB, fallback ke SIAB default
+            const siteToUse = storedSiteUuid || data.user.site_uuid || '6681452d_9cae_4ff4_8ae8_0d504774265e';
+            localStorage.setItem('backone_site_uuid', siteToUse);
+            setSelectedSite(siteToUse);
+          } else if (data.user.site_uuid) {
+            // Restricted roles: selalu pakai site_uuid dari DB (tidak bisa switch)
+            localStorage.setItem('backone_site_uuid', data.user.site_uuid);
+            setSelectedSite(data.user.site_uuid);
+          }
+        }
       })
       .catch(console.error);
 
@@ -50,26 +77,20 @@ export function Sidebar() {
       const stored = localStorage.getItem('backone_site_uuid');
       if (stored) {
         setSelectedSite(stored);
-        const isNx = stored === 'd7902405_0dc2_458b_8584_ed4d24b64f24';
-        const logoUrl = isNx ? '/nexus-logo.png' : '/backone-logo.png';
-        const links = document.querySelectorAll("link[rel*='icon']");
-        links.forEach(l => (l as HTMLLinkElement).href = logoUrl);
-        if (links.length === 0) {
-          const l = document.createElement('link');
-          l.type = 'image/x-icon'; l.rel = 'shortcut icon'; l.href = logoUrl;
-          document.getElementsByTagName('head')[0].appendChild(l);
-        }
       }
     }
   }, []);
+
+  const branding = getSiteBranding(selectedSite);
+  const isNexus = branding.name === "Nexus";
+
+
 
   const handleSiteSelect = (val: string) => {
     setSelectedSite(val);
     localStorage.setItem('backone_site_uuid', val);
     window.location.reload();
   };
-
-  const isNexus = selectedSite === 'd7902405_0dc2_458b_8584_ed4d24b64f24';
 
   return (
     <div 
@@ -79,11 +100,11 @@ export function Sidebar() {
       <div className="flex flex-col p-2 shrink-0 gap-4 border-b border-white/5">
         <div className="flex flex-col items-center justify-center w-full pt-6 pb-3 px-3 text-center mx-auto">
           <img 
-            src={isNexus ? "/nexus-logo.png" : "/backone-logo.png"} 
+            src={mounted ? branding.logo : "/backone-logo.png"} 
             alt="Logo" 
             className={cn(
               "w-12 h-12 object-contain shrink-0 mb-3",
-              isNexus 
+              (mounted && isNexus) 
                 ? "drop-shadow-[0_0_12px_rgba(6,182,212,0.45)]" 
                 : "drop-shadow-[0_0_12px_rgba(168,85,247,0.45)]"
             )} 
@@ -119,7 +140,17 @@ export function Sidebar() {
           {NAVIGATION_GROUPS.map((group) => {
             const allowedItems = group.items.filter((item) => {
               if (item.href === "/agents") {
-                return user?.role === "SUPER_ADMIN";
+                // Agents visible untuk: admin roles + COMPANY_ADMIN + COMPANY_OPERATOR
+                // COMPANY_VIEWER TIDAK mendapat tab Agents — mereka hanya butuh dashboard data
+                return user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE" || user?.role === "TENANT_ADMIN" || user?.role === "COMPANY_ADMIN" || user?.role === "COMPANY_OPERATOR";
+              }
+              if (item.href === "/device-labeling") {
+                return user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE" || user?.role === "TENANT_ADMIN" || user?.role === "COMPANY_ADMIN" || user?.role === "COMPANY_OPERATOR";
+              }
+              if (item.href === "/user-accounts") {
+                // User Accounts hanya untuk: admin + COMPANY_ADMIN (yang mengelola sub-user)
+                // COMPANY_OPERATOR dan COMPANY_VIEWER TIDAK bisa akses halaman ini
+                return user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE" || user?.role === "COMPANY_ADMIN";
               }
               return true;
             });

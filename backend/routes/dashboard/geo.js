@@ -9,7 +9,7 @@ router.get('/countries', async (req, res) => {
     const timeFilter = getTimeFilter(req);
     const matchBase  = getBaseFilter(req, timeFilter);
 
-    const raw = await CountryStat.aggregate([
+    let raw = await CountryStat.aggregate([
       { $match: matchBase },
       { $group: {
           _id:          '$country_code',
@@ -28,6 +28,37 @@ router.get('/countries', async (req, res) => {
       }},
       { $sort: { download: -1 } },
     ]);
+
+    // Fallback: if CountryStat is empty, aggregate from Flow
+    if (raw.length === 0) {
+      const flows = await Flow.find({ ...matchBase, dst_ip: { $ne: null } }).lean();
+      if (flows.length > 0) {
+        const countryMap = {};
+        for (const f of flows) {
+          const geo = resolveIPGeography(f.dst_ip);
+          const countryName = geo.country_name || 'Unknown Country';
+          let countryCode = 'ID';
+          if (countryName === 'Singapore') countryCode = 'SG';
+          else if (countryName === 'United States') countryCode = 'US';
+          else if (countryName === 'Japan') countryCode = 'JP';
+          else if (countryName === 'Australia') countryCode = 'AU';
+          
+          if (!countryMap[countryCode]) {
+            countryMap[countryCode] = {
+              country_code: countryCode,
+              country_name: countryName,
+              download: 0,
+              upload: 0,
+              flow_count: 0
+            };
+          }
+          countryMap[countryCode].download += (f.download || 0);
+          countryMap[countryCode].upload += (f.upload || 0);
+          countryMap[countryCode].flow_count += 1;
+        }
+        raw = Object.values(countryMap).sort((a, b) => b.download - a.download);
+      }
+    }
 
     res.json({ ok: true, data: raw });
   } catch (err) {

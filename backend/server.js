@@ -55,6 +55,22 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+app.use((req, res, next) => {
+  if (req.originalUrl && req.originalUrl.includes('/api/dashboard')) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const logPath = path.join(__dirname, '../scratch/http_requests.log');
+      const logLine = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - Query: ${JSON.stringify(req.query)}\n`;
+      fs.appendFileSync(logPath, logLine);
+    } catch (e) {
+      console.error('Logger error:', e.message);
+    }
+  }
+  next();
+});
+
+
 // ─── Public Routes ────────────────────────────────────────────────────────────
 const authRoutes = require('./routes/auth');
 const { getUploadsDir } = require('./routes/auth/helpers');

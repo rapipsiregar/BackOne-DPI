@@ -86,11 +86,11 @@ function EventsContent() {
   };
 
   const columns: Column<typeof data[0]>[] = [
-    { header: "#", accessor: (row, i) => i + 1, className: "w-[60px] min-w-[60px] max-w-[60px]" },
+    { header: "#", accessor: (row, i) => i + 1, className: "w-[4%] text-center" },
     {
       header: "Timestamp (WIB)",
       accessor: (row) => <TimestampCell timestamp={row.timestamp} showActiveStatus={false} />,
-      className: "w-[180px] min-w-[180px] max-w-[180px]"
+      className: "w-[15%] text-center"
     },
     {
       header: "Severity",
@@ -100,32 +100,32 @@ function EventsContent() {
           <span className="capitalize">{row.severity}</span>
         </div>
       ),
-      className: "w-[120px] min-w-[120px] max-w-[120px]"
+      className: "w-[10%] text-center"
     },
-    { header: "Event Type", accessor: (row) => row.event_type, className: "w-[130px] min-w-[130px] max-w-[130px]" },
+    { header: "Event Type", accessor: (row) => row.event_type, className: "w-[12%] text-center" },
     {
       header: "MAC Address",
       accessor: (row) => row.mac_address ? (
         <button
           onClick={() => setSelectedMac(row.mac_address)}
-          className="font-mono text-xs text-emerald-400 hover:text-emerald-300 hover:underline text-center w-full focus:outline-none"
+          className="font-mono text-xs text-emerald-400 hover:text-emerald-300 hover:underline text-center w-full focus:outline-none truncate"
         >
           {row.mac_address}
         </button>
       ) : <span className="text-slate-500">-</span>,
-      className: "w-[160px] min-w-[160px] max-w-[160px]"
+      className: "w-[14%] text-center"
     },
     {
       header: "Source IP",
       accessor: (row) => row.source_ip ? (
         <button
           onClick={() => setSelectedIp(row.source_ip)}
-          className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs text-center w-full focus:outline-none"
+          className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs text-center w-full focus:outline-none truncate"
         >
           {row.source_ip}
         </button>
       ) : <span className="text-slate-500">-</span>,
-      className: "w-[140px] min-w-[140px] max-w-[140px]"
+      className: "w-[12%] text-center"
     },
     {
       header: "Message",
@@ -152,7 +152,7 @@ function EventsContent() {
           </div>
         );
       },
-      className: "text-center w-full min-w-0 max-w-full"
+      className: "w-[33%] text-center"
     }
   ];
 

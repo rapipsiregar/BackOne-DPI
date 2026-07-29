@@ -1,5 +1,6 @@
 import { PageGuide } from "../types";
 
+// NOTE: Agents guide has been moved to guides/agents.ts
 export const INFRASTRUCTURE_GUIDES: PageGuide[] = [
   {
     id: "overview",
@@ -50,61 +51,6 @@ export const INFRASTRUCTURE_GUIDES: PageGuide[] = [
           "Use the Time Filter — compare different ranges (Last Hour vs Last 24 Hours) to distinguish momentary spikes from sustained anomalies.",
           "Prioritize the Threats card — if it shows a number greater than 0, investigate before reviewing any other metric.",
         ],
-      },
-    ],
-  },
-  {
-    id: "agents",
-    title: "Agents Inventory",
-    url: "/agents",
-    icon: "📡",
-    summary: "Full management of all registered DPI Network Agent probes at your site.",
-    sections: [
-      {
-        heading: "Statistic Cards",
-        columns: [
-          { column: "Total Agents", description: "Total number of DPI probe devices registered in the system database for this site." },
-          { column: "Online Agents", description: "Agents that successfully transmitted telemetry within the last 24 hours. Marked with a pulsing green dot and 'Last seen: HH:MM WIB'." },
-          { column: "Offline Agents", description: "Agents that have not sent any data for more than 24 hours. Marked with a grey dot and 'No Flows Detected'. Check whether the device is still powered on." },
-          { column: "Avg. Uptime", description: "Average availability percentage across all agents, calculated from the last 30 days of historical data. Ideal value is >99%. Below 90% indicates persistent connectivity or hardware stability issues." },
-        ],
-      },
-      {
-        heading: "Agent Location Map",
-        content: "An interactive map of Indonesia displaying the geographic position of each agent based on configured GPS coordinates. Online agents show a pulsing green beacon; offline agents show a grey/red beacon.",
-        items: [
-          { label: "Flow lines", description: "Drawn dynamically ONLY between agents that have active traffic flowing between them — not all agents are connected by default." },
-          { label: "Hover on agent", description: "Shows the agent name/label, UUID, online status, and uptime percentage." },
-          { label: "Hover on flow line", description: "Shows a tooltip with top active sub-flows, bandwidth volume, and connection count." },
-          { label: "Blue panel (no GPS)", description: "Lists agents with no GPS coordinates set — click the pin icon (📍) in the table to configure their location." },
-        ],
-      },
-      {
-        heading: "Table: Provisioned Network Agents",
-        columns: [
-          { column: "UUID / Serial", description: "Unique hardware identifier of the DPI probe. Click to open the Agent Detail Modal containing firmware version, OS, CPU/memory utilization, and connection history." },
-          { column: "Label", description: "User-assigned friendly name, typically indicating physical location (e.g., 'Server Room Floor 3'). Used as the identifier across the entire dashboard." },
-          { column: "Provisioned", description: "Whether the agent is registered in the central system. Green 'Yes' = registered. Red 'No' = not registered and data will not be processed." },
-          { column: "Activated", description: "Whether the agent has ever successfully connected and transmitted telemetry at least once. An unactivated agent will not appear on the map or in traffic tables." },
-          { column: "Traffic Status", description: "Real-time indicator: pulsing green dot + 'Last seen: HH:MM WIB' means actively sending data within the last 24 hours. Grey dot + 'No Flows Detected' means no data for over 24 hours." },
-          { column: "Avg Uptime", description: "Historical availability percentage specific to this agent over the last 30 days. Below 90% requires attention." },
-          { column: "Data Size", description: "Total size of telemetry data currently stored in MongoDB for this agent. Data is automatically purged after 30 days per the retention policy." },
-          { column: "Actions", description: "Five action buttons are available per agent row — see the section below for details." },
-        ],
-      },
-      {
-        heading: "Agent Row Actions",
-        items: [
-          { label: "Detail Modal ( > )", description: "Opens the Agent Detail Modal showing firmware version, OS type, CPU/memory utilization, and full connection history." },
-          { label: "User Icon", description: "Manage viewer accounts that are granted access to view this specific agent's data only." },
-          { label: "Pin Icon 📍", description: "Set or update GPS coordinates for this agent so it appears in the correct position on the location map." },
-          { label: "Eye Icon", description: "View As Agent: locks the entire dashboard scope to this agent only. All pages (Flows, Apps, Devices, etc.) will show only data from this agent. Click 'Exit View As' in the sidebar to return to the global view." },
-          { label: "Delete Icon", description: "Permanently removes the agent from the registry. This action cannot be undone." },
-        ],
-      },
-      {
-        heading: "Feature: View As Agent",
-        content: "The eye icon in the Actions column locks the entire dashboard scope to a single specific agent — all pages (Flows, Apps, Devices, etc.) will show only data from that agent. To return to the global view, click 'Exit View As' at the top of the sidebar.",
       },
     ],
   },
@@ -177,6 +123,67 @@ export const INFRASTRUCTURE_GUIDES: PageGuide[] = [
           { label: "Verify default ports", description: "If a firewall is blocking an application, verify its default ports here and coordinate with the network team." },
           { label: "Add blacklist entries gradually", description: "Add one application at a time and monitor the impact in Threat Intelligence to avoid excessive false positives." },
         ],
+      },
+    ],
+  },
+  {
+    id: "user-accounts",
+    title: "User Accounts Directory",
+    url: "/user-accounts",
+    icon: "👥",
+    summary: "Manage company tenant accounts, role scopes, and multi-agent assignments.",
+    sections: [
+      {
+        heading: "Company Tenant Cards — What You See on This Page",
+        content: "The page is organized into cards, one per client company. Each card displays the company name and a user count badge (e.g. 'Accounts: 2 / 5'). Inside every company card, there is a table listing all accounts that belong to that company. Use the search box inside each card to quickly filter by account name, username, or role.",
+      },
+      {
+        heading: "Account Table — Column Reference",
+        content: "Each row in the company card's table represents one registered user account. The columns are:",
+        columns: [
+          { column: "#", description: "Sequential row index within the current company card. Resets to 1 for each company. Helps you quickly count and reference a specific row during review." },
+          { column: "Account Name", description: "The full human-readable display name of the account holder (e.g. 'John Doe' or 'IT Team - Cibubur Branch'). This name is set during account creation and can be updated via the Edit User action. If no account name was set, the username is shown as a fallback." },
+          { column: "Username", description: "The unique login credential (username) used by this account to sign in to the dashboard. Displayed in monospace font. Usernames cannot be changed after creation — to rename, delete the account and re-create." },
+          { column: "Role", description: "The permission level of this account within the system. Displayed as a color-coded badge: purple = Company Admin, amber = Company Operator, blue = Company Viewer. Each role controls which pages, agents, and actions the user can access." },
+          { column: "Assigned Devices", description: "Shows how many network agents (DPI probes) are assigned to this account. Company Admins typically see all agents. Company Operators may be restricted to specific agents. Company Viewers are usually locked to exactly one agent. A value of 'No device assigned' means the account has no agent scope configured — the user will see an empty dashboard after login." },
+          { column: "Actions", description: "The '⚙️ Edit User' button opens the account management modal where you can update the account name, change the role, reassign agents, or delete the account. This button is disabled (greyed out) for Executive-role viewers, who have read-only access." },
+        ],
+      },
+      {
+        heading: "Role Hierarchies — Access Level Reference",
+        content: "There are three customer-tier roles, each with different permissions and agent scopes:",
+        items: [
+          { label: "Company Admin", description: "Full administrator access for the client company. Can view all network agents assigned to their company, edit device labels, view all traffic pages, and manage sub-accounts (Company Operators and Company Viewers) under their organization. Cannot add other Company Admins (only Super Admin can)." },
+          { label: "Company Operator", description: "Designed for regional IT leads or branch managers. Assigned a custom subset of network agents (e.g., 2 out of 5 agents for their branch). Can monitor traffic, view metrics, and edit device labels only for their assigned agents. Cannot manage user accounts." },
+          { label: "Company Viewer", description: "Designed for on-site technicians or monitoring staff. Locked to a single specific network agent. The entire dashboard view is automatically filtered to show only that agent's traffic. Has read-only access — cannot edit device labels or manage user accounts." },
+        ],
+      },
+      {
+        heading: "Adding a New Account",
+        content: "To provision a new account for a company:",
+        steps: [
+          "Click the '+ Add User for [Company]' button on the top-right of the target company card, or click '+ Add New Company Admin' at the bottom of the page.",
+          "Fill in the Account Name field with the user's full name or team identifier.",
+          "Enter a Username — this will be the login credential. Use a consistent naming convention (e.g. firstname.lastname or dept.city).",
+          "Set a secure Password. Inform the user to change it on first login via Settings.",
+          "Select the Role (Company Admin, Company Operator, or Company Viewer) based on the user's responsibilities.",
+          "In the Agent Assignment checklist, select which network agents (DPI probes) this account should be able to see. For Company Viewers, select exactly one agent.",
+          "Click 'Create Account'. The new account will appear in the company card immediately.",
+        ],
+      },
+      {
+        heading: "Editing or Deleting an Account",
+        content: "To modify an existing account:",
+        steps: [
+          "Click '⚙️ Edit User' in the Actions column of the target account row.",
+          "In the modal, you can update the Account Name, change the Role, or reassign the Agent Assignment (check/uncheck agents in the checklist).",
+          "Click 'Save Changes' to apply. Changes take effect immediately on the user's next page load.",
+          "To permanently delete an account, scroll down in the edit modal and click the red 'Delete Account' button. This action is irreversible — the user will be immediately logged out and unable to sign in.",
+        ],
+      },
+      {
+        heading: "5-Account Quota Limit per Company",
+        content: "To maintain system efficiency, each client company is limited to a maximum of 5 active user accounts. The badge on each company card shows the current count (e.g. 'Accounts: 3 / 5'). When the limit is reached, the badge turns red and the '+ Add User' button is disabled. The backend also enforces this limit — any API request exceeding the quota is rejected with an error.",
       },
     ],
   },

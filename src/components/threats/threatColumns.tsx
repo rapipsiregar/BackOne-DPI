@@ -22,13 +22,13 @@ export function getThreatColumns(
   return [
     {
       header: "Timestamp",
-      className: "w-[155px] min-w-[155px] max-w-[155px] text-center",
+      className: "w-[14%] text-center",
       accessor: (row) => <TimestampCell timestamp={row.detected_at} showActiveStatus={false} />,
     },
-    { header: "#", className: "w-[40px] min-w-[40px] max-w-[40px] text-center", accessor: (_row, i) => i + 1 },
+    { header: "#", className: "w-[4%] text-center", accessor: (_row, i) => i + 1 },
     {
       header: "Type",
-      className: "w-[170px] min-w-[170px] max-w-[170px]",
+      className: "w-[16%] text-center",
       accessor: (row) => (
         <div
           title={row.description || row.threat_type || "Unknown"}
@@ -40,17 +40,17 @@ export function getThreatColumns(
     },
     {
       header: "Severity",
-      className: "w-[90px] min-w-[90px] max-w-[90px] text-center",
+      className: "w-[8%] text-center",
       accessor: (row) => getSeverityBadge(row.severity),
     },
     {
       header: "Source IP",
-      className: "w-[120px] min-w-[120px] max-w-[120px] text-center",
+      className: "w-[12%] text-center",
       accessor: (row) =>
         row.ip_address ? (
           <button
             onClick={() => setSelectedIp(row.ip_address || "")}
-            className="font-medium text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs focus:outline-none w-full text-center"
+            className="font-medium text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs focus:outline-none w-full text-center truncate"
           >
             {row.ip_address}
           </button>
@@ -60,12 +60,12 @@ export function getThreatColumns(
     },
     {
       header: "Dest IP",
-      className: "w-[120px] min-w-[120px] max-w-[120px] text-center",
+      className: "w-[12%] text-center",
       accessor: (row) =>
         row.dst_ip ? (
           <button
             onClick={() => setSelectedIp(row.dst_ip || "")}
-            className="font-mono text-xs text-blue-400 hover:text-blue-300 hover:underline focus:outline-none w-full text-center"
+            className="font-mono text-xs text-blue-400 hover:text-blue-300 hover:underline focus:outline-none w-full text-center truncate"
           >
             {row.dst_ip}
           </button>
@@ -75,7 +75,7 @@ export function getThreatColumns(
     },
     {
       header: "MAC Addr",
-      className: "w-[140px] min-w-[140px] max-w-[140px] text-center",
+      className: "w-[13%] text-center",
       accessor: (row) =>
         row.mac_address ? (
           <button
@@ -89,7 +89,7 @@ export function getThreatColumns(
     },
     {
       header: "App",
-      className: "w-[110px] min-w-[110px] max-w-[110px] text-center",
+      className: "w-[9%] text-center",
       accessor: (row) => {
         const formatted = formatAppLabel(row.app_label);
         return formatted ? (
@@ -103,7 +103,7 @@ export function getThreatColumns(
     },
     {
       header: "Domain",
-      className: "w-[160px] min-w-[160px] max-w-[160px] text-center",
+      className: "w-[12%] text-center",
       accessor: (row) => row.domain ? (
         <div title={row.domain} className="truncate w-full text-center text-xs cursor-help">
           {row.domain}
@@ -114,11 +114,11 @@ export function getThreatColumns(
     },
     {
       header: "Action",
-      className: "w-[130px] min-w-[130px] max-w-[130px] text-center",
+      className: "w-[10%] text-center",
       accessor: (row) => (
         <button
           onClick={() => setSelectedThreat(row)}
-          className="px-2 py-1 text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 hover:text-white rounded-lg transition-all shadow-sm cursor-pointer whitespace-nowrap focus:outline-none"
+          className="px-2 py-1 text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 hover:text-white rounded-lg transition-all shadow-sm cursor-pointer focus:outline-none leading-tight"
         >
           View Mitigation
         </button>

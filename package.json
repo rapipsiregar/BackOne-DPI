@@ -6,11 +6,12 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "dev": "concurrently --names \"NEXT,BACKEND,PROXY\" --prefix-colors \"cyan,green,yellow\" \"next dev\" \"node backend/server.js\" \"node proxy/index.js\"",
+    "dev": "concurrently --names \"MONGO,NEXT,BACKEND,PROXY\" --prefix-colors \"magenta,cyan,green,yellow\" \"node scripts/start-mongo.js\" \"next dev\" \"node backend/server.js\" \"node proxy/index.js\"",
+    "dev:central": "concurrently --names \"NEXT,BACKEND\" --prefix-colors \"cyan,green\" \"next dev\" \"node backend/server.js\"",
     "dev:next": "next dev",
     "dev:backend": "node backend/server.js",
     "dev:proxy": "node proxy/index.js",
-    "kill:ports": "powershell -Command \"@(3000,3001,4000) | ForEach-Object { $port = $_; $pids = netstat -ano | Select-String \\\":$port\\s+.+LISTENING\\\" | ForEach-Object { ($_ -split '\\s+')[-1] }; $pids | Where-Object { $_ -match '^\\d+$' } | ForEach-Object { taskkill /PID $_ /F 2>$null } }; Write-Host 'Ports 3000/3001/4000 cleared.'\"",
+    "kill:ports": "powershell -Command \"@(3000,3001,3002,4000) | ForEach-Object { $port = $_; $pids = netstat -ano | Select-String \\\":$port\\s+.+LISTENING\\\" | ForEach-Object { ($_ -split '\\s+')[-1] }; $pids | Where-Object { $_ -match '^\\d+$' } | ForEach-Object { taskkill /PID $_ /F 2>$null } }; Write-Host 'Ports 3000/3001/3002/4000 cleared.'\"",
     "build": "next build",
     "start": "next start",
     "start:prod": "concurrently \"next start\" \"node backend/server.js\" \"node proxy/index.js\"",
