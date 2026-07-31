@@ -1,16 +1,5 @@
 // backend/routes/deviceDetailsHandler.js
-// ─────────────────────────────────────────────────────────────────────────────
 // Device Detail Handler — reads 100% from MongoDB (no live DPI API calls)
-//
-// Architecture:
-//  1. Total download/upload  → DeviceStat (latest, DPI API cumulative per-IP)
-//  2. Apps tab               → DeviceAppStat (DPI API per-IP per-app, collected
-//                               by proxy every 5min for top 30 devices)
-//  3. Protocols + Domains    → Flow collection (sampled, enriched with domain map)
-//  4. Network Flows tab      → Flow collection
-//  5. Threats tab            → Threat collection
-// ─────────────────────────────────────────────────────────────────────────────
-
 const { DeviceStat, DeviceAppStat, Flow, Threat, CustomDeviceLabel } = require('../models/Schemas');
 const User = require('../models/User');
 
@@ -92,15 +81,7 @@ module.exports = async function deviceDetailsHandler(req, res, helpers) {
       if (tf) flowFilter.timestamp = tf;
     }
 
-    // ── Parallel queries ─────────────────────────────────────────────────────
-    const flowQueryConditions = [];
-    if (ip) {
-      flowQueryConditions.push({ src_ip: ip }, { dst_ip: ip });
-    }
-    if (mac) {
-      flowQueryConditions.push({ src_mac: mac }, { dst_mac: mac });
-    }
-
+    // ── Parallel queries with B-tree Index Covered Scans ──────────────────────
     const threatQuery = {
       ...(agentUuid ? { agent_uuid: agentUuid } : {})
     };
@@ -115,14 +96,32 @@ module.exports = async function deviceDetailsHandler(req, res, helpers) {
     const appFilter = agentUuid ? { agent_uuid: agentUuid, ip_address: ip } : { ip_address: ip };
     if (req.user?.site_uuid) appFilter.site_uuid = req.user.site_uuid;
 
-    const [deviceAppStats, flowsQuery, rawThreats] = await Promise.all([
-      // Only query DeviceAppStat if we have an IP
-      ip ? DeviceAppStat.find(appFilter).sort({ timestamp: -1 }).lean() : [],
-      flowQueryConditions.length > 0
-        ? Flow.find({ ...flowFilter, $or: flowQueryConditions }).sort({ timestamp: -1 }).limit(5000).lean()
-        : [],
-      Threat.find(threatQuery).sort({ detected_at: -1 }).lean(),
+    // Use targeted indexed queries for src_ip, dst_ip, and src_mac in parallel instead of heavy $or table scan
+    const flowQueries = [];
+    if (ip) {
+      flowQueries.push(Flow.find({ ...flowFilter, src_ip: ip }).sort({ timestamp: -1 }).limit(300).lean());
+      flowQueries.push(Flow.find({ ...flowFilter, dst_ip: ip }).sort({ timestamp: -1 }).limit(300).lean());
+    }
+    if (mac) {
+      flowQueries.push(Flow.find({ ...flowFilter, src_mac: mac }).sort({ timestamp: -1 }).limit(300).lean());
+    }
+
+    const [deviceAppStats, flowResults, rawThreats] = await Promise.all([
+      ip ? DeviceAppStat.find(appFilter).sort({ timestamp: -1 }).lean() : Promise.resolve([]),
+      Promise.all(flowQueries),
+      Threat.find(threatQuery).sort({ detected_at: -1 }).limit(100).lean(),
     ]);
+
+    // Merge and deduplicate flows
+    const flowMap = new Map();
+    for (const batch of flowResults) {
+      for (const f of batch) {
+        const key = f._id ? String(f._id) : (f.flow_id || `${f.src_ip}-${f.dst_ip}-${f.timestamp}`);
+        if (!flowMap.has(key)) flowMap.set(key, f);
+      }
+    }
+    const flowsQuery = Array.from(flowMap.values())
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     // Aggregate by app_label and sum download and upload
     const appLatest = {};

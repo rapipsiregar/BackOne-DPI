@@ -121,27 +121,33 @@ export default function DevicePdfDocument({
         {/* Device Information */}
         <Text style={styles.sectionTitle}>Device Identification</Text>
         <View style={styles.grid}>
-          <View style={styles.gridCol}>
+          <View style={{ ...styles.gridCol, width: "33%" }}>
             <Text style={styles.gridLabel}>IP Address</Text>
             <Text style={styles.gridValue}>{ip || "N/A"}</Text>
           </View>
-          <View style={styles.gridCol}>
+          <View style={{ ...styles.gridCol, width: "33%" }}>
             <Text style={styles.gridLabel}>MAC Address</Text>
             <Text style={styles.gridValue}>{mac || "N/A"}</Text>
           </View>
-          <View style={{ ...styles.gridCol, width: "50%" }}>
+          <View style={{ ...styles.gridCol, width: "34%" }}>
+            <Text style={styles.gridLabel}>Owner / Custom Label</Text>
+            <Text style={{ ...styles.gridValue, color: (data.device_label || deviceData?.device_label || deviceData?.custom_label) ? "#0284c7" : "#64748b" }}>
+              {data.device_label || deviceData?.device_label || deviceData?.custom_label || "— Unassigned —"}
+            </Text>
+          </View>
+          <View style={{ ...styles.gridCol, width: "33%" }}>
             <Text style={styles.gridLabel}>Device OS</Text>
             <Text style={styles.gridValue}>{data.os_label || deviceData?.os_label || "Unknown"}</Text>
           </View>
-          <View style={styles.gridCol}>
+          <View style={{ ...styles.gridCol, width: "33%" }}>
             <Text style={styles.gridLabel}>Manufacturer</Text>
             <Text style={styles.gridValue}>{data.manufacturer || deviceData?.manufacturer || "Unknown"}</Text>
           </View>
-          <View style={styles.gridCol}>
+          <View style={{ ...styles.gridCol, width: "34%" }}>
             <Text style={styles.gridLabel}>Source Agent</Text>
-            <Text style={styles.gridValue}>{data.agent_label || "N/A"}</Text>
+            <Text style={{ ...styles.gridValue, color: "#7e22ce" }}>{data.agent_label || "N/A"}</Text>
           </View>
-          <View style={{ ...styles.gridCol, width: "50%" }}>
+          <View style={{ ...styles.gridCol, width: "100%", marginTop: 4 }}>
             <Text style={styles.gridLabel}>Last Seen</Text>
             <Text style={styles.gridValue}>
               {data.last_seen || deviceData?.last_seen

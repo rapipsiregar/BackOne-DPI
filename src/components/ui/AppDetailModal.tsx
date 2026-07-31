@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { fetchAppDetails, AppDetails } from "@/lib/api";
 import { useTimeFilter } from "@/contexts/TimeFilterContext";
 import { fmtBytes } from "@/lib/utils";
@@ -17,14 +18,14 @@ interface ColDef {
 
 function TableWrap({ children, cols }: { children: React.ReactNode; cols: ColDef[] }) {
   return (
-    <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-border/50 bg-secondary/10 custom-scrollbar">
-      <table className="w-full text-xs text-center table-fixed whitespace-nowrap min-w-[700px]">
-        <thead>
-          <tr className="border-b border-border bg-muted/50">
+    <div className="rounded-xl border border-border/50 bg-[#090D16] overflow-x-auto overflow-y-auto max-h-[55vh] custom-scrollbar">
+      <table className="w-full text-xs text-center table-fixed whitespace-nowrap min-w-[700px] border-collapse">
+        <thead className="bg-[#111827] border-b border-border/80 sticky top-0 z-10">
+          <tr className="bg-[#111827]">
             {cols.map((c) => (
               <th
                 key={c.header}
-                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] text-center ${c.width}`}
+                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] text-center bg-[#111827] border-b border-border/80 ${c.width}`}
               >
                 {c.header}
               </th>
@@ -65,6 +66,14 @@ export function AppDetailModal({ appLabel, favicon, category, agentUuid, onClose
   const [selectedIp, setSelectedIp] = useState<string | null>(null);
   const { timeRange } = useTimeFilter();
 
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = "unset"; };
+  }, []);
+
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
@@ -88,34 +97,40 @@ export function AppDetailModal({ appLabel, favicon, category, agentUuid, onClose
   const startIndex = (page - 1) * pageSize;
   const paginatedIps = topIps.slice(startIndex, startIndex + pageSize);
 
+  if (!isMounted) return null;
+
   return (
     <>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={handleClose}>
-        <div className={`absolute inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`} />
-        <div
-          className={`relative bg-card border border-border rounded-2xl w-full max-w-3xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
-          onClick={(e) => e.stopPropagation()}
-        >
+      {createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4" onClick={handleClose}>
+          <div 
+            className={`fixed inset-0 bg-slate-950/80 backdrop-blur-md z-0 ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`}
+            style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+          />
+          <div
+            className={`relative z-10 bg-card border border-border rounded-2xl sm:rounded-3xl w-full max-w-3xl h-[88vh] sm:h-[85vh] flex flex-col shadow-2xl shadow-black/60 overflow-hidden ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-green-900/30 to-emerald-900/20 rounded-t-2xl flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-500/20 rounded-lg ring-1 ring-green-500/30">
+          <div className="flex items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4 border-b border-border bg-gradient-to-r from-green-900/30 to-emerald-900/20 rounded-t-2xl flex-shrink-0">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="p-2 bg-green-500/20 rounded-lg ring-1 ring-green-500/30 shrink-0">
                 {favicon ? (
-                  <img src={favicon} alt={appLabel} className="w-5 h-5 rounded" />
+                  <img src={favicon} alt={appLabel} className="w-4 h-4 sm:w-5 sm:h-5 rounded" />
                 ) : (
-                  <Globe className="w-5 h-5 text-green-400" />
+                  <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
                 )}
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-card-foreground">{appLabel}</h3>
-                {category && <p className="text-xs text-muted-foreground">{category}</p>}
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm sm:text-lg font-bold text-card-foreground truncate">{appLabel}</h3>
+                {category && <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{category}</p>}
               </div>
             </div>
             <button
               onClick={handleClose}
-              className="p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-lg transition-all flex-shrink-0"
+              className="p-1.5 sm:p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-lg transition-all flex-shrink-0 ml-2"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
 
@@ -129,23 +144,23 @@ export function AppDetailModal({ appLabel, favicon, category, agentUuid, onClose
             ) : error ? (
               <div className="p-6 text-center text-red-400 text-sm">{error}</div>
             ) : data ? (
-              <div className="p-6 space-y-6">
+              <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6">
                 {/* Total Summary */}
-                <div className="grid grid-cols-2 gap-3 p-4 bg-white/[0.03] border border-border/50 rounded-xl">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 p-3 sm:p-4 bg-white/[0.03] border border-border/50 rounded-xl">
                   <div className="text-center">
-                    <p className="text-xs text-muted-foreground">Total Download</p>
-                    <p className="text-xl font-bold text-cyan-400">{fmtBytes(data.total_download ?? 0)}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Total Download</p>
+                    <p className="text-base sm:text-xl font-bold text-cyan-400 truncate">{fmtBytes(data.total_download ?? 0)}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xs text-muted-foreground">Total Upload</p>
-                    <p className="text-xl font-bold text-green-400">{fmtBytes(data.total_upload ?? 0)}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Total Upload</p>
+                    <p className="text-base sm:text-xl font-bold text-green-400 truncate">{fmtBytes(data.total_upload ?? 0)}</p>
                   </div>
                 </div>
 
                 {/* Devices list */}
                 <div>
-                  <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                    <Monitor className="w-4 h-4 text-blue-400" />
+                  <h4 className="text-xs sm:text-sm font-semibold text-slate-300 mb-2 sm:mb-3 flex items-center gap-2">
+                    <Monitor className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400" />
                     Devices Accessing {appLabel}
                   </h4>
                   {topIps.length === 0 ? (
@@ -202,7 +217,9 @@ export function AppDetailModal({ appLabel, favicon, category, agentUuid, onClose
             ) : null}
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
+      )}
 
       {selectedIp && (
         <DeviceDetailModal

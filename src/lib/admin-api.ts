@@ -142,13 +142,20 @@ export async function startViewAsUser(
   agentLabel: string,
   userName: string,
   userRole: string,
+  targetUserId?: number | string
 ): Promise<void> {
   const labelForToken = `${userName} (${userRole.replace(/_/g, ' ')})`;
   const res = await fetch('/api/auth/admin/view-as', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ agent_uuid: agentUuid, agent_label: labelForToken }),
+    body: JSON.stringify({
+      agent_uuid: agentUuid,
+      agent_label: labelForToken,
+      target_user_id: targetUserId || undefined,
+      target_username: userName,
+      target_role: userRole
+    }),
   });
   const contentType = res.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
@@ -167,10 +174,31 @@ export async function startViewAsUser(
       view_as_type: 'user',            // User view-as mode
       user_name: userName,             // Nama user yang di-view
       user_role: userRole,             // Role user yang di-view
+      targetUserId: targetUserId || json.target_user_id
     }));
   }
 }
 
+
+// Hapus penuh state view-as di browser
+export function clearViewAsState(): void {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(VIEW_AS_KEY);
+  }
+}
+
+// Validasi apakah role user saat ini diizinkan menggunakan mode view-as
+export function validateViewAsSession(currentUserRole?: string): ViewAsStatus {
+  const status = getViewAsStatusSync();
+  if (!status.active) return { active: false };
+
+  const allowedRoles = ['SUPER_ADMIN', 'TENANT_ADMIN', 'COMPANY_ADMIN', 'COMPANY_OPERATOR'];
+  if (currentUserRole && !allowedRoles.includes(currentUserRole)) {
+    clearViewAsState();
+    return { active: false };
+  }
+  return status;
+}
 
 // Keluar dari mode view-as — hapus dari localStorage dan server session
 export async function stopViewAs(): Promise<void> {
@@ -183,9 +211,7 @@ export async function stopViewAs(): Promise<void> {
     console.error('Failed to terminate server view-as session:', err);
   }
 
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(VIEW_AS_KEY);
-  }
+  clearViewAsState();
 }
 
 // GET view-as status (dari localStorage, bukan server)

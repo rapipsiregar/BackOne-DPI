@@ -168,11 +168,12 @@ export default function AgentPdfDocument({
           title="Monitored Devices"
           data={devices}
           columns={[
-            { header: "IP Address", width: "22%", cell: (r) => r.ip_address || "N/A" },
-            { header: "OS / Manufacturer", width: "28%", cell: (r) => r.os_label || r.manufacturer || "Unknown" },
-            { header: "Download", width: "15%", align: "right", cell: (r) => formatBytes(r.download) },
-            { header: "Upload", width: "15%", align: "right", cell: (r) => formatBytes(r.upload) },
-            { header: "Last Seen", width: "20%", cell: (r) => r.last_seen ? formatIndonesiaTime(r.last_seen) : "Never" },
+            { header: "IP Address", width: "18%", cell: (r) => r.ip_address || "N/A" },
+            { header: "Owner / Device Label", width: "22%", cell: (r) => r.label || r.custom_label || r.device_label || "—" },
+            { header: "OS / Manufacturer", width: "20%", cell: (r) => r.os_label || r.manufacturer || "Unknown" },
+            { header: "Download", width: "13%", align: "right", cell: (r) => formatBytes(r.download) },
+            { header: "Upload", width: "13%", align: "right", cell: (r) => formatBytes(r.upload) },
+            { header: "Last Seen", width: "14%", cell: (r) => r.last_seen ? formatIndonesiaTime(r.last_seen) : "Never" },
           ]}
         />
 

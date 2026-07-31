@@ -20,6 +20,8 @@ interface GetColumnsProps {
   handleEditLocation?: (agentUuid: string, agentLabel: string) => void;
   /** Set of agent UUIDs that already have a location saved */
   locationUuids?: Set<string>;
+  isViewAsActive?: boolean;
+  isViewAsMode?: boolean;
 }
 
 export function getAgentColumns({
@@ -35,6 +37,8 @@ export function getAgentColumns({
   openDelete,
   handleEditLocation,
   locationUuids = new Set(),
+  isViewAsActive,
+  isViewAsMode,
 }: GetColumnsProps): Column<Agent>[] {
   const cols: Column<Agent>[] = [
     {
@@ -124,7 +128,7 @@ export function getAgentColumns({
             <button onClick={() => setDetailAgent(row)} className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded transition-colors" title="Detail Agent">
               <ChevronRight className="w-4 h-4" />
             </button>
-            {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
+            {!isViewAsActive && (role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
               <>
                 <button
                   onClick={(e) => { e.stopPropagation(); setAccountModalAgent({ uuid, label: agentLabel }); setAccountModalOpen(true); }}
@@ -166,7 +170,7 @@ export function getAgentColumns({
               </>
             )}
             {/* COMPANY_ADMIN dan COMPANY_OPERATOR: hanya View-As */}
-            {(role === 'COMPANY_ADMIN' || role === 'COMPANY_OPERATOR') && (
+            {!isViewAsActive && (role === 'COMPANY_ADMIN' || role === 'COMPANY_OPERATOR') && (
               <button
                 onClick={(e) => { e.stopPropagation(); handleViewAs(uuid, agentLabel); }}
                 disabled={isViewAsLoading}

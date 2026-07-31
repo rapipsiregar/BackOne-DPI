@@ -269,35 +269,38 @@ export function BlacklistConfiguration() {
                   <p className="text-xs mt-1">Incoming flows matching blacklisted applications or categories will not trigger threats.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-sm text-slate-300">
-                    <thead className="bg-secondary/40 text-slate-400 font-mono text-[10px] uppercase tracking-wider border-b border-border/30">
-                      <tr>
+                <div className="rounded-xl border border-border/30 overflow-hidden bg-[#090D16]">
+                  <table className="w-full border-collapse text-left text-sm text-slate-300 table-fixed">
+                    <thead className="bg-[#111827] text-slate-400 font-mono text-[10px] uppercase tracking-wider border-b border-border/30">
+                      <tr className="bg-[#111827]">
                         <th className="p-3 w-[15%] text-center">Type</th>
                         <th className="p-3 w-[45%] text-center">Value</th>
                         <th className="p-3 w-[25%] text-center">Agent</th>
                         {canEdit && <th className="p-3 w-[15%] text-center">Actions</th>}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border/20">
-                      {rules.map((rule) => (
-                        <tr key={rule._id} className="hover:bg-secondary/10 transition-colors">
-                          <td className="p-3 text-center">
-                            <span className={`inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded ${
-                              rule.type === 'category' 
-                                ? "bg-purple-950/40 text-purple-400 border border-purple-500/20" 
-                                : "bg-blue-950/40 text-blue-400 border border-blue-500/20"
-                            }`}>
-                              {rule.type === 'category' ? <Tag className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
-                              {rule.type}
-                            </span>
-                          </td>
-                          <td className="p-3 text-center font-mono text-white text-xs">{rule.value}</td>
-                          <td className="p-3 text-center font-mono text-slate-400 text-[11px] truncate max-w-[120px]" title={rule.agent_uuid}>
-                            {rule.agent_uuid || "-"}
-                          </td>
-                          {canEdit && (
-                            <td className="p-3 text-center">
+                  </table>
+                  <div className="max-h-[55vh] overflow-y-auto custom-scrollbar">
+                    <table className="w-full border-collapse text-left text-sm text-slate-300 table-fixed">
+                      <tbody className="divide-y divide-border/20">
+                        {rules.map((rule) => (
+                          <tr key={rule._id} className="hover:bg-secondary/10 transition-colors">
+                            <td className="p-3 text-center w-[15%]">
+                              <span className={`inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded ${
+                                rule.type === 'category' 
+                                  ? "bg-purple-950/40 text-purple-400 border border-purple-500/20" 
+                                  : "bg-blue-950/40 text-blue-400 border border-blue-500/20"
+                              }`}>
+                                {rule.type === 'category' ? <Tag className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
+                                {rule.type}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center font-mono text-white text-xs w-[45%]">{rule.value}</td>
+                            <td className="p-3 text-center font-mono text-slate-400 text-[11px] truncate max-w-[120px] w-[25%]" title={rule.agent_uuid}>
+                              {rule.agent_uuid || "-"}
+                            </td>
+                            {canEdit && (
+                              <td className="p-3 text-center w-[15%]">
                               <button
                                 onClick={() => handleDeleteRule(rule._id)}
                                 className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded transition-colors"
@@ -312,8 +315,9 @@ export function BlacklistConfiguration() {
                     </tbody>
                   </table>
                 </div>
-              )}
-            </CardContent>
+              </div>
+            )}
+          </CardContent>
           </Card>
         </div>
       </div>

@@ -59,6 +59,8 @@ export default function AgentsPage() {
     handleViewAs,
     openDelete,
     handleEditLocation,
+    isViewAsActive,
+    isViewAsMode,
   } = useAgentsData();
 
   const columns = getAgentColumns({
@@ -74,6 +76,8 @@ export default function AgentsPage() {
     openDelete,
     handleEditLocation,
     locationUuids: new Set(locations.map((l: any) => l.agent_uuid)),
+    isViewAsActive,
+    isViewAsMode,
   });
 
   const externalColumns = getExternalAccountColumns((user) => {
@@ -102,15 +106,17 @@ export default function AgentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-white flex items-center gap-3">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Agents Inventory
             {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">Managed DPI probes, remote collectors, and probe infrastructure.</p>
+          <div className="shrink-0">
+            <HelpTrigger pageId="agents" />
+          </div>
         </div>
-        <HelpTrigger pageId="agents" />
+        <p className="text-xs sm:text-sm text-slate-400">Managed DPI probes, remote collectors, and probe infrastructure.</p>
       </div>
 
       {error && (
@@ -170,7 +176,7 @@ export default function AgentsPage() {
                   };
                 })}
               onEditLocation={handleEditLocation}
-              canEdit={role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN'}
+              canEdit={!isViewAsActive && (role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN')}
             />
           </div>
         </div>
@@ -181,10 +187,11 @@ export default function AgentsPage() {
         isLoading={isLoading}
         columns={columns}
         role={role}
+        isViewAsActive={isViewAsActive}
         onProvisionClick={() => setIsCreateOpen(true)}
       />
 
-      {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
+      {!isViewAsActive && (role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && (
         <ExternalAccountsSection
           role={role}
           isLoading={isLoading}

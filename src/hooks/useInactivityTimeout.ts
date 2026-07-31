@@ -62,6 +62,9 @@ export function useInactivityTimeout({
     } catch {
       // Proceed to login page even if request fails
     } finally {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("backone_view_as");
+      }
       window.location.href = "/login";
     }
   }, []);

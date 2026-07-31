@@ -2,9 +2,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { User as UserIcon, Sun, Moon, LogOut, Eye } from "lucide-react";
+import { User as UserIcon, LogOut, Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
 import { SafeImage } from "../ui/SafeImage";
 import { getViewAsStatusSync } from "@/lib/admin-api";
 
@@ -37,7 +36,6 @@ export default function SidebarProfile({ user, onOpenSettings }: ProfileProps) {
   const accountDropdownRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -105,9 +103,9 @@ export default function SidebarProfile({ user, onOpenSettings }: ProfileProps) {
       </button>
 
       {isAccountDropdownOpen && (
-        <div className="absolute bottom-0 left-full ml-4 w-60 rounded-xl border border-border bg-card/95 backdrop-blur-xl p-2 shadow-2xl z-50 animate-fade-in">
-          <div className="flex flex-col items-center justify-center p-3 mb-2 border-b border-border/50">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-primary to-blue-400 overflow-hidden mb-2">
+        <div className="absolute bottom-full left-0 mb-3 w-[232px] md:bottom-0 md:left-full md:right-auto md:ml-4 md:mb-0 md:w-60 rounded-2xl border border-slate-700/90 bg-[#0F172A] p-3 shadow-[0_10px_38px_-10px_rgba(0,0,0,0.9)] z-50 animate-fade-in ring-1 ring-white/10">
+          <div className="flex flex-col items-center justify-center p-3 mb-2 border-b border-white/10 bg-white/[0.02] rounded-xl text-center">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-primary to-blue-400 overflow-hidden mb-2 shadow-md">
               {user?.profile_picture ? (
                 <SafeImage src={`/api/uploads/${user.profile_picture}`} alt="Profile" className="w-full h-full object-cover" />
               ) : (
@@ -116,12 +114,12 @@ export default function SidebarProfile({ user, onOpenSettings }: ProfileProps) {
                 </span>
               )}
             </div>
-            <span className="text-sm font-bold text-foreground text-center break-words w-full leading-tight">
+            <span className="text-xs font-bold text-slate-100 text-center break-words w-full leading-tight">
               {user?.account_name || user?.username || 'Loading...'}
             </span>
             {isViewAsMode ? (
-              <span className="text-xs text-amber-400 mt-1 text-center font-medium flex items-center gap-1">
-                <Eye className="w-3 h-3" />
+              <span className="text-[11px] text-amber-400 mt-1 text-center font-medium flex items-center gap-1 justify-center">
+                <Eye className="w-3 h-3 shrink-0" />
                 {(() => {
                   const vt = viewAsStatus?.view_as_type;
                   if (vt === 'user') {
@@ -133,7 +131,7 @@ export default function SidebarProfile({ user, onOpenSettings }: ProfileProps) {
                 })()}
               </span>
             ) : (
-              <span className="text-xs text-primary mt-1 text-center font-medium">
+              <span className="text-[11px] text-primary mt-1 text-center font-semibold">
                 {getRoleDisplayName(user?.role)}
               </span>
             )}
@@ -145,30 +143,28 @@ export default function SidebarProfile({ user, onOpenSettings }: ProfileProps) {
                 setIsAccountDropdownOpen(false);
                 onOpenSettings();
               }}
-              className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+              className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap"
             >
-              <UserIcon className="h-4 w-4" /> Account Settings
+              <UserIcon className="h-4 w-4 text-primary shrink-0" /> Account Settings
             </button>
           )}
-          <button
-            onClick={() => {
-              setTheme(theme === 'dark' ? 'light' : 'dark');
-              setIsAccountDropdownOpen(false);
-            }}
-            className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-          >
-            {theme === 'dark' ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
-            <span className="truncate">{theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}</span>
-          </button>
-          <div className="h-px bg-border/50 my-1 mx-2" />
+
+          <div className="h-px bg-white/10 my-1.5 mx-1" />
           <button
             onClick={async () => {
-              await fetch('/api/auth/logout', { method: 'POST' });
+              try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+              } catch (e) {
+                console.error('Logout error:', e);
+              }
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('backone_view_as');
+              }
               window.location.href = "/login";
             }}
-            className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+            className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/15 transition-all whitespace-nowrap"
           >
-            <LogOut className="h-4 w-4" /> Sign Out
+            <LogOut className="h-4 w-4 text-red-400 shrink-0" /> Sign Out
           </button>
         </div>
       )}

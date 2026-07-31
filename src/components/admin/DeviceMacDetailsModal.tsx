@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { fmtBytes } from "@/lib/utils";
 import { getViewAsHeaders } from "@/lib/admin-api";
-import { Loader2, Monitor, Shield, Tag, Cpu, Clock, Network } from "lucide-react";
+import { Loader2, Monitor, Shield, Tag, Cpu, Clock, Network, ArrowDownToLine } from "lucide-react";
 
 interface IpHistoryItem {
   ip_address: string;
@@ -39,46 +39,57 @@ export default function DeviceMacDetailsModal({
   const [ips, setIps] = useState<IpHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const exportToPdf = async () => {
+    setIsExporting(true);
+    try {
+      const { pdf } = await import("@react-pdf/renderer");
+      const { default: DeviceMacPdfDocument } = await import("./DeviceMacPdfDocument");
+      const reportDateStr = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " WIB";
+      const doc = <DeviceMacPdfDocument macAddress={macAddress} customLabel={customLabel} defaultLabel={defaultLabel} agentName={agentName} manufacturer={manufacturer} deviceType={deviceType} ips={ips} reportDateStr={reportDateStr} />;
+      const blob = await pdf(doc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Device_MAC_Details_${macAddress.replace(/[:]/g, "")}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export PDF:", err);
+      alert("Failed to generate PDF report. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen || !macAddress) return;
-
     setIsLoading(true);
     setError(null);
-
-    fetch(`/api/dashboard/devices/mac-details?mac=${encodeURIComponent(macAddress)}`, {
-      headers: getViewAsHeaders(),
-    })
+    fetch(`/api/dashboard/devices/mac-details?mac=${encodeURIComponent(macAddress)}`, { headers: getViewAsHeaders() })
       .then((res) => res.json())
       .then((data) => {
-        if (data.ok) {
-          setIps(data.ips || []);
-        } else {
-          setError(data.error || "Failed to load device details.");
-        }
+        if (data.ok) setIps(data.ips || []);
+        else setError(data.error || "Failed to load device details.");
       })
-      .catch((err) => {
-        setError(err.message || "An error occurred while loading details.");
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+      .catch((err) => setError(err.message || "An error occurred while loading details."))
+      .finally(() => setIsLoading(false));
   }, [isOpen, macAddress]);
 
-  const formatFriendlyDate = (dateStr?: string) => {
-    if (!dateStr) return "-";
+  const DateCell = ({ dateStr }: { dateStr?: string }) => {
+    if (!dateStr) return <span>-</span>;
     try {
-      const date = new Date(dateStr);
-      return date.toLocaleString("id-ID", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }) + " WIB";
-    } catch {
-      return dateStr;
-    }
+      const d = new Date(dateStr);
+      const datePart = d.toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
+      const timePart = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
+      return (
+        <div className="flex flex-col items-center justify-center leading-tight py-0.5" title={`${datePart} ${timePart}`}>
+          <span className="font-medium text-slate-300 text-[11px] whitespace-nowrap">{datePart}</span>
+          <span className="text-[10px] text-slate-500 whitespace-nowrap">{timePart}</span>
+        </div>
+      );
+    } catch { return <span>{dateStr}</span>; }
   };
 
   return (
@@ -89,12 +100,12 @@ export default function DeviceMacDetailsModal({
     >
       <div className="space-y-6 max-h-[75vh] overflow-y-auto pr-1 custom-scrollbar">
         {/* Profile Card */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
               <Tag className="w-3 h-3" /> MAC Address
             </span>
-            <code className="text-xs text-white font-mono block">{macAddress}</code>
+            <code className="text-xs text-white font-mono block truncate" title={macAddress}>{macAddress}</code>
           </div>
 
           <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-1">
@@ -132,7 +143,7 @@ export default function DeviceMacDetailsModal({
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
               <Shield className="w-3 h-3" /> Device Type
             </span>
-            <span className="text-xs text-slate-200 block capitalize">{deviceType || "Unknown"}</span>
+            <span className="text-xs text-slate-200 block capitalize truncate" title={deviceType}>{deviceType || "Unknown"}</span>
           </div>
 
           <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-1">
@@ -165,47 +176,57 @@ export default function DeviceMacDetailsModal({
               No IP addresses recorded for this MAC address.
             </div>
           ) : (
-            <div className="border border-white/5 rounded-xl overflow-hidden bg-white/[0.01]">
-              <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                <table className="w-full text-xs text-slate-300">
-                  <thead className="bg-white/[0.03] text-slate-400 uppercase text-[9px] tracking-wider sticky top-0 z-10 border-b border-white/5">
-                    <tr>
-                      <th className="px-3 py-2 text-center">IP Address</th>
-                      <th className="px-3 py-2 text-center">First Seen</th>
-                      <th className="px-3 py-2 text-center">Last Seen</th>
-                      <th className="px-3 py-2 text-center">Traffic (Down / Up)</th>
-                      <th className="px-3 py-2 text-center">Flows</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {ips.map((ip) => (
-                      <tr key={ip.ip_address} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="px-3 py-2.5 font-mono text-center text-slate-200">
+            <div className="border border-white/10 rounded-xl overflow-x-auto overflow-y-auto max-h-60 custom-scrollbar bg-[#090D16]">
+              <table className="w-full text-xs text-slate-300 border-collapse table-fixed min-w-[520px]">
+                <thead className="bg-[#0F172A] text-slate-300 uppercase text-[9px] tracking-wider border-b border-white/10 sticky top-0 z-10">
+                  <tr className="bg-[#0F172A]">
+                    <th className="px-2.5 py-2.5 text-center w-[25%]">IP Address</th>
+                    <th className="px-2 py-2.5 text-center w-[20%]">First Seen</th>
+                    <th className="px-2 py-2.5 text-center w-[20%]">Last Seen</th>
+                    <th className="px-2 py-2.5 text-center w-[23%]">Traffic (Down / Up)</th>
+                    <th className="px-2 py-2.5 text-center w-[12%]">Flows</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {ips.map((ip) => (
+                    <tr key={ip.ip_address} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-2.5 py-2.5 font-mono text-center text-slate-200">
+                        <div className="truncate w-full text-center font-semibold text-cyan-300 text-xs" title={ip.ip_address}>
                           {ip.ip_address}
-                        </td>
-                        <td className="px-3 py-2.5 text-center text-slate-400">
-                          {formatFriendlyDate(ip.first_seen)}
-                        </td>
-                        <td className="px-3 py-2.5 text-center text-slate-400 flex items-center justify-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-500" />
-                          {formatFriendlyDate(ip.last_seen)}
-                        </td>
-                        <td className="px-3 py-2.5 text-center font-mono">
-                          {fmtBytes(ip.download)} / {fmtBytes(ip.upload)}
-                        </td>
-                        <td className="px-3 py-2.5 text-center font-mono text-slate-400">
-                          {ip.flows}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2.5 text-center text-slate-400">
+                        <DateCell dateStr={ip.first_seen} />
+                      </td>
+                      <td className="px-2 py-2.5 text-center text-slate-400">
+                        <DateCell dateStr={ip.last_seen} />
+                      </td>
+                      <td className="px-2 py-2.5 text-center font-mono text-[11px] whitespace-nowrap">
+                        <span className="text-cyan-400 font-semibold">{fmtBytes(ip.download)}</span>
+                        <span className="text-slate-600 mx-1">/</span>
+                        <span className="text-emerald-400 font-semibold">{fmtBytes(ip.upload)}</span>
+                      </td>
+                      <td className="px-2 py-2.5 text-center font-mono text-cyan-400 font-semibold text-xs">
+                        {ip.flows?.toLocaleString() ?? 0}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
 
-        <div className="flex justify-end pt-4 border-t border-white/5">
+        <div className="flex items-center justify-between pt-4 border-t border-white/5">
+          <button
+            type="button"
+            disabled={isExporting || isLoading}
+            onClick={exportToPdf}
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+          >
+            {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowDownToLine className="w-3.5 h-3.5" />}
+            <span>{isExporting ? "Generating..." : "Export PDF"}</span>
+          </button>
           <button
             type="button"
             onClick={onClose}

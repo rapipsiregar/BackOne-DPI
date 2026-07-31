@@ -179,48 +179,50 @@ export function CategoryDetailPanel({
               <p className="text-sm">No records found for this entry in Database</p>
             </div>
           ) : (
-            <table className="w-full border-collapse text-center whitespace-nowrap text-sm table-fixed">
-              <thead className="sticky top-0 bg-secondary z-10 shadow-md">
-                {activeTab === "apps" ? (
-                  <tr>
-                    <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center w-[33%]">Application</th>
-                    <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center w-[33%]">Download</th>
-                    <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center w-[33%]">Upload</th>
-                  </tr>
-                ) : (
-                  <tr>
-                    <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center w-[16%]">Source IP</th>
-                    <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center w-[16%]">MAC Address</th>
-                    <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center w-[20%]">Device Name</th>
-                    <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center w-[16%]">Manufacturer</th>
-                    <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center w-[16%]">Download</th>
-                    <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center w-[16%]">Upload</th>
-                  </tr>
-                )}
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                {activeTab === "apps" ? (
-                  (pagedData as CategoryDetailAppRow[]).map((row, i) => (
-                    <tr key={i} className="hover:bg-white/[0.04] transition-colors duration-150">
-                      <td className="px-3 py-2.5 text-sm text-center align-middle"><Cell value={row.app_label || "—"} className="text-slate-200" /></td>
-                      <td className="px-3 py-2.5 text-sm text-center align-middle"><Cell value={fmtBytes(row.download)} className="text-cyan-400 font-mono text-xs" /></td>
-                      <td className="px-3 py-2.5 text-sm text-center align-middle"><Cell value={fmtBytes(row.upload)} className="text-emerald-400 font-mono text-xs" /></td>
+            <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
+              <table className="w-full border-collapse text-center whitespace-nowrap text-sm table-fixed">
+                <thead className="bg-[#111827] border-b border-white/10 sticky top-0 z-10">
+                  {activeTab === "apps" ? (
+                    <tr className="bg-[#111827]">
+                      <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-center w-[33%]">Application</th>
+                      <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-center w-[33%]">Download</th>
+                      <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-center w-[33%]">Upload</th>
                     </tr>
-                  ))
-                ) : (
-                  (pagedData as CategoryDetailDeviceRow[]).map((row, i) => (
-                    <tr key={i} className="hover:bg-white/[0.04] transition-colors duration-150">
-                      <td className="px-3 py-2.5 text-sm text-center align-middle"><Cell value={row.src_ip || "—"} className="text-blue-400 font-mono text-xs" /></td>
-                      <td className="px-3 py-2.5 text-sm text-center align-middle"><Cell value={row.mac_address || "—"} className="font-mono text-xs text-slate-400" /></td>
-                      <td className="px-3 py-2.5 text-sm text-center align-middle"><Cell value={row.device_label || row.src_ip || "—"} className="text-slate-200" /></td>
-                      <td className="px-3 py-2.5 text-sm text-center align-middle"><Cell value={row.manufacturer || "—"} className="text-slate-400 text-xs" /></td>
-                      <td className="px-3 py-2.5 text-sm text-center align-middle"><Cell value={fmtBytes(row.download)} className="text-cyan-400 font-mono text-xs" /></td>
-                      <td className="px-3 py-2.5 text-sm text-center align-middle"><Cell value={fmtBytes(row.upload)} className="text-emerald-400 font-mono text-xs" /></td>
+                  ) : (
+                    <tr className="bg-[#111827]">
+                      <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-center w-[16%]">Source IP</th>
+                      <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-center w-[16%]">MAC Address</th>
+                      <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-center w-[20%]">Device Name</th>
+                      <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-center w-[16%]">Manufacturer</th>
+                      <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-center w-[16%]">Download</th>
+                      <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 text-center w-[16%]">Upload</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  )}
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                    {activeTab === "apps" ? (
+                      (pagedData as CategoryDetailAppRow[]).map((row, i) => (
+                        <tr key={i} className="hover:bg-white/[0.04] transition-colors duration-150">
+                          <td className="px-3 py-2.5 text-sm text-center align-middle w-[33%]"><Cell value={row.app_label || "—"} className="text-slate-200" /></td>
+                          <td className="px-3 py-2.5 text-sm text-center align-middle w-[33%]"><Cell value={fmtBytes(row.download)} className="text-cyan-400 font-mono text-xs" /></td>
+                          <td className="px-3 py-2.5 text-sm text-center align-middle w-[33%]"><Cell value={fmtBytes(row.upload)} className="text-emerald-400 font-mono text-xs" /></td>
+                        </tr>
+                      ))
+                    ) : (
+                      (pagedData as CategoryDetailDeviceRow[]).map((row, i) => (
+                        <tr key={i} className="hover:bg-white/[0.04] transition-colors duration-150">
+                          <td className="px-3 py-2.5 text-sm text-center align-middle w-[16%]"><Cell value={row.src_ip || "—"} className="text-blue-400 font-mono text-xs" /></td>
+                          <td className="px-3 py-2.5 text-sm text-center align-middle w-[16%]"><Cell value={row.mac_address || "—"} className="font-mono text-xs text-slate-400" /></td>
+                          <td className="px-3 py-2.5 text-sm text-center align-middle w-[20%]"><Cell value={row.device_label || row.src_ip || "—"} className="text-slate-200" /></td>
+                          <td className="px-3 py-2.5 text-sm text-center align-middle w-[16%]"><Cell value={row.manufacturer || "—"} className="text-slate-400 text-xs" /></td>
+                          <td className="px-3 py-2.5 text-sm text-center align-middle w-[16%]"><Cell value={fmtBytes(row.download)} className="text-cyan-400 font-mono text-xs" /></td>
+                          <td className="px-3 py-2.5 text-sm text-center align-middle w-[16%]"><Cell value={fmtBytes(row.upload)} className="text-emerald-400 font-mono text-xs" /></td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+            </div>
           )}
         </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, BookOpen, ChevronUp, ChevronDown, Info, HelpCircle, ExternalLink } from "lucide-react";
 import Link from "next/link";
@@ -102,6 +103,11 @@ function SectionBlock({ heading, content, steps, columns, items }: PageGuide["se
 
 export function ContextualHelpModal({ pageId, isOpen, onClose }: ContextualHelpModalProps) {
   const guide = PAGE_GUIDES.find((p) => p.id === pageId);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Esc key closes modal
   useEffect(() => {
@@ -118,12 +124,11 @@ export function ContextualHelpModal({ pageId, isOpen, onClose }: ContextualHelpM
     };
   }, [isOpen, onClose]);
 
-  if (!guide) return null;
+  if (!mounted || !guide || !isOpen) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4">
           {/* Backdrop blur overlay */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -139,32 +144,32 @@ export function ContextualHelpModal({ pageId, isOpen, onClose }: ContextualHelpM
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ type: "spring", duration: 0.4 }}
-            className="relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl border border-white/10 bg-slate-900/90 text-white shadow-2xl overflow-hidden"
+            className="relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl border border-white/10 bg-slate-900/95 text-white shadow-2xl overflow-hidden backdrop-blur-xl"
           >
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-white/6 px-6 py-4 bg-gradient-to-r from-blue-900/20 to-indigo-900/10">
+            <div className="flex items-start justify-between border-b border-white/6 px-4 py-3 sm:px-6 sm:py-4 bg-gradient-to-r from-blue-900/20 to-indigo-900/10">
               <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-600/15 border border-blue-500/20 text-xl shadow-inner">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-600/15 border border-blue-500/20 text-xl shadow-inner shrink-0">
                   {guide.icon}
                 </span>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-white">Guide: {guide.title}</h3>
+                    <h3 className="text-sm sm:text-base font-bold text-white truncate">Guide: {guide.title}</h3>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">Metric columns and data layout guide</p>
+                  <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">Metric columns and data layout guide</p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white transition-colors"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white transition-colors shrink-0"
               >
                 <X className="h-4.5 w-4.5" />
               </button>
             </div>
 
             {/* Scrollable Body */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
-              <div className="rounded-xl border border-blue-500/10 bg-blue-500/5 px-4 py-3 text-xs text-slate-300 leading-relaxed">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-3 sm:space-y-4">
+              <div className="rounded-xl border border-blue-500/10 bg-blue-500/5 px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs text-slate-300 leading-relaxed">
                 <span className="font-semibold text-blue-400">About This Page:</span> {guide.summary}
               </div>
 
@@ -174,29 +179,29 @@ export function ContextualHelpModal({ pageId, isOpen, onClose }: ContextualHelpM
             </div>
 
             {/* Footer */}
-            <div className="border-t border-white/6 bg-white/[0.02] px-6 py-4 flex items-center justify-between">
-              <span className="text-[10px] text-slate-500">
+            <div className="border-t border-white/6 bg-white/[0.02] px-4 py-3.5 sm:px-6 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span className="text-[10px] text-slate-400 text-center sm:text-left">
                 Full detailed lookup is available in the main User Guide.
               </span>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-end gap-2.5 w-full sm:w-auto">
                 <button
                   onClick={onClose}
-                  className="rounded-xl border border-white/8 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-all"
+                  className="flex-1 sm:flex-none justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-all text-center"
                 >
                   Close Guide
                 </button>
                 <Link
                   href="/help"
-                  className="flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-blue-600/10 hover:bg-blue-500 transition-all"
+                  className="flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-blue-600/20 hover:bg-blue-500 transition-all text-center flex"
                 >
                   Open Full Guide
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                 </Link>
               </div>
             </div>
           </motion.div>
         </div>
-      )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

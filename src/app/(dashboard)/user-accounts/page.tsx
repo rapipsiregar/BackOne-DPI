@@ -127,8 +127,8 @@ export default function UserAccountsPage() {
     const userRole = user.role;
     setViewAsLoading(user.username);
     try {
-      // startViewAsUser menyimpan: agent_label (label agent), user_name, user_role, view_as_type='user'
-      await startViewAsUser(targetAgentUuid, agentLabel, userName, userRole);
+      // startViewAsUser menyimpan: agent_label (label agent), user_name, user_role, view_as_type='user', target_user_id
+      await startViewAsUser(targetAgentUuid, agentLabel, userName, userRole, user.id);
       router.refresh();
       window.location.reload();
     } catch (err: any) {
@@ -148,18 +148,20 @@ export default function UserAccountsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-white flex items-center gap-3">
+    <div className="space-y-6 pb-24 sm:pb-10 animate-fade-in">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             User Accounts Directory
             {isLoading && <Loader2 className="w-5 h-5 animate-spin text-amber-500" />}
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage company tenant user access, roles, and device ownership delegation.
-          </p>
+          <div className="shrink-0">
+            <HelpTrigger pageId="user-accounts" />
+          </div>
         </div>
-        <HelpTrigger pageId="user-accounts" />
+        <p className="text-xs sm:text-sm text-slate-400">
+          Manage company tenant user access, roles, and device ownership delegation.
+        </p>
       </div>
 
       {error && (
@@ -214,11 +216,11 @@ export default function UserAccountsPage() {
           )}
           
           {role === "SUPER_ADMIN" && companies.length > 0 && (
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end pt-2 pb-6 sm:pb-0">
               <button
                 type="button"
                 onClick={() => handleAddUserClick("")}
-                className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition-all shadow-md shadow-amber-600/10 hover:shadow-lg cursor-pointer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition-all shadow-lg shadow-amber-600/20 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 Add New Company Admin

@@ -37,7 +37,7 @@ export default function DeviceOverviewTab({ data, deviceData }: DeviceOverviewTa
         </div>
       </div>
 
-      <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-border rounded-2xl p-6">
+      <div className="bg-white/[0.02] border border-border rounded-2xl p-6">
         <h4 className="text-sm font-bold text-card-foreground uppercase tracking-wider mb-6 flex items-center gap-2">
           <Server className="w-4 h-4 text-blue-500" /> Identity & Metadata
         </h4>

@@ -93,22 +93,16 @@ const WorldMapComponent = ({ data }: WorldMapProps) => {
       onMouseLeave={() => setTooltipData(null)}
     >
       {/* Legend */}
-      <div className="absolute top-4 left-4 z-10 flex flex-col gap-1 pointer-events-none bg-background/80 p-3 rounded-lg border border-border/50 backdrop-blur-md shadow-lg">
-        <div className="text-sm font-medium text-foreground flex items-center gap-2">
-          Heatmap Intensity
-        </div>
-        <div className="flex items-center gap-2 mt-2">
-          <div className="text-xs text-muted-foreground">Low</div>
-          <div 
-            className="w-24 h-2 rounded-full shadow-sm"
-            style={{ 
-              background: isLight 
-                ? 'linear-gradient(to right, #e0f2fe, #bae6fd, #7dd3fc, #38bdf8, #0284c7)' 
-                : 'linear-gradient(to right, #1e3a8a, #1d4ed8, #2563eb, #60a5fa)' 
-            }}
-          ></div>
-          <div className="text-xs text-muted-foreground">High</div>
-        </div>
+      <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-10 flex items-center gap-2 pointer-events-none bg-background/90 px-3 py-1.5 rounded-full border border-border/50 backdrop-blur-md shadow-md text-[10px] sm:text-xs text-muted-foreground font-medium">
+        <span className="font-semibold text-foreground hidden sm:inline">Intensity:</span>
+        <span>Low</span>
+        <div 
+          className="w-14 sm:w-20 h-1.5 sm:h-2 rounded-full shadow-sm"
+          style={{ 
+            background: 'linear-gradient(to right, #1e3a8a, #1d4ed8, #2563eb, #60a5fa)' 
+          }}
+        />
+        <span>High</span>
       </div>
       
       {/* Zoom Controls */}

@@ -172,6 +172,7 @@ router.post('/logout', requireAuth, async (req, res) => {
     console.error('[Logout] Session deletion failed:', err.message);
   }
   res.clearCookie('token');
+  res.clearCookie('view_as_token');
   res.json({ message: 'Logged out successfully' });
 });
 

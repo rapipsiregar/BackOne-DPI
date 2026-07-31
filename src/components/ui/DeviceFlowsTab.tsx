@@ -19,14 +19,14 @@ interface ColDef {
 
 function TableWrap({ children, cols }: { children: React.ReactNode; cols: ColDef[] }) {
   return (
-    <div className="overflow-x-auto overflow-y-auto max-h-[60vh] rounded-xl border border-border/50 bg-secondary/10 custom-scrollbar">
-      <table className="w-full text-xs text-center table-fixed whitespace-nowrap min-w-[800px]">
-        <thead className="sticky top-0 bg-[#111827] z-10">
-          <tr className="border-b border-border">
+    <div className="rounded-xl border border-border/50 bg-[#090D16] overflow-x-auto custom-scrollbar touch-pan-y">
+      <table className="w-full text-xs text-center table-fixed whitespace-nowrap min-w-[800px] border-collapse">
+        <thead className="bg-[#111827] border-b border-border/80">
+          <tr className="bg-[#111827]">
             {cols.map((c) => (
               <th
                 key={c.header}
-                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] text-center ${c.width}`}
+                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] text-center bg-[#111827] border-b border-border/80 ${c.width}`}
               >
                 {c.header}
               </th>
@@ -51,7 +51,7 @@ function Cell({ value, className = "", center = true, right = false }: { value: 
   );
 }
 
-export default function DeviceFlowsTab({ flows, ip }: Props) {
+export default function DeviceFlowsTab({ flows = [], ip }: Props) {
   const [page, setPage] = useState(1);
   const pageSize = 50;
   const { 
@@ -82,7 +82,7 @@ export default function DeviceFlowsTab({ flows, ip }: Props) {
 
   if (flows.length === 0) {
     return (
-      <div className="text-center py-10 bg-slate-50/50 dark:bg-white/[0.02] border border-border rounded-2xl">
+      <div className="text-center py-10 bg-white/[0.02] border border-border rounded-2xl">
         <Activity className="w-12 h-12 text-muted-foreground/60 mx-auto mb-3" />
         <h4 className="text-card-foreground font-bold text-lg mb-1">No Flow Data Yet</h4>
         <p className="text-muted-foreground font-medium max-w-md mx-auto">

@@ -16,7 +16,7 @@ interface GlobeMapProps {
 
 export const GlobeMap = ({ data }: GlobeMapProps) => {
   const globeRef = useRef<any>(null);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
+  const [dimensions, setDimensions] = useState({ width: 360, height: 320 });
   const [countries, setCountries] = useState<any>(null);
   const [userInteracting, setUserInteracting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,10 +26,10 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
-        setDimensions({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight || 500
-        });
+        const width = containerRef.current.offsetWidth || (typeof window !== 'undefined' ? window.innerWidth : 360);
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+        const height = containerRef.current.offsetHeight || (isMobile ? 320 : 480);
+        setDimensions({ width, height });
       }
     };
 
@@ -52,7 +52,7 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  // Setup Initial Controls & Position
+  // Setup Initial Controls & Camera Position
   useEffect(() => {
     let checkInterval = setInterval(() => {
       if (globeRef.current && globeRef.current.controls) {
@@ -64,14 +64,18 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         controls.rotateSpeed = 0.8;
         controls.minPolarAngle = Math.PI / 4; 
         controls.maxPolarAngle = Math.PI * 3/4;
-        controls.minDistance = 140; // Zoom in limit
-        controls.maxDistance = 350; // Zoom out limit
+        controls.minDistance = 120; // Zoom in limit
+        controls.maxDistance = 500; // Zoom out limit
 
         controls.addEventListener('start', () => setUserInteracting(true));
         controls.addEventListener('end', () => setUserInteracting(false));
 
-        // Focus on Southeast Asia initially
-        globeRef.current.pointOfView({ lat: -6.2, lng: 106.8, altitude: 1.8 }, 2000);
+        // Focus on Southeast Asia with optimal altitude on mobile to ensure 100% full sphere visibility
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+        const initialAlt = isMobile ? 2.4 : 1.8;
+        const initialLat = isMobile ? 5 : -6.2;
+        
+        globeRef.current.pointOfView({ lat: initialLat, lng: 106.8, altitude: initialAlt }, 1500);
       }
     }, 100);
 
@@ -119,7 +123,6 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
 
   const { arcsData, pointsData, labelsData } = useGlobeData(data, isLight);
 
-  // Stable polygon color callbacks to prevent mesh rebuilds and fix drag lag (Requirement 1 & 2)
   const getPolygonCapColor = useMemo(() => {
     const color = isLight ? '#4ade80' : '#0f172a';
     return () => color;
@@ -138,7 +141,7 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-[500px] rounded-xl overflow-visible bg-transparent cursor-move flex items-center justify-center transition-all duration-500"
+      className="relative w-full h-[360px] sm:h-[400px] md:h-[480px] rounded-xl overflow-hidden bg-transparent cursor-move flex items-center justify-center transition-all duration-500 mx-auto"
       onMouseEnter={() => setUserInteracting(true)}
       onMouseLeave={() => setUserInteracting(false)}
     >
@@ -169,20 +172,15 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         arcDashGap={0.2}
         arcDashAnimateTime={2000}
         arcAltitude={(d: any) => {
-          // Convert lat/lng to radians
           const phi1 = d.startLat * Math.PI / 180;
           const lambda1 = d.startLng * Math.PI / 180;
           const phi2 = d.endLat * Math.PI / 180;
           const lambda2 = d.endLng * Math.PI / 180;
           
-          // Great-circle angular distance
           const cosTheta = Math.sin(phi1) * Math.sin(phi2) + Math.cos(phi1) * Math.cos(phi2) * Math.cos(lambda1 - lambda2);
           const theta = Math.acos(Math.max(-1, Math.min(1, cosTheta)));
-          
-          // Chord depth under the sphere surface
           const chordDepth = 1 - Math.cos(theta / 2);
           
-          // Sleeker hover height that hugs the sphere surface closely (Requirement 2)
           return chordDepth + 0.02 + (theta * 0.008);
         }}
         arcStroke={isLight ? 0.8 : 0.6}
@@ -213,7 +211,7 @@ export const GlobeMap = ({ data }: GlobeMapProps) => {
         labelText="name"
         labelColor={(d: any) => d.color}
         labelResolution={2}
-        labelAltitude={0.02} // float labels above polygon altitude to make them visible (Requirement 1)
+        labelAltitude={0.02}
       />
     </div>
   );

@@ -17,14 +17,14 @@ interface ColDef {
 
 function TableWrap({ children, cols }: { children: React.ReactNode; cols: ColDef[] }) {
   return (
-    <div className="overflow-x-auto overflow-y-auto max-h-[60vh] rounded-xl border border-border/50 bg-secondary/10 custom-scrollbar">
-      <table className="w-full text-xs text-center table-fixed whitespace-nowrap min-w-[700px]">
-        <thead className="sticky top-0 bg-[#111827] z-10">
-          <tr className="border-b border-border">
+    <div className="rounded-xl border border-border/50 bg-[#090D16] overflow-x-auto overflow-y-auto max-h-[55vh] custom-scrollbar">
+      <table className="w-full text-xs text-center table-fixed whitespace-nowrap min-w-[700px] border-collapse">
+        <thead className="bg-[#111827] border-b border-border/80 sticky top-0 z-10">
+          <tr className="bg-[#111827]">
             {cols.map((c) => (
               <th
                 key={c.header}
-                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] text-center ${c.width}`}
+                className={`px-3 py-2.5 font-medium text-muted-foreground uppercase tracking-wider text-[10px] text-center bg-[#111827] border-b border-border/80 ${c.width}`}
               >
                 {c.header}
               </th>
@@ -49,7 +49,7 @@ function Cell({ value, className = "", center = true, right = false }: { value: 
   );
 }
 
-export default function DeviceThreatsTab({ threats }: Props) {
+export default function DeviceThreatsTab({ threats = [] }: Props) {
   const [page, setPage] = useState(1);
   const pageSize = 50;
 

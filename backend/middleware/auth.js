@@ -19,9 +19,12 @@ async function requireAuth(req, res, next) {
         res.clearCookie('token');
         return res.status(401).json({ error: 'Sesi login telah dinonaktifkan atau kedaluwarsa.' });
       }
-      // Update last active
-      activeSession.last_active = new Date();
-      await activeSession.save();
+      // Debounce last_active update: only update if older than 60s, and execute asynchronously
+      const now = new Date();
+      if (!activeSession.last_active || (now.getTime() - new Date(activeSession.last_active).getTime() > 60000)) {
+        activeSession.last_active = now;
+        activeSession.save().catch(err => console.error('[Auth] Session save err:', err.message));
+      }
     }
 
     // ── VIEW-AS MODE ──────────────────────────────────────────────────────────
@@ -45,11 +48,18 @@ async function requireAuth(req, res, next) {
             }
           }
 
-          const targetAgentUser = await User.findOne({ agent_uuid: targetAgent, role: 'AGENT_VIEWER' }).lean();
+          let targetUserDoc = null;
+          if (viewDecoded.target_user_id) {
+            targetUserDoc = await User.findById(viewDecoded.target_user_id).lean();
+          } else if (viewDecoded.target_username) {
+            targetUserDoc = await User.findOne({ username: viewDecoded.target_username }).lean();
+          } else {
+            targetUserDoc = await User.findOne({ agent_uuid: targetAgent, role: 'AGENT_VIEWER' }).lean();
+          }
           
           let targetSiteUuid = req.user.site_uuid;
-          if (targetAgentUser && targetAgentUser.site_uuid) {
-            targetSiteUuid = targetAgentUser.site_uuid;
+          if (targetUserDoc && targetUserDoc.site_uuid) {
+            targetSiteUuid = targetUserDoc.site_uuid;
           } else {
             const summaryDoc = await Summary.findOne({ agent_uuid: targetAgent }).lean();
             if (summaryDoc && summaryDoc.site_uuid) {
@@ -59,11 +69,15 @@ async function requireAuth(req, res, next) {
 
           req.user = {
             ...req.user,
-            role:          'AGENT_VIEWER',
-            agent_uuid:    targetAgent,
+            role:          targetUserDoc ? targetUserDoc.role : 'AGENT_VIEWER',
+            agent_uuid:    targetUserDoc ? (targetUserDoc.agent_uuid || targetAgent) : targetAgent,
+            agent_uuids:   targetUserDoc ? (targetUserDoc.agent_uuids || [targetAgent]) : [targetAgent],
             agent_label:   viewDecoded.viewAsLabel,
             site_uuid:     targetSiteUuid,
+            company_name:  targetUserDoc ? targetUserDoc.company_name : req.user.company_name,
             _viewAsMode:   true,
+            _viewAsUser:   !!targetUserDoc,
+            _targetUserId: targetUserDoc ? targetUserDoc.id : null,
             _originalRole: req.user.role,
           };
         }
@@ -91,8 +105,11 @@ async function requireAdmin(req, res, next) {
         res.clearCookie('token');
         return res.status(401).json({ error: 'Sesi login telah dinonaktifkan atau kedaluwarsa.' });
       }
-      activeSession.last_active = new Date();
-      await activeSession.save();
+      const now = new Date();
+      if (!activeSession.last_active || (now.getTime() - new Date(activeSession.last_active).getTime() > 60000)) {
+        activeSession.last_active = now;
+        activeSession.save().catch(err => console.error('[AuthAdmin] Session save err:', err.message));
+      }
     }
 
     const validAdminRoles = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'COMPANY_OPERATOR', 'TENANT_ADMIN', 'SOC_ANALYST'];

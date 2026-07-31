@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HelpCircle, X, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTenantConfig } from '@/contexts/TenantConfigContext';
@@ -39,7 +39,25 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
 export function HelpCenterFAB() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isModalActive, setIsModalActive] = useState(false);
   const { tenantConfig } = useTenantConfig();
+
+  useEffect(() => {
+    const checkModalState = () => {
+      const isLocked = document.body.style.overflow === "hidden";
+      const hasModalInDom = Boolean(
+        document.querySelector(".animate-modal-in") || 
+        document.querySelector('[role="dialog"]')
+      );
+      setIsModalActive(isLocked || hasModalInDom);
+    };
+    
+    checkModalState();
+
+    const observer = new MutationObserver(checkModalState);
+    observer.observe(document.body, { attributes: true, attributeFilter: ["style", "class"], childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
 
   const brandName = tenantConfig?.brandName || "System";
   const footerCopyright = tenantConfig?.footerCopyright || `${brandName} &copy; 2026`;
@@ -50,6 +68,8 @@ export function HelpCenterFAB() {
       faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (isModalActive) return null;
+
   return (
     <>
       {/* Floating Action Button */}
@@ -57,7 +77,7 @@ export function HelpCenterFAB() {
         onClick={() => setIsOpen(true)}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:bg-blue-500 transition-colors"
+        className="help-center-fab fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-30 flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:bg-blue-500 transition-colors"
         aria-label="Help and Resources"
       >
         <HelpCircle className="h-6 w-6" />

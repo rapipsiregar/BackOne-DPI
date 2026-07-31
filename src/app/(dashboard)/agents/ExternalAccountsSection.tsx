@@ -5,6 +5,8 @@ import { DataTable, Column } from "@/components/ui/DataTable";
 import { Plus, Loader2 } from "lucide-react";
 import { type ManagedUser } from "@/lib/admin-api";
 
+import { getSiteBranding } from "@/lib/branding";
+
 interface ExternalAccountsSectionProps {
   role: string | null;
   isLoading: boolean;
@@ -32,14 +34,17 @@ export default function ExternalAccountsSection({
   setTargetCreatedBy,
   setExternalModalOpen,
 }: ExternalAccountsSectionProps) {
+  const siteUuid = typeof window !== 'undefined' ? (localStorage.getItem('backone_site_uuid') || undefined) : undefined;
+  const branding = getSiteBranding(siteUuid);
+
   if (role === 'SUPER_ADMIN') {
     return (
       <div className="space-y-6">
-        {/* Table 1: Superadmin (BackOne) Accounts */}
+        {/* Table 1: Superadmin Accounts */}
         <Card className="bg-card/50 backdrop-blur-sm border-border/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-white flex items-center gap-2">
-              <span>Superadmin (BackOne) External Accounts ({superadminUsers.length})</span>
+              <span>Superadmin ({branding.name}) External Accounts ({superadminUsers.length})</span>
             </CardTitle>
             <button
               onClick={() => {

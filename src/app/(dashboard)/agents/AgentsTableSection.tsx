@@ -10,6 +10,7 @@ interface AgentsTableSectionProps {
   isLoading: boolean;
   columns: Column<Agent>[];
   role: string | null;
+  isViewAsActive?: boolean;
   onProvisionClick?: () => void;
 }
 
@@ -18,13 +19,14 @@ export default function AgentsTableSection({
   isLoading,
   columns,
   role,
+  isViewAsActive,
   onProvisionClick,
 }: AgentsTableSectionProps) {
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-border/50">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <CardTitle className="text-white">Provisioned Network Agents ({agents.length})</CardTitle>
-        {(role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && onProvisionClick && (
+        {!isViewAsActive && (role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN') && onProvisionClick && (
           <button 
             onClick={onProvisionClick}
             className="flex items-center gap-2 bg-primary hover:bg-primary/95 text-primary-foreground px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-blue-500/10"

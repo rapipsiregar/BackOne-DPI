@@ -20,25 +20,25 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#3b82f6'
 
 export function TopWidgets({ topApps, topProtocols }: TopWidgetsProps) {
   return (
-    <div className="col-span-3 space-y-6">
+    <div className="w-full space-y-4 sm:space-y-6">
       <Card className="bg-card/80 backdrop-blur-xl border-border/50 flex-1">
-        <CardHeader>
-          <CardTitle className="text-lg text-white">Top Apps (Download)</CardTitle>
+        <CardHeader className="p-3.5 pb-2 sm:p-6 sm:pb-4">
+          <CardTitle className="text-sm sm:text-lg text-white">Top Apps (Download)</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3.5 pt-0 sm:p-6 sm:pt-0">
           {(!topApps.data || topApps.data.length === 0) ? (
-            <div className="h-[150px] flex items-center justify-center text-muted-foreground text-sm">
+            <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">
               No Data
             </div>
           ) : (
-            <div className="h-[150px] w-full">
+            <div className="h-[200px] sm:h-[220px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topApps.data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <BarChart data={topApps.data} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                   <XAxis dataKey="app_label" stroke="#a1a1aa" fontSize={11} tickLine={false} axisLine={false} tickMargin={5} />
                   <YAxis 
                     stroke="#a1a1aa" 
-                    fontSize={11} 
+                    fontSize={10} 
                     tickLine={false} 
                     axisLine={false}
                     tickFormatter={(value) => {
@@ -55,7 +55,7 @@ export function TopWidgets({ topApps, topProtocols }: TopWidgetsProps) {
                       borderRadius: '8px',
                       color: '#fafafa',
                     }}
-                    itemStyle={{ color: '#fafafa', fontSize: '13px', fontWeight: 500 }}
+                    itemStyle={{ color: '#fafafa', fontSize: '12px', fontWeight: 500 }}
                     formatter={(value: any) => [fmtBytes(value as number), 'Download']}
                   />
                   <Bar dataKey="download" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
@@ -67,50 +67,53 @@ export function TopWidgets({ topApps, topProtocols }: TopWidgetsProps) {
       </Card>
 
       <Card className="bg-card/80 backdrop-blur-xl border-border/50 flex-1">
-        <CardHeader>
-          <CardTitle className="text-lg text-white">Top Protocols</CardTitle>
+        <CardHeader className="p-3.5 pb-2 sm:p-6 sm:pb-4">
+          <CardTitle className="text-sm sm:text-lg text-white">Top Protocols</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3.5 pt-0 sm:p-6 sm:pt-0">
           {(!topProtocols.data || topProtocols.data.length === 0) ? (
-            <div className="h-[150px] flex items-center justify-center text-muted-foreground text-sm">
+            <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">
               No Data
             </div>
           ) : (
-            <div className="h-[150px] w-full flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={topProtocols.data}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={70}
-                    paddingAngle={4}
-                    dataKey="download"
-                    nameKey="protocol_label"
-                    stroke="none"
-                  >
-                    {topProtocols.data.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'rgba(24, 24, 27, 0.9)', 
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)', 
-                      borderRadius: '8px',
-                      color: '#fafafa'
-                    }}
-                    itemStyle={{ color: '#fafafa', fontSize: '13px', fontWeight: 500 }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="min-h-[180px] sm:min-h-[200px] w-full flex flex-col sm:flex-row items-center justify-center gap-3">
+              <div className="h-[150px] sm:h-[160px] w-full max-w-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={topProtocols.data}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={65}
+                      paddingAngle={4}
+                      dataKey="download"
+                      nameKey="protocol_label"
+                      stroke="none"
+                    >
+                      {topProtocols.data.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(24, 24, 27, 0.9)', 
+                        backdropFilter: 'blur(10px)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)', 
+                        borderRadius: '8px',
+                        color: '#fafafa'
+                      }}
+                      itemStyle={{ color: '#fafafa', fontSize: '12px', fontWeight: 500 }}
+                      formatter={(value: any) => [fmtBytes(value as number), 'Traffic']}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
               {/* Custom Legend */}
-              <div className="flex flex-col justify-center ml-2 space-y-3">
+              <div className="flex flex-wrap sm:flex-col items-center justify-center sm:justify-start gap-2 sm:gap-3 sm:ml-2">
                 {topProtocols.data.slice(0, 5).map((entry, index) => (
-                  <div key={`${entry.protocol_label}-${index}`} className="flex items-center text-sm text-muted-foreground whitespace-nowrap group cursor-default">
-                    <div className="w-3.5 h-3.5 rounded-full mr-3 shrink-0 shadow-sm" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                  <div key={`${entry.protocol_label}-${index}`} className="flex items-center text-xs text-muted-foreground whitespace-nowrap group cursor-default">
+                    <div className="w-3 h-3 rounded-full mr-2 shrink-0 shadow-sm" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                     <span className="truncate max-w-[100px] group-hover:text-white transition-colors">{entry.protocol_label}</span>
                   </div>
                 ))}

@@ -1,17 +1,42 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
 
-// Client-side cache to prevent duplicate fetches for the same IP
+// Memory cache to prevent duplicate fetches for the same IP across component re-renders
 const geoIpCache: Record<string, { isp: string; country: string; as_org: string }> = {};
 
-export function IpDetails({ ip }: { ip: string }) {
-  const [details, setDetails] = useState<{ isp: string; country: string; as_org: string } | null>(null);
+function isPrivateIp(ip: string): boolean {
+  if (!ip) return false;
+  return (
+    ip.startsWith("192.168.") ||
+    ip.startsWith("10.") ||
+    ip.startsWith("127.") ||
+    ip === "0.0.0.0" ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)
+  );
+}
+
+const LOCAL_RESOLVED = {
+  isp: "Local Network",
+  country: "Local",
+  as_org: "Local Area Network"
+};
+
+export const IpDetails = memo(function IpDetails({ ip }: { ip: string }) {
+  const [details, setDetails] = useState<{ isp: string; country: string; as_org: string } | null>(() => {
+    if (!ip) return null;
+    if (isPrivateIp(ip)) return LOCAL_RESOLVED;
+    if (geoIpCache[ip]) return geoIpCache[ip];
+    return null;
+  });
 
   useEffect(() => {
     if (!ip) return;
+    if (isPrivateIp(ip)) {
+      setDetails(LOCAL_RESOLVED);
+      return;
+    }
 
-    // Check memory cache first
     if (geoIpCache[ip]) {
       setDetails(geoIpCache[ip]);
       return;
@@ -34,11 +59,13 @@ export function IpDetails({ ip }: { ip: string }) {
       .catch((err) => {
         console.warn("GeoIP lookup client error:", err);
         if (isMounted) {
-          setDetails({
+          const fallback = {
             isp: "Public IP",
             country: "Remote",
             as_org: "Public Network",
-          });
+          };
+          geoIpCache[ip] = fallback;
+          setDetails(fallback);
         }
       });
 
@@ -54,7 +81,10 @@ export function IpDetails({ ip }: { ip: string }) {
   const isLocal = details.country === "Local";
 
   return (
-    <div className="text-[10px] leading-tight mt-0.5 max-w-[180px] truncate" title={`${details.isp}${!isLocal ? ` • ${details.country}` : ''}`}>
+    <div
+      className="text-[10px] leading-tight mt-0.5 max-w-[180px] truncate"
+      title={`${details.isp}${!isLocal ? ` • ${details.country}` : ""}`}
+    >
       <span className={isLocal ? "text-emerald-500/90 font-medium" : "text-cyan-400/90 font-medium"}>
         {details.isp}
       </span>
@@ -65,4 +95,4 @@ export function IpDetails({ ip }: { ip: string }) {
       )}
     </div>
   );
-}
+});

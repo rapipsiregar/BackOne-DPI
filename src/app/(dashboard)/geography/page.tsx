@@ -104,15 +104,17 @@ export default function GeographyPage() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Geo Traffic
             {isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
           </h2>
-          <p className="text-muted-foreground mt-1">Visualize data flow and activity across the globe.</p>
+          <div className="shrink-0">
+            <HelpTrigger pageId="geography" />
+          </div>
         </div>
-        <HelpTrigger pageId="geography" />
+        <p className="text-xs sm:text-sm text-slate-400">Visualize data flow and activity across the globe.</p>
       </div>
       
       <UniversalFilters

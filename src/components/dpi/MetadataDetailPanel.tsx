@@ -114,9 +114,9 @@ function getColGroup(type: MetadataDetailType): string {
 
 // ─── Table Head ────────────────────────────────────────────────────────────────
 function TableHead({ cols }: { cols: ColDef[] }) {
-  const base = "px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center";
+  const base = "px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center bg-slate-900 sticky top-0 z-30";
   return (
-    <tr>
+    <tr className="bg-slate-900">
       {cols.map((c) => (
         <th key={c.header} className={`${base} ${c.width}`}>
           {c.header}
@@ -334,16 +334,18 @@ export function MetadataDetailPanel({ type, value, timeRange, onClose }: Props) 
               <p className="text-sm">No records found for this entry in Database</p>
             </div>
           ) : (
-            <table className="w-full border-collapse text-center whitespace-nowrap text-sm table-fixed">
-              <thead className="sticky top-0 bg-slate-900 z-10">
-                <TableHead cols={cols} />
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                {pagedData.map((row, i) => (
-                  <TableRow key={pageStart + i} row={row} group={group} />
-                ))}
-              </tbody>
-            </table>
+            <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
+              <table className="w-full border-collapse text-center whitespace-nowrap text-sm table-fixed">
+                <thead className="bg-slate-900 border-b border-white/10 sticky top-0 z-10">
+                  <TableHead cols={cols} />
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {pagedData.map((row, i) => (
+                    <TableRow key={pageStart + i} row={row} group={group} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 

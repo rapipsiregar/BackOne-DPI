@@ -47,12 +47,14 @@ export default function NetworkInfrastructurePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Network Topology</h1>
-          <p className="text-slate-400 mt-2">Physical, logical, and geographic network topologies.</p>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl sm:text-3xl font-bold text-white tracking-tight">Network Topology</h1>
+          <div className="shrink-0">
+            <HelpTrigger pageId="network-infrastructure" />
+          </div>
         </div>
-        <HelpTrigger pageId="network-infrastructure" />
+        <p className="text-xs sm:text-sm text-slate-400">Physical, logical, and geographic network topologies.</p>
       </div>
 
       <Tabs>

@@ -12,7 +12,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-card/80 backdrop-blur-xl text-card-foreground shadow-sm hover:shadow-primary/5 hover:border-primary/20 transition-all duration-300 ease-in-out hover:-translate-y-0.5",
+        "rounded-xl border border-border bg-card/80 backdrop-blur-xl text-card-foreground shadow-sm hover:shadow-primary/5 hover:border-primary/20 transition-colors duration-200",
         className
       )}
       {...props}
@@ -30,7 +30,7 @@ export function CardHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col space-y-1.5 p-6", className)}>
+    <div className={cn("flex flex-col space-y-1.5 p-3.5 sm:p-6", className)}>
       {children}
     </div>
   );
@@ -63,6 +63,6 @@ export function CardContent({
   className?: string;
 }) {
   return (
-    <div className={cn("p-6 pt-0", className)}>{children}</div>
+    <div className={cn("p-3.5 pt-0 sm:p-6 sm:pt-0", className)}>{children}</div>
   );
 }

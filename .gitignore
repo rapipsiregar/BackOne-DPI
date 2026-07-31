@@ -63,13 +63,14 @@ temp_docx/
 AGENTS.md
 CLAUDE.md
 .agents/
-docs/
 plans/
+All Account BackOne demoplace.pdf
+scripts/edge_user_data/
 .env*
+migration-temp/
 
 # Local uploads
 backend/public/api/uploads/
 
 # Database migration temporary files
-migration-temp/
 

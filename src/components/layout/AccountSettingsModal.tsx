@@ -32,17 +32,17 @@ export function AccountSettingsModal({
       isOpen={isOpen} 
       onClose={onClose} 
       title="Account Settings"
-      className="sm:max-w-3xl sm:w-full h-[520px]"
+      className="w-[95vw] max-w-3xl h-[85vh] max-h-[540px] md:h-[520px]"
     >
-      <div className="flex flex-col md:flex-row gap-6 h-[430px]">
-        {/* Left Sidebar Layout (Fixed Width & Height) */}
-        <div className="w-full md:w-[180px] flex flex-row md:flex-col gap-1 border-b md:border-b-0 md:border-r border-border/50 pb-4 md:pb-0 md:pr-4 shrink-0 overflow-x-auto md:overflow-x-visible custom-scrollbar h-full">
+      <div className="flex flex-col md:flex-row gap-3 md:gap-6 h-full max-h-[440px] overflow-hidden">
+        {/* Navigation Tabs (Horizontal on mobile, Vertical on desktop) */}
+        <div className="w-full md:w-[190px] flex flex-row md:flex-col gap-1.5 border-b md:border-b-0 md:border-r border-border/50 pb-2.5 md:pb-0 md:pr-4 shrink-0 overflow-x-auto md:overflow-x-visible no-scrollbar">
           <button
             onClick={() => setActiveTab('account_name')}
             className={cn(
-              "flex items-center w-full px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all text-left",
+              "flex items-center justify-center md:justify-start px-3 py-2 md:px-3.5 md:py-2.5 text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all text-left whitespace-nowrap shrink-0",
               activeTab === 'account_name' 
-                ? "bg-primary/10 text-primary border-l-2 border-primary" 
+                ? "bg-primary/10 text-primary border-b-2 md:border-b-0 md:border-l-2 border-primary" 
                 : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]"
             )}
           >
@@ -52,9 +52,9 @@ export function AccountSettingsModal({
           <button
             onClick={() => setActiveTab('profile_picture')}
             className={cn(
-              "flex items-center w-full px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all text-left",
+              "flex items-center justify-center md:justify-start px-3 py-2 md:px-3.5 md:py-2.5 text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all text-left whitespace-nowrap shrink-0",
               activeTab === 'profile_picture' 
-                ? "bg-primary/10 text-primary border-l-2 border-primary" 
+                ? "bg-primary/10 text-primary border-b-2 md:border-b-0 md:border-l-2 border-primary" 
                 : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]"
             )}
           >
@@ -64,9 +64,9 @@ export function AccountSettingsModal({
           <button
             onClick={() => setActiveTab('username')}
             className={cn(
-              "flex items-center w-full px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all text-left",
+              "flex items-center justify-center md:justify-start px-3 py-2 md:px-3.5 md:py-2.5 text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all text-left whitespace-nowrap shrink-0",
               activeTab === 'username' 
-                ? "bg-primary/10 text-primary border-l-2 border-primary" 
+                ? "bg-primary/10 text-primary border-b-2 md:border-b-0 md:border-l-2 border-primary" 
                 : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]"
             )}
           >
@@ -76,9 +76,9 @@ export function AccountSettingsModal({
           <button
             onClick={() => setActiveTab('password')}
             className={cn(
-              "flex items-center w-full px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all text-left",
+              "flex items-center justify-center md:justify-start px-3 py-2 md:px-3.5 md:py-2.5 text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all text-left whitespace-nowrap shrink-0",
               activeTab === 'password' 
-                ? "bg-primary/10 text-primary border-l-2 border-primary" 
+                ? "bg-primary/10 text-primary border-b-2 md:border-b-0 md:border-l-2 border-primary" 
                 : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]"
             )}
           >
@@ -89,9 +89,9 @@ export function AccountSettingsModal({
             <button
               onClick={() => setActiveTab('view_as_history')}
               className={cn(
-                "flex items-center w-full px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all text-left whitespace-nowrap",
+                "flex items-center justify-center md:justify-start px-3 py-2 md:px-3.5 md:py-2.5 text-[11px] uppercase tracking-wider font-bold rounded-xl transition-all text-left whitespace-nowrap shrink-0",
                 activeTab === 'view_as_history' 
-                  ? "bg-primary/10 text-primary border-l-2 border-primary" 
+                  ? "bg-primary/10 text-primary border-b-2 md:border-b-0 md:border-l-2 border-primary" 
                   : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]"
               )}
             >
@@ -100,8 +100,8 @@ export function AccountSettingsModal({
           )}
         </div>
 
-        {/* Right Content Pane (Fixed Height & Scrollable for strict Rule 9 size consistency) */}
-        <div className="flex-1 min-w-0 h-full overflow-y-auto pr-2 custom-scrollbar">
+        {/* Content Pane */}
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto pr-1 custom-scrollbar pt-1 md:pt-0">
           {activeTab === 'account_name' && (
             <AccountNameTab user={user} setUser={setUser} onClose={onClose} />
           )}

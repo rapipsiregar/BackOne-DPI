@@ -1,7 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { ViewportScaler } from "@/components/layout/ViewportScaler";
 import "./globals.css";
 
 // Inter font — local variable font file, matches demoplace.my.id
@@ -32,6 +31,13 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -41,13 +47,14 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} ${backoneFont.variable} h-full antialiased dark`}
+      style={{ colorScheme: "dark" }}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
-        <ViewportScaler />
+      <body className="min-h-full flex flex-col overflow-x-hidden bg-background text-foreground" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
+          forcedTheme="dark"
           enableSystem={false}
         >
           {children}

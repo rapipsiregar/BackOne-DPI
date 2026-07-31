@@ -133,21 +133,21 @@ export default function ThreatsContent() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Detected Threats
             {threats.isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
           </h2>
-          <p className="text-muted-foreground mt-1">Monitor and respond to network security threats.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <HelpTrigger pageId="threats" />
-          <div className="flex items-center gap-2 text-sm font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-            <ShieldCheck className="h-4 w-4" />
-            <span>Active Monitoring</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <HelpTrigger pageId="threats" />
+            <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.1)] shrink-0">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Active Monitoring</span>
+            </div>
           </div>
         </div>
+        <p className="text-xs sm:text-sm text-slate-400">Monitor and respond to network security threats.</p>
       </div>
 
       <ThreatFilters

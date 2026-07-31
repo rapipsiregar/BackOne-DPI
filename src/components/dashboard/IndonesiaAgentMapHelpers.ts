@@ -119,13 +119,6 @@ export const MAP_CSS_INJECT = `
     background: #0f172a !important;
     border: 1px solid rgba(255,255,255,0.15);
   }
-  /* Light mode popup tip — matches white popup background */
-  @media (prefers-color-scheme: light) {
-    .leaflet-custom-popup .leaflet-popup-tip {
-      background: #ffffff !important;
-      border: 1px solid #e2e8f0;
-    }
-  }
   .leaflet-custom-popup .leaflet-popup-content {
     margin: 0 !important;
     padding: 0 !important;

@@ -96,12 +96,19 @@ export default function IntelligencePage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-          Threat Intelligence
-          {loadingStats && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
-        </h2>
-        <HelpTrigger pageId="intelligence" />
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+            Threat Intelligence
+            {loadingStats && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+          </h2>
+          <div className="shrink-0">
+            <HelpTrigger pageId="intelligence" />
+          </div>
+        </div>
+        <p className="text-xs sm:text-sm text-slate-400">
+          Threat feeds, domain reputation, and security intelligence indicators.
+        </p>
       </div>
 
 

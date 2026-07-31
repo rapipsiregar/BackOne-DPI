@@ -47,15 +47,17 @@ export default function DpiAnalyticsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">DPI MetaData</h1>
-          <p className="text-slate-400 mt-2">
-            Deep Packet Inspection metadata and fingerprinting.{" "}
-            <span className="text-blue-400 text-sm">Click any row to view device-level detail.</span>
-          </p>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl sm:text-3xl font-bold text-white tracking-tight">DPI MetaData</h1>
+          <div className="shrink-0">
+            <HelpTrigger pageId="dpi-analytics" />
+          </div>
         </div>
-        <HelpTrigger pageId="dpi-analytics" />
+        <p className="text-xs sm:text-sm text-slate-400">
+          Deep Packet Inspection metadata and fingerprinting.{" "}
+          <span className="text-blue-400 text-xs sm:text-sm">Click any row to view device-level detail.</span>
+        </p>
       </div>
 
       <DpiAnalyticsTabs

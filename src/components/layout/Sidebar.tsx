@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { X } from "lucide-react";
 import { AccountSettingsModal } from "./AccountSettingsModal";
 import { getViewAsHeaders } from "@/lib/admin-api";
 import { NAVIGATION_GROUPS } from "./SidebarData";
@@ -14,7 +15,12 @@ import SidebarSiteSelector from "./SidebarSiteSelector";
 import SidebarTimeSelector from "./SidebarTimeSelector";
 import { getSiteBranding } from "@/lib/branding";
 
-export function Sidebar() {
+interface SidebarProps {
+  isMobile?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [user, setUser] = useState<{ username?: string; account_name?: string; profile_picture?: string; role?: string; agent_uuid?: string; agent_uuids?: string[]; company_name?: string; _isViewAsMode?: boolean } | null>(null);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
@@ -97,11 +103,22 @@ export function Sidebar() {
       className="flex h-full max-h-screen flex-col border-r border-white/5 bg-black/20 backdrop-blur-3xl transition-all w-64 shrink-0 relative z-40 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)]"
     >
       {/* Brand & Site Info */}
-      <div className="flex flex-col p-2 shrink-0 gap-4 border-b border-white/5">
-        <div className="flex flex-col items-center justify-center w-full pt-6 pb-3 px-3 text-center mx-auto">
+      <div className="flex flex-col p-2 shrink-0 gap-4 border-b border-white/5 relative">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Close sidebar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+        <div className="flex flex-col items-center justify-center w-full pt-6 pb-3 px-3 text-center mx-auto" suppressHydrationWarning>
           <img 
             src={mounted ? branding.logo : "/backone-logo.png"} 
             alt="Logo" 
+            suppressHydrationWarning
             className={cn(
               "w-12 h-12 object-contain shrink-0 mb-3",
               (mounted && isNexus) 
@@ -140,16 +157,12 @@ export function Sidebar() {
           {NAVIGATION_GROUPS.map((group) => {
             const allowedItems = group.items.filter((item) => {
               if (item.href === "/agents") {
-                // Agents visible untuk: admin roles + COMPANY_ADMIN + COMPANY_OPERATOR
-                // COMPANY_VIEWER TIDAK mendapat tab Agents — mereka hanya butuh dashboard data
                 return user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE" || user?.role === "TENANT_ADMIN" || user?.role === "COMPANY_ADMIN" || user?.role === "COMPANY_OPERATOR";
               }
               if (item.href === "/device-labeling") {
                 return user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE" || user?.role === "TENANT_ADMIN" || user?.role === "COMPANY_ADMIN" || user?.role === "COMPANY_OPERATOR";
               }
               if (item.href === "/user-accounts") {
-                // User Accounts hanya untuk: admin + COMPANY_ADMIN (yang mengelola sub-user)
-                // COMPANY_OPERATOR dan COMPANY_VIEWER TIDAK bisa akses halaman ini
                 return user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE" || user?.role === "COMPANY_ADMIN";
               }
               return true;
@@ -169,6 +182,7 @@ export function Sidebar() {
                     <Link
                       key={item.href}
                       href={item.href}
+                      onClick={() => onClose?.()}
                       className={cn(
                         "group flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium tracking-wide transition-all duration-300",
                         isActive
@@ -196,7 +210,7 @@ export function Sidebar() {
       {/* Footer (Account & Notifications) */}
       <div className="mt-auto p-4 border-t border-white/5 bg-white/5 backdrop-blur-sm">
         <div className="flex items-center gap-3">
-          <SidebarProfile user={user} onOpenSettings={() => setIsAccountOpen(true)} />
+          <SidebarProfile user={user} onOpenSettings={() => { setIsAccountOpen(true); onClose?.(); }} />
           <SidebarNotifications />
         </div>
       </div>

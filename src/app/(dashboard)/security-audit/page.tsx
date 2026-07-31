@@ -54,9 +54,14 @@ export default function SecurityAuditPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white tracking-tight">Security & Encryption Audit</h2>
-        <p className="text-sm text-slate-400 mt-1">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-white">Security & Encryption Audit</h2>
+          <div className="shrink-0">
+            <HelpTrigger pageId="events" />
+          </div>
+        </div>
+        <p className="text-xs sm:text-sm text-slate-400">
           Monitor TLS versions distribution, cipher suites, active certificate properties, and device risk profiles.
         </p>
       </div>

@@ -97,12 +97,19 @@ export default function DNSPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-          DNS
-          {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
-        </h2>
-        <HelpTrigger pageId="dns" />
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+            DNS Analytics
+            {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+          </h2>
+          <div className="shrink-0">
+            <HelpTrigger pageId="dns" />
+          </div>
+        </div>
+        <p className="text-xs sm:text-sm text-slate-400">
+          Monitor DNS queries, domain lookups, and name resolution telemetry.
+        </p>
       </div>
       
       <UniversalFilters
@@ -166,23 +173,26 @@ export default function DNSPage() {
                   <p className="max-w-md">The upstream API did not return any identifiable IPs or MACs actively connecting to this domain at this exact moment.</p>
                 </div>
               ) : (
-                <div className="rounded-lg border border-border/50 overflow-hidden">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-secondary/30 text-muted-foreground">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">Device Name</th>
-                        <th className="px-4 py-3 font-medium">IP Address</th>
-                        <th className="px-4 py-3 font-medium">MAC Address</th>
-                        <th className="px-4 py-3 font-medium text-right">Last Seen</th>
+                <div className="rounded-lg border border-border/50 overflow-hidden bg-[#090D16]">
+                  <table className="w-full text-sm text-left border-collapse table-fixed">
+                    <thead className="bg-[#111827] text-slate-300 border-b border-border/50">
+                      <tr className="bg-[#111827]">
+                        <th className="px-4 py-3 font-medium w-[25%]">Device Name</th>
+                        <th className="px-4 py-3 font-medium w-[25%]">IP Address</th>
+                        <th className="px-4 py-3 font-medium w-[25%]">MAC Address</th>
+                        <th className="px-4 py-3 font-medium text-right w-[25%]">Last Seen</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border/50">
-                      {detailData.map((d, i) => (
-                        <tr key={i} className="hover:bg-white/5 transition-colors">
-                          <td className="px-4 py-3 text-white">{d.deviceName}</td>
-                          <td className="px-4 py-3 text-blue-400">{d.ip}</td>
-                          <td className="px-4 py-3 text-purple-400 font-mono text-xs">{d.mac}</td>
-                          <td className="px-4 py-3 text-right">
+                  </table>
+                  <div className="max-h-[50vh] overflow-y-auto custom-scrollbar">
+                    <table className="w-full text-sm text-left border-collapse table-fixed">
+                      <tbody className="divide-y divide-border/50">
+                        {detailData.map((d, i) => (
+                          <tr key={i} className="hover:bg-white/5 transition-colors">
+                            <td className="px-4 py-3 text-white w-[25%]">{d.deviceName}</td>
+                          <td className="px-4 py-3 text-blue-400 w-[25%]">{d.ip}</td>
+                          <td className="px-4 py-3 text-purple-400 font-mono text-xs w-[25%]">{d.mac}</td>
+                          <td className="px-4 py-3 text-right w-[25%]">
                             <TimestampCell timestamp={d.timestamp} showActiveStatus={true} />
                           </td>
                         </tr>
@@ -190,6 +200,7 @@ export default function DNSPage() {
                     </tbody>
                   </table>
                 </div>
+              </div>
               )}
             </div>
           </div>

@@ -84,28 +84,32 @@ export default function SummaryPage() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Overview Dashboard
             {isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
           </h2>
-          <p className="text-muted-foreground mt-1">Real-time network traffic and intelligence summary.</p>
+          <div className="shrink-0">
+            <HelpTrigger pageId="overview" />
+          </div>
         </div>
-        <HelpTrigger pageId="overview" />
+        <p className="text-xs sm:text-sm text-slate-400">Real-time network traffic and intelligence summary.</p>
       </div>
 
       {/* KPI Cards */}
       <KPICards summary={summary.data} />
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7 animate-slide-up" style={{ animationDelay: '300ms' }}>
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-7 animate-slide-up" style={{ animationDelay: '300ms' }}>
         {/* Global Connections Map */}
-        <div className="col-span-4 relative flex items-center justify-center">
+        <div className="col-span-full lg:col-span-4 relative flex items-center justify-center">
           <GlobeMap data={mapData} />
         </div>
 
         {/* Top Widgets (Apps & Protocols) */}
-        <TopWidgets topApps={topApps} topProtocols={topProtocols} />
+        <div className="col-span-full lg:col-span-3">
+          <TopWidgets topApps={topApps} topProtocols={topProtocols} />
+        </div>
       </div>
     </div>
   );

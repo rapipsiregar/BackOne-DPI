@@ -84,15 +84,17 @@ export default function NetworkIntelligencePage() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             Traffic Categories
             {isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
           </h2>
-          <p className="text-muted-foreground mt-1">Deep packet inspection analytics and geography.</p>
+          <div className="shrink-0">
+            <HelpTrigger pageId="network-intelligence" />
+          </div>
         </div>
-        <HelpTrigger pageId="network-intelligence" />
+        <p className="text-xs sm:text-sm text-slate-400">Deep packet inspection analytics and geography.</p>
       </div>
       
       <UniversalFilters

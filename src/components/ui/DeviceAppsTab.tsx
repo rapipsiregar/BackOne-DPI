@@ -12,7 +12,7 @@ interface Props {
   totalUpload: number;
 }
 
-export default function DeviceAppsTab({ apps, totalDownload, totalUpload }: Props) {
+export default function DeviceAppsTab({ apps = [], totalDownload = 0, totalUpload = 0 }: Props) {
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
@@ -56,7 +56,7 @@ export default function DeviceAppsTab({ apps, totalDownload, totalUpload }: Prop
 
   if (apps.length === 0) {
     return (
-      <div className="text-center py-10 bg-slate-50/50 dark:bg-white/[0.02] border border-border rounded-2xl">
+      <div className="text-center py-10 bg-white/[0.02] border border-border rounded-2xl">
         <Box className="w-12 h-12 text-muted-foreground/60 mx-auto mb-3" />
         <h4 className="text-card-foreground font-bold text-lg mb-1">No Application Traffic</h4>
         <p className="text-muted-foreground font-medium max-w-md mx-auto">
@@ -91,7 +91,7 @@ export default function DeviceAppsTab({ apps, totalDownload, totalUpload }: Prop
           const appBytes = app.download + app.upload;
           const pct = totalBytes > 0 ? ((appBytes / totalBytes) * 100).toFixed(1) : "0";
           return (
-            <div key={i} className="bg-slate-50/50 dark:bg-white/[0.03] border border-border p-4 rounded-2xl hover:bg-slate-100/50 dark:hover:bg-white/[0.05] transition-colors group relative overflow-hidden text-xs">
+            <div key={i} className="bg-white/[0.03] border border-border p-4 rounded-2xl hover:bg-white/[0.05] transition-colors group relative overflow-hidden text-xs">
               <div className="absolute top-0 left-0 h-1 bg-blue-500/30 transition-all duration-500" style={{ width: `${pct}%` }} />
               <h5 className="font-semibold text-card-foreground mb-3 text-sm flex justify-between items-center">
                 {formatAppLabel(app.app_label)}

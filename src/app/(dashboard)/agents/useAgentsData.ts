@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getAgents } from "@/lib/actions/agents";
 import { Agent } from "@/lib/actions/agentsCore";
-import { getAdminUsers, startViewAs, getViewAsHeaders, type ManagedUser } from "@/lib/admin-api";
+import { getAdminUsers, startViewAs, getViewAsHeaders, getViewAsStatusSync, type ManagedUser } from "@/lib/admin-api";
 import { useTimeFilter } from "@/contexts/TimeFilterContext";
 import { usePollingKey } from "@/lib/usePolling";
 
@@ -17,6 +17,10 @@ export function useAgentsData() {
   const [storageMap, setStorageMap] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const viewAsStatus = getViewAsStatusSync();
+  const isViewAsActive = !!viewAsStatus.active;
+  const isViewAsMode = isViewAsActive;
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -68,10 +72,9 @@ export function useAgentsData() {
       const res = await fetch('/api/dashboard/agents/storage', {
         headers: getViewAsHeaders()
       });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.ok && json.storage) setStorageMap(json.storage);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.ok && json.storage) setStorageMap(json.storage);
     } catch (err) {
       console.error("Failed to load agent storage stats:", err);
     }
@@ -82,10 +85,9 @@ export function useAgentsData() {
       const res = await fetch("/api/dashboard/agent-locations", {
         headers: getViewAsHeaders(),
       });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.ok && json.data) setLocations(json.data);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.ok && json.data) setLocations(json.data);
     } catch (err) {
       console.error("Failed to load locations:", err);
     }
@@ -101,11 +103,17 @@ export function useAgentsData() {
       ]);
       if (agentData.status === 'fulfilled') {
         let allAgents = agentData.value;
-        // Filter agents untuk COMPANY_ADMIN dan COMPANY_OPERATOR — hanya tampilkan yang di-assign
-        const uuids = allowedUuids ?? myAgentUuids;
-        const r = currentRole ?? role;
-        if ((r === 'COMPANY_ADMIN' || r === 'COMPANY_OPERATOR') && uuids.length > 0) {
-          allAgents = allAgents.filter(a => uuids.includes(a.uuid || a.serial));
+        const currentViewAs = getViewAsStatusSync();
+        if (currentViewAs.active && currentViewAs.agent_uuid) {
+          // Scope ONLY to target view-as agent
+          allAgents = allAgents.filter(a => (a.uuid || a.serial) === currentViewAs.agent_uuid);
+        } else {
+          // Filter agents untuk COMPANY_ADMIN dan COMPANY_OPERATOR — hanya tampilkan yang di-assign
+          const uuids = allowedUuids ?? myAgentUuids;
+          const r = currentRole ?? role;
+          if ((r === 'COMPANY_ADMIN' || r === 'COMPANY_OPERATOR') && uuids.length > 0) {
+            allAgents = allAgents.filter(a => uuids.includes(a.uuid || a.serial));
+          }
         }
         setAgents(allAgents);
       } else {
@@ -142,8 +150,9 @@ export function useAgentsData() {
           const uuids: string[] = data.user.agent_uuids || [];
           setRole(userRole);
           setMyAgentUuids(uuids);
+          const currentViewAs = getViewAsStatusSync();
           const allowed = ['SUPER_ADMIN', 'TENANT_ADMIN', 'EXECUTIVE', 'COMPANY_ADMIN', 'COMPANY_OPERATOR'];
-          if (!allowed.includes(userRole || '')) {
+          if (!allowed.includes(userRole || '') && !currentViewAs.active) {
             router.push('/');
           } else {
             loadAgents(uuids, userRole);
@@ -235,5 +244,7 @@ export function useAgentsData() {
     handleViewAs,
     openDelete,
     handleEditLocation,
+    isViewAsActive,
+    isViewAsMode,
   };
 }

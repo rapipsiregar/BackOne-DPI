@@ -14,7 +14,7 @@ interface ColDef {
 
 function TableWrap({ children, cols }: { children: React.ReactNode; cols: ColDef[] }) {
   return (
-    <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-border/50 bg-secondary/10 custom-scrollbar">
+    <div className="overflow-x-auto rounded-xl border border-border/50 bg-secondary/10 custom-scrollbar touch-pan-y">
       <table className="w-full text-xs text-center table-fixed whitespace-nowrap min-w-[800px]">
         <thead>
           <tr className="border-b border-border bg-muted/50">

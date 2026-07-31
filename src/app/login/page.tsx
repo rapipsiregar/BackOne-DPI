@@ -25,9 +25,22 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        data = { error: text || `Server error (${res.status})` };
+      }
+
       if (!res.ok) {
-        throw new Error(data.error || "Login failed");
+        throw new Error(data.error || data.message || "Login failed");
+      }
+
+      // Selalu bersihkan state view-as lama saat login akun baru
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("backone_view_as");
       }
 
       window.location.href = "/";
@@ -60,41 +73,35 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleLogin} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-300">Username</label>
-            <div className="relative">
-              <User className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                placeholder="admin"
-                required
-              />
-            </div>
+          <div className="relative">
+            <User className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              placeholder="Username"
+              required
+            />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-300">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-10 py-2.5 bg-background border border-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                placeholder="••••••••"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-2.5 text-muted-foreground hover:text-white transition-colors focus:outline-none"
-              >
-                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-              </button>
-            </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full pl-10 pr-10 py-2.5 bg-background border border-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              placeholder="Password"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-2.5 text-muted-foreground hover:text-white transition-colors focus:outline-none"
+            >
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
           </div>
 
           <button
