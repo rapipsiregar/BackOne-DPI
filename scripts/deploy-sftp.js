@@ -34,7 +34,7 @@ const LOCAL_ROOT = path.resolve(__dirname, '..');
 // These are the minimum required for production deployment
 const UPLOAD_MANIFEST = [
   // Next.js standalone server build output (entire .next folder with manifests and server files)
-  { local: '.next/standalone/.next', remote: '.next/standalone/.next', type: 'dir' },
+  { local: '.next/standalone', remote: '.next/standalone', type: 'dir' },
 
   // Next.js static assets and chunks (CRITICAL to prevent 404 chunk errors)
   { local: '.next/static', remote: '.next/static', type: 'dir' },
