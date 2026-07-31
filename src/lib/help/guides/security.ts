@@ -52,7 +52,7 @@ export const SECURITY_GUIDES: PageGuide[] = [
         items: [
           { label: "Info (Blue)", description: "Normal activity requiring no action. Examples: 'Agent F6-2V-DT-8A connected', 'Database retention cycle completed: 1,234 records deleted', 'Summary data updated for site SIAB'. These logs support audit trails and retrospective troubleshooting." },
           { label: "Warning (Yellow)", description: "Situations that need attention but are not yet critical. Examples: 'Agent YW-6I-61-LL missing GPS coordinates', 'Database collection approaching size threshold', 'API rate limit warning'. Should be addressed before they escalate into serious problems." },
-          { label: "Critical (Red)", description: "Conditions requiring immediate action. Examples: 'Agent 1T-5Q-RC-AS offline for >24 hours', 'MongoDB connection failed', 'Disk space critical (>95%)'. Ignoring Critical events may result in monitoring data loss." },
+          { label: "Critical (Red)", description: "Conditions requiring immediate action. Examples: 'Agent 1T-5Q-RC-AS offline for >24 hours', 'Database connection failed', 'Disk space critical (>95%)'. Ignoring Critical events may result in monitoring data loss." },
         ],
       },
       {

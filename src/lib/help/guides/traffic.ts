@@ -14,7 +14,7 @@ export const TRAFFIC_CORE_GUIDES: PageGuide[] = [
       },
       {
         heading: "Filter & Search",
-        content: "The search bar enables instant search by Source IP, Destination IP, protocol, or domain/application name. Queries are processed against a MongoDB index optimized to scan up to 1,000,000 records.",
+        content: "The search bar enables instant search by Source IP, Destination IP, protocol, or domain/application name. Queries are processed against a database index optimized to scan up to 1,000,000 records.",
         items: [
           { label: "Subnet filter", description: "Type '192.168.' to filter all connections from local devices in that subnet." },
           { label: "Port filter", description: "Type '443' to view all HTTPS connections, or '22' to view all SSH sessions." },
