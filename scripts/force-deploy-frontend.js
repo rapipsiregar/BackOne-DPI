@@ -86,6 +86,8 @@ async function main() {
     'mkdir -p /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next/',
     'cp -r /home/adminbackend/web/demoplace.my.id/public_html/.next/static /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next/static',
     'cp -r /home/adminbackend/web/demoplace.my.id/public_html/public /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/public 2>/dev/null || true',
+    'ln -sfn /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next /home/adminbackend/web/demoplace.my.id/public_html/_next',
+    'ln -sfn /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next/static /home/adminbackend/web/demoplace.my.id/public_html/.next/static',
     '/home/adminbackend/.npm-global/bin/pm2 restart backone-frontend --update-env',
     'sleep 3 && /home/adminbackend/.npm-global/bin/pm2 list',
     'curl -s http://127.0.0.1:3000/login | grep -i "locked"'

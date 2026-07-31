@@ -113,6 +113,8 @@ const POST_DEPLOY_COMMANDS = [
   'mkdir -p /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next/',
   'cp -r /home/adminbackend/web/demoplace.my.id/public_html/.next/static /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next/static && echo "Static assets copied to standalone"',
   'cp -r /home/adminbackend/web/demoplace.my.id/public_html/public /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/public 2>/dev/null || true',
+  'ln -sfn /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next /home/adminbackend/web/demoplace.my.id/public_html/_next',
+  'ln -sfn /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next/static /home/adminbackend/web/demoplace.my.id/public_html/.next/static',
 
   // SECURITY: Remove .env files from standalone (they should never be in the build output)
   'rm -f /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.env.production && echo "Removed .env.production from standalone"',
