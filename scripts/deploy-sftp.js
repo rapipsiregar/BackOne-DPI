@@ -122,7 +122,7 @@ const POST_DEPLOY_COMMANDS = [
   'export PM2=/home/adminbackend/.npm-global/bin/pm2 && $PM2 --version 2>&1 || (npm config set prefix /home/adminbackend/.npm-global && npm install -g pm2)',
 
   // Reload PM2 processes with new code (zero-downtime reload)
-  'export PM2=/home/adminbackend/.npm-global/bin/pm2 && cd /home/adminbackend/web/demoplace.my.id/public_html && NODE_ENV=production $PM2 reload ecosystem.config.js 2>&1 || NODE_ENV=production $PM2 start ecosystem.config.js',
+  'export PM2=/home/adminbackend/.npm-global/bin/pm2 && cd /home/adminbackend/web/demoplace.my.id/public_html && NODE_ENV=production $PM2 reload ecosystem.config.js 2>&1 && $PM2 restart backone-frontend --update-env 2>&1 || NODE_ENV=production $PM2 start ecosystem.config.js',
 
   // Save PM2 process list for auto-restart on server reboot
   '/home/adminbackend/.npm-global/bin/pm2 save',

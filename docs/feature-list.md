@@ -21,6 +21,10 @@ under a heading per module/section, matching `plans/next-enhancements.md`.
   taken, what succeeded/failed, the resulting state, and considerations for next
   time. See AGENTS.md §2b. — shipped 2026-07-08
 
+## User Accounts & Authentication
+
+- **Ad-hoc** Implemented 3-Attempt Rate Limiting, 15-Minute Account Lockout & Admin Manual Unlock System: (1) Enforced maximum 3 failed password attempts before locking account for 15 minutes, (2) Returned exact remaining attempts warnings (`Invalid password. 2 attempts remaining before lockout.`), (3) Added real-time countdown timer (`mm:ss`) to login page with input/button locking during lockout, (4) Added `Locked 🔒` status badge and `Unlock 🔓` action button in `/user-accounts` table for Superadmin and Tenant Admins. — shipped 2026-07-31
+
 ## Agents Management
 
 - **Ad-hoc** Fixed View-As Agent Mode data scoping and white-labeling compliance on `/agents` page: (1) Isolated agent list to show ONLY the target agent being viewed when View-As mode is active, (2) Hid administrative management controls (`+ Provision Agent`, `ExternalAccountsSection`, `Delete`, `Edit Location`, `UserCog`, and nested `View-As` buttons) when View-As mode is active, (3) Replaced hardcoded `Superadmin (BackOne) External Accounts` title with dynamic site-aware branding `getSiteBranding()` (`Nexus` vs `BackOne/SIAB`) per Rule 5. — shipped 2026-07-30
