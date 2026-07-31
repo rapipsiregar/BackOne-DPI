@@ -1,7 +1,7 @@
 // Admin User Management API helpers
 
 export interface ManagedUser {
-  id: number;
+  id: string | number;
   username: string;
   role: 'SUPER_ADMIN' | 'EXECUTIVE' | 'AGENT_VIEWER' | 'SOC_ANALYST' | 'ENGINEER' | 'TENANT_ADMIN' | string;
   site_uuid: string | null;
@@ -10,6 +10,8 @@ export interface ManagedUser {
   agent_uuids?: string[];
   account_name: string | null;
   profile_picture: string | null;
+  login_attempts?: number;
+  lockout_until?: string | null;
   created_at: string;
 }
 
@@ -99,7 +101,7 @@ export async function updateAdminAgentUser(formData: FormData): Promise<{ ok: bo
 }
 
 // DELETE /api/auth/admin/delete-agent-user/:id
-export async function deleteAdminAgentUser(userId: number): Promise<void> {
+export async function deleteAdminAgentUser(userId: string | number): Promise<void> {
   const res = await fetch('/api/auth/admin/delete-agent-user/' + userId, {
     method: 'DELETE',
     credentials: 'include',
@@ -237,5 +239,17 @@ export function getViewAsHeaders(): Record<string, string> {
 export function resolveAgentLabel(agentUuid: string, users: ManagedUser[]): string {
   const user = users.find(u => u.agent_uuid === agentUuid && u.role === 'AGENT_VIEWER');
   return user?.account_name || agentUuid;
+}
+
+export async function unlockUser(userId: string | number): Promise<{ ok: boolean; message?: string; error?: string }> {
+  const res = await fetch('/api/auth/admin/unlock-user', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getViewAsHeaders(),
+    },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  return res.json();
 }
 

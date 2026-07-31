@@ -29,7 +29,12 @@ router.post('/login', async (req, res) => {
     // Check if account is currently locked out
     if (user.lockout_until && user.lockout_until > new Date()) {
       const remainingTime = Math.ceil((user.lockout_until - new Date()) / 60000);
-      return res.status(403).json({ error: `Account is temporarily locked. Please try again in ${remainingTime} minute(s).` });
+      const remainingSeconds = Math.ceil((user.lockout_until - new Date()) / 1000);
+      return res.status(403).json({
+        error: `Account is temporarily locked due to 3 failed login attempts. Please try again in ${remainingTime} minute(s).`,
+        lockout_until: user.lockout_until,
+        lockout_seconds: remainingSeconds,
+      });
     }
 
     const isValid = bcrypt.compareSync(password, user.password_hash);
@@ -38,10 +43,19 @@ router.post('/login', async (req, res) => {
       if (user.login_attempts >= 3) {
         user.lockout_until = new Date(Date.now() + 15 * 60 * 1000); // 15 mins lockout
         await user.save();
-        return res.status(403).json({ error: 'Account is temporarily locked. Please try again in 15 minute(s).' });
+        return res.status(403).json({
+          error: 'Account is temporarily locked due to 3 failed login attempts. Please try again in 15 minute(s).',
+          lockout_until: user.lockout_until,
+          lockout_seconds: 900,
+        });
       } else {
         await user.save();
-        return res.status(401).json({ error: 'Invalid Password' });
+        const attemptsLeft = 3 - user.login_attempts;
+        const attemptsMsg = attemptsLeft === 1 ? '1 attempt remaining before lockout.' : `${attemptsLeft} attempts remaining before lockout.`;
+        return res.status(401).json({
+          error: `Invalid password. ${attemptsMsg}`,
+          attempts_left: attemptsLeft,
+        });
       }
     }
 

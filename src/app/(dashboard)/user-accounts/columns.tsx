@@ -3,22 +3,26 @@
 
 import { Column } from "@/components/ui/DataTable";
 import { type ManagedUser } from "@/lib/admin-api";
-import { Eye, Loader2 } from "lucide-react";
+import { Eye, Loader2, Lock, Unlock } from "lucide-react";
 
 interface GetColumnsProps {
   role: string | null;
   currentUsername?: string | null;
   viewAsLoading?: string | null;
+  unlockLoading?: string | null;
   onEditClick: (user: ManagedUser) => void;
   onViewAsClick?: (user: ManagedUser) => void;
+  onUnlockClick?: (user: ManagedUser) => void;
 }
 
 export function getColumns({
   role,
   currentUsername,
   viewAsLoading,
+  unlockLoading,
   onEditClick,
   onViewAsClick,
+  onUnlockClick,
 }: GetColumnsProps): Column<ManagedUser>[] {
   return [
     {
@@ -28,7 +32,7 @@ export function getColumns({
     },
     {
       header: "Account Name",
-      className: "w-[22%] text-center",
+      className: "w-[20%] text-center",
       accessor: (row) => (
         <span className="text-sm font-medium text-slate-200">
           {row.account_name || row.username}
@@ -37,7 +41,7 @@ export function getColumns({
     },
     {
       header: "Username",
-      className: "w-[18%] text-center",
+      className: "w-[16%] text-center",
       accessor: (row) => <code className="text-xs text-slate-400 font-mono">{row.username}</code>
     },
     {
@@ -57,8 +61,27 @@ export function getColumns({
       }
     },
     {
+      header: "Status",
+      className: "w-[12%] text-center",
+      accessor: (row) => {
+        const isLocked = row.lockout_until && new Date(row.lockout_until) > new Date();
+        if (isLocked) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 uppercase tracking-wider">
+              <Lock className="w-3 h-3" /> Locked
+            </span>
+          );
+        }
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+            Active
+          </span>
+        );
+      }
+    },
+    {
       header: "Assigned Devices",
-      className: "w-[15%] text-center",
+      className: "w-[14%] text-center",
       accessor: (row) => {
         const uuids = row.agent_uuids || [];
         if (uuids.length === 0) return <span className="text-xs text-slate-500 italic">No device assigned</span>;
@@ -75,7 +98,6 @@ export function getColumns({
       accessor: (row) => {
         const isSelf = currentUsername && row.username === currentUsername;
         const isCompanyAdmin = row.role === "COMPANY_ADMIN";
-        // View-As tersedia untuk COMPANY_OPERATOR dan COMPANY_VIEWER (bukan diri sendiri, bukan admin)
         const canViewAs = onViewAsClick &&
           !isSelf &&
           !isCompanyAdmin &&
@@ -107,20 +129,37 @@ export function getColumns({
     },
     {
       header: "Actions",
-      className: "w-[12%] text-center",
+      className: "w-[15%] text-center",
       accessor: (row) => {
         const isSelf = currentUsername && row.username === currentUsername;
+        const isLocked = row.lockout_until && new Date(row.lockout_until) > new Date();
         const isDisabled = role === "EXECUTIVE" || isSelf;
+        const isUnlocking = unlockLoading === row.id;
+
         return (
-          <button
-            type="button"
-            onClick={() => !isSelf && onEditClick(row)}
-            disabled={!!isDisabled}
-            title={isSelf ? "Cannot edit your own account from here" : undefined}
-            className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed hover:underline font-medium cursor-pointer"
-          >
-            {isSelf ? "👤 (You)" : "⚙️ Edit User"}
-          </button>
+          <div className="flex items-center justify-center gap-2">
+            {isLocked && onUnlockClick && (
+              <button
+                type="button"
+                onClick={() => onUnlockClick(row)}
+                disabled={isUnlocking}
+                title="Unlock account access"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-emerald-400 bg-emerald-400/10 border border-emerald-400/30 hover:bg-emerald-400/20 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isUnlocking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Unlock className="w-3 h-3" />}
+                <span>Unlock</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => !isSelf && onEditClick(row)}
+              disabled={!!isDisabled}
+              title={isSelf ? "Cannot edit your own account from here" : undefined}
+              className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed hover:underline font-medium cursor-pointer"
+            >
+              {isSelf ? "👤 (You)" : "⚙️ Edit"}
+            </button>
+          </div>
         );
       }
     }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Users, Plus } from "lucide-react";
-import { getAdminUsers, getViewAsHeaders, startViewAsUser, type ManagedUser } from "@/lib/admin-api";
+import { getAdminUsers, getViewAsHeaders, startViewAsUser, unlockUser, type ManagedUser } from "@/lib/admin-api";
 
 import { HelpTrigger } from "@/components/help/HelpTrigger";
 import ExternalAccountModal from "@/components/admin/ExternalAccountModal";
@@ -23,6 +23,7 @@ export default function UserAccountsPage() {
   const [modalUser, setModalUser] = useState<ManagedUser | null>(null);
   const [targetCompany, setTargetCompany] = useState<string | null>(null);
   const [viewAsLoading, setViewAsLoading] = useState<string | null>(null);
+  const [unlockLoading, setUnlockLoading] = useState<string | number | null>(null);
   // Registry agents untuk lookup label agent (digunakan pada View-As banner)
   const [agentRegistry, setAgentRegistry] = useState<Record<string, string>>({});
 
@@ -138,13 +139,30 @@ export default function UserAccountsPage() {
     }
   };
 
+  const handleUnlockUser = async (user: ManagedUser) => {
+    setUnlockLoading(user.id);
+    try {
+      const res = await unlockUser(user.id);
+      if (res.ok) {
+        await loadData();
+      } else {
+        alert('Failed to unlock user: ' + (res.error || 'Unknown error'));
+      }
+    } catch (err: any) {
+      alert('Failed to unlock user: ' + err.message);
+    } finally {
+      setUnlockLoading(null);
+    }
+  };
 
   const columns = getColumns({
     role,
     currentUsername,
     viewAsLoading,
+    unlockLoading: unlockLoading !== null ? String(unlockLoading) : null,
     onEditClick: handleEditClick,
     onViewAsClick: (role === "SUPER_ADMIN" || role === "COMPANY_ADMIN") ? handleViewAsUser : undefined,
+    onUnlockClick: (role === "SUPER_ADMIN" || role === "COMPANY_ADMIN" || role === "TENANT_ADMIN") ? handleUnlockUser : undefined,
   });
 
   return (
