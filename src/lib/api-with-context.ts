@@ -143,14 +143,14 @@ export function useFlows(page: number = 1, pageSize: number = 50, filters: any =
     `limit=${pageSize}`,
     `skip=${(page - 1) * pageSize}`
   ];
-  if (filters.protocol) queryParts.push(`protocol=${encodeURIComponent(filters.protocol)}`);
-  if (filters.src_ip) queryParts.push(`src_ip=${encodeURIComponent(filters.src_ip)}`);
-  if (filters.dst_ip) queryParts.push(`dst_ip=${encodeURIComponent(filters.dst_ip)}`);
-  if (filters.dst_port) queryParts.push(`dst_port=${encodeURIComponent(filters.dst_port)}`);
-  if (filters.app) queryParts.push(`app=${encodeURIComponent(filters.app)}`);
-  if (filters.domain) queryParts.push(`domain=${encodeURIComponent(filters.domain)}`);
-  if (filters.sort_download) queryParts.push(`sort_download=${encodeURIComponent(filters.sort_download)}`);
-  if (filters.sort_upload) queryParts.push(`sort_upload=${encodeURIComponent(filters.sort_upload)}`);
+  if (filters.protocol && filters.protocol !== 'All') queryParts.push(`protocol=${encodeURIComponent(filters.protocol)}`);
+  if (filters.src_ip && filters.src_ip !== 'All') queryParts.push(`src_ip=${encodeURIComponent(filters.src_ip)}`);
+  if (filters.dst_ip && filters.dst_ip !== 'All') queryParts.push(`dst_ip=${encodeURIComponent(filters.dst_ip)}`);
+  if (filters.dst_port && filters.dst_port !== 'All') queryParts.push(`dst_port=${encodeURIComponent(filters.dst_port)}`);
+  if (filters.app && filters.app !== 'All') queryParts.push(`app=${encodeURIComponent(filters.app)}`);
+  if (filters.domain && filters.domain !== 'All') queryParts.push(`domain=${encodeURIComponent(filters.domain)}`);
+  if (filters.sort_download && filters.sort_download !== 'All') queryParts.push(`sort_download=${encodeURIComponent(filters.sort_download)}`);
+  if (filters.sort_upload && filters.sort_upload !== 'All') queryParts.push(`sort_upload=${encodeURIComponent(filters.sort_upload)}`);
   if (filters.dateFrom) queryParts.push(`date_from=${encodeURIComponent(filters.dateFrom)}`);
   if (filters.dateTo) queryParts.push(`date_to=${encodeURIComponent(filters.dateTo)}`);
   if (filters.search) queryParts.push(`search=${encodeURIComponent(filters.search)}`);
@@ -184,6 +184,16 @@ export function useFlowsOptions() {
     apps: [],
     domains: []
   });
+}
+
+export function useAgentLocations() {
+  const { timeRange } = useTimeFilter();
+  return useCtxFetch<any[]>('/agent-locations', timeRange, []);
+}
+
+export function useCities(limit: number = 1000000) {
+  const { timeRange } = useTimeFilter();
+  return useCtxFetch<any[]>(`/cities?limit=${limit}`, timeRange, []);
 }
 
 export function useCountries(limit: number = 1000000) {

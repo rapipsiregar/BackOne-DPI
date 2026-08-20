@@ -53,10 +53,10 @@ export default function SecurityAuditPage() {
   const safeCount = filteredDevices.filter((d) => d.risk_level === "Safe").length;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white tracking-tight">Security & Encryption Audit</h2>
-        <p className="text-sm text-slate-400 mt-1">
+    <div className="space-y-6 pb-10">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">Security & Encryption Audit</h2>
+        <p className="text-xs sm:text-sm text-slate-400 leading-normal sm:leading-relaxed">
           Monitor TLS versions distribution, cipher suites, active certificate properties, and device risk profiles.
         </p>
       </div>

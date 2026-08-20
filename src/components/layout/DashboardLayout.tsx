@@ -2,173 +2,148 @@
 
 import { ReactNode, useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
-import { getViewAsStatusSync, stopViewAs, getViewAsHeaders } from "@/lib/admin-api";
-import { AlertTriangle, LogOut, Clock, ShieldAlert, Loader2 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
+import { getViewAsStatusSync, validateViewAsSession } from "@/lib/admin-api";
 import { HelpCenterFAB } from "@/components/ui/HelpCenterFAB";
+import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
+import { usePathname } from "next/navigation";
+import { getSiteBranding } from "@/lib/branding";
+import { MobileTopBar } from "./MobileTopBar";
+import { MobileBottomBar } from "./MobileBottomBar";
+import { ViewAsBanner } from "./ViewAsBanner";
+import { SessionTimeoutModal } from "./SessionTimeoutModal";
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
-  const [viewAs, setViewAs] = useState<{ active: boolean; agent_label?: string; agent_uuid?: string }>({ active: false });
+  const [viewAs, setViewAs] = useState<any>({ active: false });
   const [user, setUser] = useState<any>(null);
-  
-  // Timeout dialog state
-  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(120);
-  const [isRenewing, setIsRenewing] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
-    setViewAs(getViewAsStatusSync());
-    
-    // Fetch initial user session to get token exp time
-    fetch('/api/auth/me', { headers: getViewAsHeaders() })
-      .then(res => res.json())
-      .then(data => {
-        if (data.user) setUser(data.user);
+    const branding = getSiteBranding();
+    const getPageTitlePrefix = (path: string): string => {
+      switch (path) {
+        case "/": return "Overview Dashboard";
+        case "/agents": return "Agents";
+        case "/apps": return "Apps";
+        case "/devices": return "Devices";
+        case "/dns": return "DNS";
+        case "/dpi-analytics": return "DPI MetaData";
+        case "/events": return "Recent Events";
+        case "/flows": return "Flows";
+        case "/geography": return "Geo Traffic";
+        case "/intelligence": return "Threat Intelligence";
+        case "/lookup": return "App Lookup";
+        case "/network-infrastructure": return "Network Topology";
+        case "/network-intelligence": return "Traffic Categories";
+        case "/threats": return "Detected Threats";
+        case "/help": return "User Guide";
+        default: return "";
+      }
+    };
+
+    const updateTitleAndFavicon = () => {
+      if (typeof document !== 'undefined') {
+        const prefix = getPageTitlePrefix(pathname);
+        document.title = prefix ? `${prefix} | ${branding.name} - Deep Package Inspection` : `${branding.name} - Deep Package Inspection`;
+        const logoUrl = branding.logo;
+        const links = document.querySelectorAll("link[rel*='icon']");
+        if (links.length > 0) {
+          links.forEach(l => (l as HTMLLinkElement).href = logoUrl);
+        } else {
+          const l = document.createElement('link');
+          l.rel = 'icon';
+          l.href = logoUrl;
+          document.head.appendChild(l);
+        }
+      }
+    };
+
+    updateTitleAndFavicon();
+    const timer = setTimeout(updateTitleAndFavicon, 50);
+    return () => clearTimeout(timer);
+  }, [pathname]);
+
+  const {
+    showWarning: showTimeoutWarning,
+    timeLeft,
+    isRenewing,
+    handleRenewSession,
+    handleLogout
+  } = useInactivityTimeout({
+    timeoutSeconds: 60 * 60,
+    warningSeconds: 2 * 60
+  });
+
+  useEffect(() => {
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(res => {
+        if (res.status === 401) {
+          window.location.href = "/login";
+          return null;
+        }
+        return res.json();
       })
-      .catch(console.error);
+      .then(data => {
+        if (data && data.user) {
+          setUser(data.user);
+          const originalRole = data.user._originalRole || data.user.role;
+          setViewAs(validateViewAsSession(originalRole));
+        } else {
+          setViewAs(getViewAsStatusSync());
+        }
+      })
+      .catch(() => setViewAs(getViewAsStatusSync()));
   }, []);
-
-  // Background timer to watch token expiration
-  useEffect(() => {
-    if (!user || !user.exp) return;
-
-    const timer = setInterval(() => {
-      const now = Math.floor(Date.now() / 1000);
-      const remaining = user.exp - now;
-
-      if (remaining <= 120 && remaining > 0) {
-        setTimeLeft(remaining);
-        setShowTimeoutWarning(true);
-      } else if (remaining <= 0) {
-        // Session expired, force logout immediately
-        clearInterval(timer);
-        setShowTimeoutWarning(false);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('backone_view_as');
-        }
-        fetch('/api/auth/logout', { method: 'POST' })
-          .then(() => {
-            window.location.href = '/login';
-          });
-      } else {
-        setShowTimeoutWarning(false);
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [user]);
-
-  const handleRenewSession = async () => {
-    setIsRenewing(true);
-    try {
-      const res = await fetch('/api/auth/renew', { method: 'POST' });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.ok && json.user) {
-          setUser(json.user);
-          setShowTimeoutWarning(false);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to renew session:", err);
-    } finally {
-      setIsRenewing(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('backone_view_as');
-      }
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.href = '/login';
-    } catch (err) {
-      console.error("Failed to logout:", err);
-    }
-  };
-
-  const formatCountdown = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}m ${s.toString().padStart(2, '0')}s`;
-  };
-
-  const handleExit = async () => {
-    await stopViewAs();
-    window.location.reload();
-  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-transparent transition-colors duration-500 relative">
-      <Sidebar />
-      
+      {/* Desktop Sidebar (hidden on mobile/tablet) */}
+      <div className="hidden lg:flex h-full shrink-0">
+        <Sidebar />
+      </div>
+
+      {/* Mobile / Tablet Drawer Sidebar (hidden on desktop) */}
+      <div 
+        className={`fixed inset-0 z-50 flex lg:hidden transition-all duration-500 ease-in-out ${
+          isMobileMenuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      >
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-md"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+        <div 
+          className={`relative z-10 flex w-72 max-w-[80vw] flex-col bg-card shadow-2xl h-full transform transition-transform duration-500 ease-in-out ${
+            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <Sidebar isMobile onClose={() => setIsMobileMenuOpen(false)} />
+        </div>
+      </div>
+
+      {/* Main Content Area */}
       <div className="flex flex-1 flex-col overflow-hidden w-full min-w-0 relative transition-all duration-500 ease-in-out">
-        {viewAs.active && (
-          <div className="bg-gradient-to-r from-amber-600/90 via-amber-700/90 to-amber-900/90 border-b border-amber-500/30 px-6 py-2.5 flex items-center justify-between text-white shadow-lg backdrop-blur-sm z-30 animate-pulse-subtle">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <AlertTriangle className="w-4 h-4 text-amber-300 animate-bounce" />
-              <span>
-                You are currently viewing data as Network Agent: <strong className="text-amber-200">{viewAs.agent_label || "Unknown Agent"}</strong> <span className="text-xs text-white/70">({viewAs.agent_uuid})</span>
-              </span>
-            </div>
-            <button
-              onClick={handleExit}
-              className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 active:bg-white/30 border border-white/20 rounded-md text-xs font-semibold tracking-wide transition-all shadow-sm shrink-0"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Exit View Mode
-            </button>
-          </div>
-        )}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-transparent p-4 md:p-6 transition-all duration-500 ease-in-out w-full relative">
-          <div className="mx-auto w-full max-w-7xl space-y-6">
+        <MobileTopBar onOpenMenu={() => setIsMobileMenuOpen(true)} />
+        <ViewAsBanner viewAs={viewAs} />
+
+        <main suppressHydrationWarning className="flex-1 overflow-y-auto overflow-x-hidden bg-transparent p-2.5 sm:p-5 lg:p-8 pb-24 lg:pb-8 transition-all duration-500 ease-in-out w-full relative min-w-0">
+          <div suppressHydrationWarning className="w-full min-w-0 space-y-4 sm:space-y-6">
             {children}
           </div>
         </main>
       </div>
 
-      {/* Premium Session Timeout Warning Modal */}
-      <Modal isOpen={showTimeoutWarning} onClose={() => {}} title="Session Security Alert">
-        <div className="space-y-5 text-xs text-slate-300">
-          <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-            <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0" />
-            <p className="font-medium text-slate-200">
-              For your security, your active dashboard session will automatically expire due to inactivity.
-            </p>
-          </div>
+      {/* Mobile Bottom Navigation Bar (< 1024px) */}
+      <MobileBottomBar onOpenMenu={() => setIsMobileMenuOpen(true)} />
 
-          <div className="flex flex-col items-center justify-center p-6 bg-slate-900/40 border border-white/5 rounded-2xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-blue-500/5 blur-3xl rounded-full" />
-            <Clock className="w-8 h-8 text-blue-400 mb-2 relative animate-pulse" />
-            <span className="text-[10px] text-slate-500 uppercase tracking-widest relative">Remaining Time</span>
-            <span className="text-3xl font-black text-white font-mono tracking-tight mt-1 relative">
-              {formatCountdown(timeLeft)}
-            </span>
-          </div>
+      <SessionTimeoutModal
+        showWarning={showTimeoutWarning}
+        timeLeft={timeLeft}
+        isRenewing={isRenewing}
+        onRenew={handleRenewSession}
+        onLogout={handleLogout}
+      />
 
-          <div className="pt-2 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all"
-            >
-              Logout Now
-            </button>
-            <button
-              type="button"
-              onClick={handleRenewSession}
-              disabled={isRenewing}
-              className="flex items-center gap-2 bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50"
-            >
-              {isRenewing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Keep Me Logged In
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Global Help Center Drawer */}
       <HelpCenterFAB />
     </div>
   );

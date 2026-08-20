@@ -4,7 +4,7 @@
 
 const cron = require('node-cron');
 const { collectAllAgents, collectSpecificAgent, collectSpecificAgents } = require('./collector');
-const { syncApplicationDictionary } = require('./netifyClient');
+const { syncApplicationDictionary } = require('./backoneClient');
 
 // Mode: 'all' = collect all agents, 'agent' = collect one specific agent, 'agents' = collect multiple agents
 const COLLECT_MODE    = process.env.PROXY_COLLECT_MODE || 'all';

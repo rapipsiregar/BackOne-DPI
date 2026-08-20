@@ -19,7 +19,7 @@ const baseOptions = {
 
 // ─── Bandwidth Summary (per agent, per collection cycle) ───────────────────────
 const SummarySchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:      { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:     { type: String, index: true },   // null = global/all agents
   site_uuid:      { type: String, index: true },
   bandwidth_down: Number,
@@ -38,7 +38,7 @@ const SummarySchema = new mongoose.Schema({
 
 // ─── Top Applications (per agent) ─────────────────────────────────────────────
 const AppStatSchema = new mongoose.Schema({
-  timestamp:  { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:  { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid: { type: String, index: true },
   site_uuid:  { type: String, index: true },
   app_label:  { type: String, required: true },
@@ -49,7 +49,7 @@ const AppStatSchema = new mongoose.Schema({
 
 // ─── Protocol Statistics (per agent) ──────────────────────────────────────────
 const ProtocolStatSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:      { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:     { type: String, index: true },
   site_uuid:      { type: String, index: true },
   protocol_label: { type: String, required: true },
@@ -60,7 +60,7 @@ const ProtocolStatSchema = new mongoose.Schema({
 
 // ─── Discovered Devices (per agent, includes IP + MAC + device info) ───────────
 const DeviceStatSchema = new mongoose.Schema({
-  timestamp:    { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:    { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:   { type: String, index: true },
   site_uuid:    { type: String, index: true },
   ip_address:   { type: String, required: true, index: true },
@@ -77,7 +77,7 @@ const DeviceStatSchema = new mongoose.Schema({
 
 // ─── Network Flows (per agent) ─────────────────────────────────────────────────
 const FlowSchema = new mongoose.Schema({
-  timestamp:  { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:  { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid: { type: String, index: true },
   site_uuid:  { type: String, index: true },
   flow_id:    String,
@@ -96,7 +96,7 @@ const FlowSchema = new mongoose.Schema({
 
 // ─── Cyber Threats (per agent) ─────────────────────────────────────────────────
 const ThreatSchema = new mongoose.Schema({
-  timestamp:   { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:   { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:  { type: String, index: true },
   site_uuid:   { type: String, index: true },
   threat_type: String,
@@ -112,7 +112,7 @@ const ThreatSchema = new mongoose.Schema({
 
 // ─── App Categories (per agent) ───────────────────────────────────────────────
 const AppCategoryStatSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:      { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:     { type: String, index: true },
   site_uuid:      { type: String, index: true },
   category_label: { type: String, required: true },
@@ -123,7 +123,7 @@ const AppCategoryStatSchema = new mongoose.Schema({
 
 // ─── System Events (per agent) ─────────────────────────────────────────────────
 const EventSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:      { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:     { type: String, index: true },
   site_uuid:      { type: String, index: true },
   event_id:       Number,
@@ -153,7 +153,7 @@ EventSchema.index({ agent_uuid: 1, timestamp: -1 });
 
 // ── Per-Device Per-Application Stats (synced from proxy) ─────────────────
 const DeviceAppStatSchema = new mongoose.Schema({
-  timestamp:  { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:  { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid: { type: String, index: true },
   site_uuid:  { type: String, index: true },
   ip_address: { type: String, required: true, index: true },

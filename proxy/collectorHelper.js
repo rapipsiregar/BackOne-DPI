@@ -17,10 +17,10 @@ const {
   QuicHostnameStat,
 } = require('./models/Schemas');
 
-async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify, label) {
+async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, backone, label) {
   try {
     // 2b. App Categories
-    const categories = await netify.fetchTopAppCategories(5, 50, agentUuid, SITE_UUID);
+    const categories = await backone.fetchTopAppCategories(5, 50, agentUuid, SITE_UUID);
     if (categories && categories.length > 0) {
       const catDocs = categories.map(c => ({
         timestamp,
@@ -36,7 +36,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2c. TLS Versions
-    const tlsVersions = await netify.fetchTlsVersions(5, 50, agentUuid, SITE_UUID);
+    const tlsVersions = await backone.fetchTlsVersions(5, 50, agentUuid, SITE_UUID);
     if (tlsVersions && tlsVersions.length > 0) {
       const tvDocs = tlsVersions.map(v => ({
         timestamp,
@@ -52,7 +52,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2d. TLS Ciphers
-    const tlsCiphers = await netify.fetchTlsCiphers(5, 50, agentUuid, SITE_UUID);
+    const tlsCiphers = await backone.fetchTlsCiphers(5, 50, agentUuid, SITE_UUID);
     if (tlsCiphers && tlsCiphers.length > 0) {
       const tcDocs = tlsCiphers.map(c => ({
         timestamp,
@@ -68,7 +68,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2e. TLS Security
-    const tlsSecurity = await netify.fetchTlsSecurity(5, 50, agentUuid, SITE_UUID);
+    const tlsSecurity = await backone.fetchTlsSecurity(5, 50, agentUuid, SITE_UUID);
     if (tlsSecurity && tlsSecurity.length > 0) {
       const tsDocs = tlsSecurity.map(s => ({
         timestamp,
@@ -84,7 +84,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2f. Top Countries
-    const countries = await netify.fetchTopCountries(5, 100, agentUuid, SITE_UUID);
+    const countries = await backone.fetchTopCountries(5, 100, agentUuid, SITE_UUID);
     if (countries && countries.length > 0) {
       const coDocs = countries.map(c => ({
         timestamp,
@@ -101,7 +101,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2g. Top Protocols
-    const protocols = await netify.fetchTopProtocols(5, 50, agentUuid, SITE_UUID);
+    const protocols = await backone.fetchTopProtocols(5, 50, agentUuid, SITE_UUID);
     if (protocols && protocols.length > 0) {
       const protoDocs = protocols.map(p => ({
         timestamp,
@@ -117,7 +117,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2h. SNI Hostnames
-    const snis = await netify.fetchSniHostnames(5, 10000, agentUuid, SITE_UUID);
+    const snis = await backone.fetchSniHostnames(5, 10000, agentUuid, SITE_UUID);
     if (snis && snis.length > 0) {
       const sniDocs = snis.map(s => ({
         timestamp, agent_uuid: agentUuid, site_uuid: SITE_UUID,
@@ -128,9 +128,9 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
       console.log(`[Collector]   ✓ ${sniDocs.length} SNI hostnames saved for ${label}`);
     }
 
-    /* -- COMMENTED OUT DUE TO NETIFY API HTTP 422 (UNSUPPORTED TIER) --
+    /* -- COMMENTED OUT DUE TO BACKONE API HTTP 422 (UNSUPPORTED TIER) --
     // 2i. SSL Server Common Names
-    const cns = await netify.fetchSslServerCn(1440, 50, agentUuid);
+    const cns = await backone.fetchSslServerCn(1440, 50, agentUuid);
     if (cns && cns.length > 0) {
       const cnDocs = cns.map(c => ({
         timestamp, agent_uuid: agentUuid, site_uuid: SITE_UUID,
@@ -141,7 +141,7 @@ async function collectSecondaryTelemetry(agentUuid, timestamp, SITE_UUID, netify
     }
 
     // 2j. QUIC Hostnames
-    const quics = await netify.fetchQuicHostnames(1440, 50, agentUuid);
+    const quics = await backone.fetchQuicHostnames(1440, 50, agentUuid);
     if (quics && quics.length > 0) {
       const quicDocs = quics.map(q => ({
         timestamp, agent_uuid: agentUuid, site_uuid: SITE_UUID,

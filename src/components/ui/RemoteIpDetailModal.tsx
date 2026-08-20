@@ -66,24 +66,24 @@ export function RemoteIpDetailModal({ ip, onClose }: Props) {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={handleClose}>
       <div className={`absolute inset-0 bg-black/60 backdrop-blur-md ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`} />
       <div
-        className={`relative bg-card border border-border rounded-3xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/10 dark:shadow-blue-900/20 overflow-hidden backdrop-blur-xl ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+        className={`relative bg-card border border-border/50 rounded-3xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/10 dark:shadow-blue-900/20 overflow-hidden backdrop-blur-xl font-sans ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-border bg-gradient-to-br from-indigo-500/5 via-slate-500/5 to-slate-500/10 dark:from-indigo-900/10 dark:via-slate-900/20 dark:to-slate-950/40 relative z-10">
-          <div className="flex items-center gap-4">
-            <div className="relative">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-4 py-4 sm:px-6 sm:py-5 border-b border-border bg-gradient-to-br from-indigo-500/5 via-slate-500/5 to-slate-500/10 dark:from-indigo-900/10 dark:via-slate-900/20 dark:to-slate-950/40 relative z-10">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="relative flex-shrink-0">
               <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-20 rounded-full" />
-              <div className="p-3 bg-gradient-to-br from-indigo-500/20 to-blue-500/10 rounded-xl ring-1 ring-indigo-500/30 relative">
-                <Globe className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
+              <div className="p-2 sm:p-3 bg-gradient-to-br from-indigo-500/20 to-blue-500/10 rounded-lg sm:rounded-xl ring-1 ring-indigo-500/30 relative">
+                <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-500 dark:text-indigo-400" />
               </div>
             </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h3 className="text-xl font-bold text-card-foreground tracking-tight">{ip}</h3>
-                {isRefreshing && <RefreshCcw className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 animate-spin" />}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <h3 className="text-base sm:text-xl font-bold text-card-foreground tracking-tight truncate">{ip}</h3>
+                {isRefreshing && <RefreshCcw className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-500 dark:text-indigo-400 animate-spin flex-shrink-0" />}
               </div>
               <div className="mt-1">
                 <IpDetails ip={ip} />
@@ -91,18 +91,18 @@ export function RemoteIpDetailModal({ ip, onClose }: Props) {
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0 w-full sm:w-auto border-t border-border/40 pt-3 sm:border-t-0 sm:pt-0">
             <button 
               onClick={() => loadData(true)} 
               disabled={isLoading || isRefreshing}
-              className="p-2.5 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 rounded-full transition-all disabled:opacity-50"
+              className="p-2 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 rounded-full transition-all disabled:opacity-50"
               title="Refresh Data"
             >
               <RefreshCcw className="w-4 h-4" />
             </button>
             <button 
               onClick={handleClose}
-              className="p-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-all bg-black/5 dark:bg-white/5"
+              className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-all bg-black/5 dark:bg-white/5"
             >
               <X className="w-4 h-4" />
             </button>
@@ -177,7 +177,7 @@ export function RemoteIpDetailModal({ ip, onClose }: Props) {
                     </div>
                   </div>
 
-                  <div className="bg-slate-50/50 dark:bg-white/[0.02] border border-border rounded-2xl p-6">
+                  <div className="bg-white/[0.02] border border-border/50 rounded-2xl p-6">
                     <h4 className="text-sm font-bold text-card-foreground uppercase tracking-wider mb-6 flex items-center gap-2">
                       <Server className="w-4 h-4 text-indigo-500" /> Network Properties
                     </h4>

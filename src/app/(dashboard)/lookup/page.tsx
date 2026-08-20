@@ -21,16 +21,26 @@ export default function LookupPage() {
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-            App Lookup
-          </h1>
-          <p className="text-slate-400 mt-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4 w-full">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight truncate">
+              App Lookup
+            </h1>
+            {/* Mobile Actions: Inline next to Title */}
+            <div className="flex items-center gap-1.5 flex-shrink-0 sm:hidden">
+              <HelpTrigger pageId="lookup" />
+            </div>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 leading-normal sm:leading-relaxed">
             Search {branding.name === "BackOne" ? "BackOne's" : `${branding.name}'s`} extensive classification database of over 2,500+ apps, protocols, and services, and manage your blacklist configuration.
           </p>
         </div>
-        <HelpTrigger pageId="lookup" />
+
+        {/* Laptop/Tablet Actions: Floats on the right */}
+        <div className="hidden sm:flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          <HelpTrigger pageId="lookup" />
+        </div>
       </div>
 
       <Tabs>

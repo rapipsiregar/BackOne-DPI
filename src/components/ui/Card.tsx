@@ -30,7 +30,7 @@ export function CardHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col space-y-1.5 p-6", className)}>
+    <div className={cn("flex flex-col space-y-1.5 p-4 sm:p-6", className)}>
       {children}
     </div>
   );
@@ -63,6 +63,6 @@ export function CardContent({
   className?: string;
 }) {
   return (
-    <div className={cn("p-6 pt-0", className)}>{children}</div>
+    <div className={cn("p-4 sm:p-6 pt-0 sm:pt-0", className)}>{children}</div>
   );
 }

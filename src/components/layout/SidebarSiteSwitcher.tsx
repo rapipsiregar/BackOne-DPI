@@ -24,6 +24,7 @@ export function SidebarSiteSwitcher({
   getSiteLabel,
 }: SidebarSiteSwitcherProps) {
   const isGlobalUser = user?.role === 'SUPER_ADMIN' ||
+    user?.role === 'EXECUTIVE' ||
     ((!user?.site_uuid || user?.site_uuid === 'default') && ['SOC_ANALYST', 'ENGINEER'].includes(user?.role || ''));
 
   if (!user || !isGlobalUser) {
@@ -67,15 +68,15 @@ export function SidebarSiteSwitcher({
             SIAB
           </button>
           <button
-            onClick={() => handleSiteSelect('d7902405_0dc2_458b_8584_ed4d24b64f24')}
+            onClick={() => handleSiteSelect('1959bb55_045b_47c7_bbdd_f33b7db197b9')}
             className={cn(
               "w-full rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors",
-              selectedSite === 'd7902405_0dc2_458b_8584_ed4d24b64f24'
+              selectedSite === '1959bb55_045b_47c7_bbdd_f33b7db197b9'
                 ? "bg-primary/20 text-white font-medium"
                 : "text-slate-400 hover:bg-white/5 hover:text-white"
             )}
           >
-            Nexus
+            Office
           </button>
         </div>
       </div>

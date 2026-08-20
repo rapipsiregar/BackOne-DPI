@@ -101,25 +101,65 @@ router.post('/change-account-name', requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/auth/upload-profile-picture ───────────────────────────────────
-router.post('/upload-profile-picture', requireAuth, upload.single('profile_picture'), async (req, res) => {
+// Menerima JSON: { profile_picture_base64: "data:image/png;base64,...", user_id? }
+// Menghindari multipart/form-data yang bermasalah melalui Apache proxy layer
+router.post('/upload-profile-picture', requireAuth, async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+    const { profile_picture_base64, user_id } = req.body;
 
-    const user = await User.findById(req.user.id);
+    if (!profile_picture_base64) {
+      return res.status(400).json({ error: 'No image data provided. Please select an image file first.' });
+    }
+
+    // Validasi format base64 data URL
+    const matches = profile_picture_base64.match(/^data:image\/(png|jpg|jpeg|gif|webp);base64,(.+)$/);
+    if (!matches) {
+      return res.status(400).json({ error: 'Invalid image format. Only PNG, JPG, GIF, WEBP are allowed.' });
+    }
+
+    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+    const base64Data = matches[2];
+
+    // Validasi ukuran (max 5MB uncompressed)
+    const fileSizeBytes = Buffer.byteLength(base64Data, 'base64');
+    if (fileSizeBytes > 5 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Image too large. Maximum size is 5MB.' });
+    }
+
+    // Tentukan target user (self atau admin update user lain)
+    const targetId = user_id || req.user.id;
+    const user = await User.findById(targetId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    user.profile_picture = req.file.filename;
+    // Hapus foto profil lama jika ada
+    if (user.profile_picture) {
+      const oldPath = path.join(getUploadsDir(), user.profile_picture);
+      if (fs.existsSync(oldPath)) {
+        try { fs.unlinkSync(oldPath); } catch (_) {}
+      }
+    }
+
+    // Simpan file baru
+    const filename = `profile-${targetId}-${Date.now()}.${ext}`;
+    const filePath = path.join(getUploadsDir(), filename);
+    fs.writeFileSync(filePath, base64Data, 'base64');
+
+    user.profile_picture = filename;
     await user.save();
 
-    const newToken = makeToken(user);
-    setCookieToken(res, newToken);
+    // Perbarui token hanya jika user mengupdate foto dirinya sendiri
+    if (String(targetId) === String(req.user.id)) {
+      const newToken = makeToken(user);
+      setCookieToken(res, newToken);
+    }
 
-    res.json({ ok: true, message: 'Foto profil berhasil diperbarui', profile_picture: req.file.filename });
+    res.json({ ok: true, message: 'Profile picture updated successfully.', profile_picture: filename });
   } catch (err) {
     console.error('[Upload Error]', err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // ─── POST /api/auth/remove-profile-picture ───────────────────────────────────
 router.post('/remove-profile-picture', requireAuth, async (req, res) => {

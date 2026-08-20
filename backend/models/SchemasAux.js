@@ -11,7 +11,7 @@ const baseOptions = {
 
 // ─── TLS Versions (per agent) ──────────────────────────────────────────────────
 const TlsVersionStatSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:      { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:     { type: String, index: true },
   site_uuid:      { type: String, index: true },
   tls_version:    { type: String, required: true },
@@ -22,7 +22,7 @@ const TlsVersionStatSchema = new mongoose.Schema({
 
 // ─── TLS Ciphers (per agent) ───────────────────────────────────────────────────
 const TlsCipherStatSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:      { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:     { type: String, index: true },
   site_uuid:      { type: String, index: true },
   tls_cipher:     { type: String, required: true },
@@ -33,7 +33,7 @@ const TlsCipherStatSchema = new mongoose.Schema({
 
 // ─── TLS Security (per agent) ──────────────────────────────────────────────────
 const TlsSecurityStatSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:      { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:     { type: String, index: true },
   site_uuid:      { type: String, index: true },
   tls_security:   { type: String, required: true },
@@ -44,7 +44,7 @@ const TlsSecurityStatSchema = new mongoose.Schema({
 
 // ─── Country Traffic Stats (per agent) ────────────────────────────────────────
 const CountryStatSchema = new mongoose.Schema({
-  timestamp:    { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:    { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:   { type: String, index: true },
   site_uuid:    { type: String, index: true },
   country_code: { type: String, required: true },

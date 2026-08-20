@@ -1,12 +1,22 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
-// Bypass google font remote fetch during offline compilation
-const inter = {
-  variable: "font-sans",
-};
+// Inter font — local variable font file, matches demoplace.my.id
+// demoplace uses: --font-sans: var(--font-inter) which renders as Inter
+const inter = localFont({
+  src: [
+    {
+      path: "../../public/fonts/Inter-Variable.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+  ],
+  variable: "--font-inter",
+  display: "swap",
+  adjustFontFallback: false,
+});
 
 const backoneFont = localFont({
   src: "../../public/fonts/BackOneLogo-Regular.ttf",
@@ -21,6 +31,13 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -30,12 +47,14 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} ${backoneFont.variable} h-full antialiased dark`}
+      style={{ colorScheme: "dark" }}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+      <body className="min-h-full flex flex-col overflow-x-hidden bg-background text-foreground" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
+          forcedTheme="dark"
           enableSystem={false}
         >
           {children}

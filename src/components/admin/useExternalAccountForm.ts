@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { ManagedUser } from "@/lib/admin-api";
-import { updateAdminAgentUser, deleteAdminAgentUser, createAdminExternalUser, getViewAsHeaders } from "@/lib/admin-api";
+import { deleteAdminAgentUser, getViewAsHeaders } from "@/lib/admin-api";
+import { submitExternalAccountForm } from "./useExternalAccountSubmit";
 
 interface UseExternalAccountFormProps {
   isOpen: boolean;
@@ -39,7 +40,6 @@ export function useExternalAccountForm({
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
-  // Get current admin user context & global agent registry
   useEffect(() => {
     if (!isOpen) return;
 
@@ -51,9 +51,7 @@ export function useExternalAccountForm({
           setAdminCompany(data.user.company_name || "");
           setAdminAgentUuids(data.user.agent_uuids || []);
           
-          // Default role berdasarkan konteks modal
           if (modalContext === 'agents') {
-            // Agents: default ke TENANT_ADMIN (role teknikal)
             setRole("TENANT_ADMIN");
           } else if (data.user.role === "COMPANY_ADMIN") {
             setRole("COMPANY_OPERATOR");
@@ -90,9 +88,8 @@ export function useExternalAccountForm({
         }
       })
       .catch(console.error);
-  }, [isOpen]);
+  }, [isOpen, modalContext]);
 
-  // Load existing user data when in edit mode
   useEffect(() => {
     if (!isOpen) return;
     setError("");
@@ -135,32 +132,24 @@ export function useExternalAccountForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isEdit = !!user;
-    
     setError("");
     setSuccess("");
     setIsSubmitting(true);
     try {
-      const fd = new FormData();
-      if (username.trim()) fd.append("username", username.trim());
-      if (password) fd.append("password", password);
-      fd.append("account_name", accountName.trim());
-      if (picFile) fd.append("profile_picture", picFile);
-      
       const finalCompany = adminRole === "COMPANY_ADMIN" ? adminCompany : companyName;
-      if (finalCompany) fd.append("company_name", finalCompany);
-      fd.append("agent_uuids", JSON.stringify(selectedAgents));
 
-      if (isEdit) {
-        fd.append("user_id", String(user.id));
-        await updateAdminAgentUser(fd);
-        setSuccess(password ? "Password successfully reset & Account updated!" : "Account successfully updated!");
-      } else {
-        fd.append("role", role);
-        await createAdminExternalUser(fd);
-        setSuccess("External account successfully created!");
-      }
-      
+      const successMsg = await submitExternalAccountForm({
+        user,
+        username,
+        password,
+        accountName,
+        role,
+        selectedAgents,
+        finalCompany,
+        picFile,
+      });
+
+      setSuccess(successMsg);
       setTimeout(() => {
         onSuccess();
         onClose();

@@ -25,7 +25,7 @@ module.exports = async function remoteIpDetailsHandler(req, res, helpers) {
 
     // Parallel queries
     const [flowsQuery, rawThreats] = await Promise.all([
-      Flow.find({ ...flowFilter, $or: [{ src_ip: ip }, { dst_ip: ip }] }).sort({ timestamp: -1 }).limit(2000).lean(),
+      Flow.find({ ...flowFilter, $or: [{ src_ip: ip }, { dst_ip: ip }] }).sort({ timestamp: -1 }).limit(1000000).lean(),
       Threat.find({ ip_address: ip, ...flowFilter }).sort({ detected_at: -1 }).lean(),
     ]);
 

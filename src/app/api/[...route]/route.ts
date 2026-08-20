@@ -26,7 +26,7 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ rou
     const route = routeArray.join('/');
     
     const url = new URL(req.url);
-
+    
     // Force ALL traffic to go through our own Centralized Proxy Server (Express Backend)
     const localBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
     const destinationUrl = `${localBase}/api/${route}${url.search}`;
@@ -39,6 +39,11 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ rou
     } else {
       headers.set('Content-Type', 'application/json');
     }
+
+    const contentLength = req.headers.get('content-length');
+    if (contentLength) {
+      headers.set('Content-Length', contentLength);
+    }
     
     // Forward cookie for authentication
     const cookie = req.headers.get('cookie');
@@ -46,24 +51,23 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ rou
       headers.set('cookie', cookie);
     }
     
-    // Forward X-View-As-Agent header for view-as mode data filtering
-    const viewAsHeader = req.headers.get('x-view-as-agent');
-    if (viewAsHeader) {
-      headers.set('x-view-as-agent', viewAsHeader);
-    }
+    // Forward all custom headers starting with x- (e.g. x-backone-site-uuid, x-view-as-agent)
+    req.headers.forEach((value, name) => {
+      if (name.toLowerCase().startsWith('x-')) {
+        headers.set(name, value);
+      }
+    });
     
     const hasBody = !['GET', 'HEAD'].includes(req.method);
-    let body = null;
-    
-    if (hasBody) {
-      body = await req.arrayBuffer();
-    }
+    const body = hasBody ? req.body : undefined;
     
     const response = await fetch(destinationUrl, {
       method: req.method,
       headers,
-      body: body || undefined,
+      body: body,
       cache: 'no-store', // Prevent Next.js from aggressively caching the backend response
+      // @ts-ignore
+      duplex: hasBody ? 'half' : undefined,
     });
     
     const responseBuffer = await response.arrayBuffer();

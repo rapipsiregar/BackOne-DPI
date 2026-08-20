@@ -1,5 +1,6 @@
 const express = require('express');
 const router  = express.Router();
+const mongoose = require('mongoose');
 const { AppStat, ProtocolStat, AppCategoryStat, LookupApp } = require('../../models/Schemas');
 const { getTimeFilter, getBaseFilter } = require('./helpers');
 
@@ -23,12 +24,43 @@ router.get('/apps', async (req, res) => {
       { $limit: limit }
     ];
 
-    const result = await AppStat.aggregate(pipeline);
+    let result = await AppStat.aggregate(pipeline);
+
+    // Fallback: if no AppStat records exist, aggregate from Flow
+    if (result.length === 0) {
+      const { Flow } = require('../../models/Schemas');
+      const flowPipeline = [
+        { $match: { ...base, app_label: { $ne: null, $ne: '' } } },
+        { $group: {
+            _id:      '$app_label',
+            download: { $sum: '$download' },
+            upload:   { $sum: '$upload' },
+            flows:    { $sum: 1 },
+        }},
+        { $sort: { download: -1 } },
+        { $limit: limit }
+      ];
+      result = await Flow.aggregate(flowPipeline);
+    }
+    
+    // Fetch lookup metadata (category and favicon) to enrich apps list
+    const labels = result.map(r => r._id);
+    const lookups = await LookupApp.find({ label: { $in: labels } }).lean();
+    const lookupMap = {};
+    for (const app of lookups) {
+      lookupMap[app.label] = {
+        favicon: app.favicon || app.logo || null,
+        category: app.application_category?.label || null
+      };
+    }
+
     const formatted = result.map(r => ({
       app_label: r._id,
       download:  r.download || 0,
       upload:    r.upload || 0,
       flows:     r.flows || 0,
+      category:  lookupMap[r._id]?.category || null,
+      favicon:   lookupMap[r._id]?.favicon || null,
     }));
 
     res.json({ ok: true, data: formatted });
@@ -54,7 +86,23 @@ router.get('/protocols', async (req, res) => {
       { $sort: { download: -1 } }
     ];
 
-    const result = await ProtocolStat.aggregate(pipeline);
+    let result = await ProtocolStat.aggregate(pipeline);
+
+    // Fallback: if no ProtocolStat records exist, aggregate from Flow
+    if (result.length === 0) {
+      const { Flow } = require('../../models/Schemas');
+      const flowPipeline = [
+        { $match: { ...base, protocol: { $ne: null, $ne: '' } } },
+        { $group: {
+            _id:      '$protocol',
+            download: { $sum: '$download' },
+            upload:   { $sum: '$upload' },
+            flows:    { $sum: 1 },
+        }},
+        { $sort: { download: -1 } }
+      ];
+      result = await Flow.aggregate(flowPipeline);
+    }
     const formatted = result.map(r => ({
       protocol_label: r._id,
       download:       r.download || 0,

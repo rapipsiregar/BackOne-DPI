@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { X } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { useMemo, useState } from "react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { ThreatStat } from "@/lib/api";
 import { formatAppLabel } from "@/lib/utils";
 import { DropdownFilterSelect } from "@/components/ui/DropdownFilterSelect";
@@ -56,6 +55,8 @@ export function ThreatFilters({
   activeFilterCount,
   onReset,
 }: ThreatFiltersProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
   // Derive unique options from data
   const opts = (key: keyof ThreatStat) => {
     const raw = Array.from(
@@ -79,143 +80,161 @@ export function ThreatFilters({
   }, [all]);
 
   return (
-    <Card className="bg-card/80 backdrop-blur-xl border-border/50 relative z-30 overflow-visible">
-      <CardHeader className="border-b border-border/50 pb-3 flex flex-row items-center justify-between">
+    <div className="mb-4">
+      {/* Compact Trigger Button Bar */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <CardTitle className="text-sm font-semibold text-white uppercase tracking-wider">
-            Filters
-          </CardTitle>
+          <button
+            onClick={() => setIsOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-card/90 border border-border/70 hover:border-primary/50 text-xs font-semibold text-foreground transition-all shadow-sm active:scale-[0.98]"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
+            <span>Filter Threat Data</span>
+            {activeFilterCount > 0 && (
+              <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-full text-[10px] font-bold">
+                {activeFilterCount} active
+              </span>
+            )}
+          </button>
+
           {activeFilterCount > 0 && (
-            <span className="text-xs bg-primary/10 text-primary px-2.5 py-0.5 rounded-full font-semibold">
-              {activeFilterCount} active
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {fType && fType !== "All" && (
+                <span className="text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 px-2 py-1 rounded-lg flex items-center gap-1">
+                  Type: {fType}
+                  <button onClick={() => setFType("All")}><X className="w-3 h-3" /></button>
+                </span>
+              )}
+              {fSev && fSev !== "All" && (
+                <span className="text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 px-2 py-1 rounded-lg flex items-center gap-1">
+                  Severity: {fSev}
+                  <button onClick={() => setFSev("All")}><X className="w-3 h-3" /></button>
+                </span>
+              )}
+              {fApp && fApp !== "All" && (
+                <span className="text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 px-2 py-1 rounded-lg flex items-center gap-1">
+                  App: {formatAppLabel(fApp)}
+                  <button onClick={() => setFApp("All")}><X className="w-3 h-3" /></button>
+                </span>
+              )}
+            </div>
           )}
         </div>
+
         {activeFilterCount > 0 && (
           <button
             onClick={onReset}
-            className="text-xs font-medium text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
+            className="text-[11px] font-semibold text-red-400 hover:text-red-300 transition-colors flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-500/10"
           >
-            <X className="w-3.5 h-3.5" />
-            Reset Filters
+            <X className="w-3 h-3" />
+            Reset All
           </button>
         )}
-      </CardHeader>
-      <CardContent className="p-4 overflow-visible">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 overflow-visible">
-          {/* Date Range */}
-          <div className="space-y-1.5 overflow-visible">
-            <label className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-              Date Range
-            </label>
-            <DateRangePicker
-              minDate={minDate}
-              dateFrom={dateFrom}
-              dateTo={dateTo}
-              onChange={(f, t) => {
-                setDateFrom(f);
-                setDateTo(t);
-              }}
-              onClear={() => {
-                setDateFrom("");
-                setDateTo("");
-              }}
-            />
-          </div>
+      </div>
 
-          {/* Type */}
-          <div className="space-y-1.5 overflow-visible">
-            <label className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-              Type
-            </label>
-            <DropdownFilterSelect
-              value={fType}
-              onChange={setFType}
-              options={opts("threat_type")}
-              placeholder="All Types"
-            />
-          </div>
+      {/* Pop-up Filter Modal Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-overlay-in"
+          onClick={() => setIsOpen(false)}
+        >
+          <div
+            className="w-full max-w-2xl bg-card/95 border border-border/80 rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-2xl animate-modal-in flex flex-col gap-5 max-h-[85vh] overflow-y-auto custom-scrollbar"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-border/50 pb-3">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-primary" />
+                <h3 className="text-sm sm:text-base font-bold text-foreground">Filter Detected Threats</h3>
+                {activeFilterCount > 0 && (
+                  <span className="text-xs bg-primary/20 text-primary px-2.5 py-0.5 rounded-full font-bold">
+                    {activeFilterCount} Active
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-secondary transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-          {/* Severity */}
-          <div className="space-y-1.5 overflow-visible">
-            <label className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-              Severity
-            </label>
-            <DropdownFilterSelect
-              value={fSev}
-              onChange={setFSev}
-              options={opts("severity")}
-              placeholder="All Severities"
-            />
-          </div>
+            {/* Modal Body Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
+                  Date Range
+                </label>
+                <DateRangePicker
+                  minDate={minDate}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+                  onClear={() => { setDateFrom(""); setDateTo(""); }}
+                />
+              </div>
 
-          {/* Source IP */}
-          <div className="space-y-1.5 overflow-visible">
-            <label className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-              Source IP
-            </label>
-            <DropdownFilterSelect
-              value={fSrcIp}
-              onChange={setFSrcIp}
-              options={opts("ip_address")}
-              placeholder="All Source IPs"
-            />
-          </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Type</label>
+                <DropdownFilterSelect value={fType} onChange={setFType} options={opts("threat_type")} placeholder="All Types" />
+              </div>
 
-          {/* Dest IP */}
-          <div className="space-y-1.5 overflow-visible">
-            <label className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-              Dest IP
-            </label>
-            <DropdownFilterSelect
-              value={fDstIp}
-              onChange={setFDstIp}
-              options={opts("dst_ip")}
-              placeholder="All Dest IPs"
-            />
-          </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Severity</label>
+                <DropdownFilterSelect value={fSev} onChange={setFSev} options={opts("severity")} placeholder="All Severities" />
+              </div>
 
-          {/* MAC */}
-          <div className="space-y-1.5 overflow-visible">
-            <label className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-              MAC Address
-            </label>
-            <DropdownFilterSelect
-              value={fMac}
-              onChange={setFMac}
-              options={opts("mac_address")}
-              placeholder="All MACs"
-            />
-          </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Source IP</label>
+                <DropdownFilterSelect value={fSrcIp} onChange={setFSrcIp} options={opts("ip_address")} placeholder="All Source IPs" />
+              </div>
 
-          {/* App */}
-          <div className="space-y-1.5 overflow-visible">
-            <label className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-              App
-            </label>
-            <DropdownFilterSelect
-              value={fApp}
-              onChange={setFApp}
-              options={opts("app_label")}
-              placeholder="All Apps"
-              optionFormatter={formatAppLabel}
-            />
-          </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Dest IP</label>
+                <DropdownFilterSelect value={fDstIp} onChange={setFDstIp} options={opts("dst_ip")} placeholder="All Dest IPs" />
+              </div>
 
-          {/* Domain */}
-          <div className="space-y-1.5 overflow-visible">
-            <label className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">
-              Domain
-            </label>
-            <DropdownFilterSelect
-              value={fDomain}
-              onChange={setFDomain}
-              options={opts("domain")}
-              placeholder="All Domains"
-            />
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">MAC Address</label>
+                <DropdownFilterSelect value={fMac} onChange={setFMac} options={opts("mac_address")} placeholder="All MACs" />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">App</label>
+                <DropdownFilterSelect value={fApp} onChange={setFApp} options={opts("app_label")} placeholder="All Apps" optionFormatter={formatAppLabel} />
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Domain</label>
+                <DropdownFilterSelect value={fDomain} onChange={setFDomain} options={opts("domain")} placeholder="All Domains" />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between border-t border-border/50 pt-4 mt-2">
+              {activeFilterCount > 0 ? (
+                <button
+                  onClick={onReset}
+                  className="text-xs font-semibold text-red-400 hover:text-red-300 transition-colors flex items-center gap-1.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Reset All Filters
+                </button>
+              ) : (
+                <div />
+              )}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-md shadow-primary/20"
+              >
+                Apply Filters
+              </button>
+            </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }

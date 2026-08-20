@@ -3,7 +3,6 @@
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import ViewAsAgentBanner from "@/components/admin/ViewAsAgentBanner";
-import { getViewAsHeaders } from "@/lib/admin-api";
 
 
 export function Header() {
@@ -11,7 +10,7 @@ export function Header() {
   const [userRole, setUserRole] = useState<string>("");
 
   useEffect(() => {
-    fetch('/api/auth/me', { headers: getViewAsHeaders() })
+    fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => {
         if (d.user?.role) setUserRole(d.user.role);

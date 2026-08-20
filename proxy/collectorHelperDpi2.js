@@ -13,8 +13,8 @@ const {
   generateAutoLabel
 } = require('./deviceResolver');
 
-async function collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, netify, label) {
-  const devices = await netify.fetchDiscoveredDevices(5, 500, agentUuid, SITE_UUID);
+async function collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, backone, label) {
+  const devices = await backone.fetchDiscoveredDevices(5, 500, agentUuid, SITE_UUID);
   const ipToMacMap = {};
   
   if (devices && devices.length > 0) {
@@ -56,7 +56,7 @@ async function collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, netify, la
       let deviceAppCount = 0;
       for (let i = 0; i < topDevices.length; i += 5) {
         const batch = topDevices.slice(i, i + 5);
-        const results = await Promise.allSettled(batch.map(d => netify.fetchDeviceApps(d.ip_address, 5, 50, agentUuid, SITE_UUID)));
+        const results = await Promise.allSettled(batch.map(d => backone.fetchDeviceApps(d.ip_address, 5, 50, agentUuid, SITE_UUID)));
         const appDocs = [];
         results.forEach((res, idx) => {
           if (res.status === 'fulfilled' && Array.isArray(res.value)) {
@@ -80,10 +80,13 @@ async function collectDevicesAndApps(agentUuid, timestamp, SITE_UUID, netify, la
   return ipToMacMap;
 }
 
-async function collectFlows(agentUuid, timestamp, SITE_UUID, netify, label, ipToMacMap) {
-  // Netify API has a hard limit of 1,000,000 for settings_limit. Use 1000000 as default per rule.
+async function collectFlows(agentUuid, timestamp, SITE_UUID, backone, label, ipToMacMap) {
+  // BackOne API has a limit of 1,000,000 for settings_limit. Use 1000000 as default per rule.
   const flowLimit = parseInt(process.env.PROXY_FLOW_LIMIT || '1000000');
-  const flows = await netify.fetchFlows(flowLimit, agentUuid, SITE_UUID);
+  // Fetch flows dari 24 jam terakhir (1440 menit) agar semua flow — termasuk yang sudah selesai —
+  // tersimpan ke MongoDB, bukan hanya koneksi yang aktif saat ini.
+  const FLOW_INTERVAL_MINUTES = 1440;
+  const flows = await backone.fetchFlows(flowLimit, agentUuid, SITE_UUID, FLOW_INTERVAL_MINUTES);
   if (flows && flows.length > 0) {
     const flowDocs = flows.map(f => {
       const mac = f.src_mac || ipToMacMap[f.src_ip] || generateMacFromIp(f.src_ip);

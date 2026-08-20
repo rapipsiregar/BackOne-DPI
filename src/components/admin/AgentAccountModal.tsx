@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, User, Key, Tag, Cpu, Upload, Trash2, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { X, Trash2, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import type { ManagedUser } from "@/lib/admin-api";
 import { createAdminAgentUser, updateAdminAgentUser, deleteAdminAgentUser } from "@/lib/admin-api";
+import { AgentAccountFormFields } from "./AgentAccountFormFields";
 
 interface AgentAccountModalProps {
   isOpen: boolean;
@@ -11,7 +12,7 @@ interface AgentAccountModalProps {
   onSuccess: () => void;
   agentUuid: string;
   agentLabel: string;
-  existingUser: ManagedUser | null; // null = create mode
+  existingUser: ManagedUser | null;
 }
 
 export default function AgentAccountModal({
@@ -72,14 +73,31 @@ export default function AgentAccountModal({
     setIsSubmitting(true);
     try {
       if (isEdit) {
-        const fd = new FormData();
-        fd.append("user_id", String(existingUser!.id));
-        if (username.trim()) fd.append("username", username.trim());
-        if (password) fd.append("password", password);
-        fd.append("account_name", accountName.trim());
-        fd.append("agent_uuid", agentUuid);
-        if (picFile) fd.append("profile_picture", picFile);
-        await updateAdminAgentUser(fd);
+        const payload: Record<string, any> = {
+          user_id: String(existingUser!.id),
+          account_name: accountName.trim(),
+          agent_uuid: agentUuid,
+        };
+        if (username.trim()) payload.username = username.trim();
+        if (password) payload.password = password;
+
+        await updateAdminAgentUser(payload);
+
+        if (picFile) {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error("Failed to read file"));
+            reader.readAsDataURL(picFile);
+          });
+          await fetch('/api/auth/upload-profile-picture', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile_picture_base64: base64, user_id: String(existingUser!.id) }),
+          });
+        }
+
         setSuccess("Account successfully updated!");
       } else {
         await createAdminAgentUser({
@@ -120,12 +138,9 @@ export default function AgentAccountModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Modal */}
       <div className="relative z-10 w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-700 bg-gradient-to-r from-blue-900/40 to-slate-900">
           <div>
             <h3 className="text-lg font-bold text-white">
@@ -139,88 +154,20 @@ export default function AgentAccountModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {/* Profile Picture */}
-          <div className="flex items-center gap-4">
-            <div
-              className="w-16 h-16 rounded-full border-2 border-dashed border-slate-600 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-colors overflow-hidden bg-slate-800"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {previewPic ? (
-                <img src={previewPic} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <Upload className="w-6 h-6 text-slate-500" />
-              )}
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-300">Profile Picture</p>
-              <p className="text-xs text-slate-500">Click to upload image</p>
-            </div>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePicChange} />
-          </div>
+          <AgentAccountFormFields
+            isEdit={isEdit}
+            username={username}
+            setUsername={setUsername}
+            password={password}
+            setPassword={setPassword}
+            accountName={accountName}
+            setAccountName={setAccountName}
+            agentUuid={agentUuid}
+            previewPic={previewPic}
+            fileInputRef={fileInputRef}
+            handlePicChange={handlePicChange}
+          />
 
-          {/* Account Name (Label) */}
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
-              <Tag className="w-3.5 h-3.5 inline mr-1" />
-              Account Name (Label Agent)
-            </label>
-            <input
-              type="text"
-              value={accountName}
-              onChange={e => setAccountName(e.target.value)}
-              placeholder="e.g., Gateway 007"
-              className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 transition-colors"
-            />
-            <p className="text-xs text-slate-500 mt-1">This name will appear as a label in the Agents tab</p>
-          </div>
-
-          {/* Agent UUID (readonly info) */}
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
-              <Cpu className="w-3.5 h-3.5 inline mr-1" />
-              Agent UUID
-            </label>
-            <input
-              type="text"
-              value={agentUuid}
-              readOnly
-              className="w-full px-3 py-2.5 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-400 font-mono text-sm cursor-not-allowed"
-            />
-          </div>
-
-          {/* Username */}
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
-              <User className="w-3.5 h-3.5 inline mr-1" />
-              Login Username
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              placeholder="Username for login"
-              required={!isEdit}
-              className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 transition-colors"
-            />
-          </div>
-
-          {/* Password */}
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
-              <Key className="w-3.5 h-3.5 inline mr-1" />
-              Password {isEdit && <span className="text-slate-500">(leave blank to keep unchanged)</span>}
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder={isEdit ? "••••••••" : "New password"}
-              required={!isEdit}
-              className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 transition-colors"
-            />
-          </div>
-
-          {/* Feedback */}
           {error && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-red-900/30 border border-red-800 text-red-300 text-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -234,7 +181,6 @@ export default function AgentAccountModal({
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex gap-2 pt-2">
             {isEdit && (
               <button
@@ -244,14 +190,16 @@ export default function AgentAccountModal({
                 className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-red-900/30 border border-red-800 text-red-300 text-sm hover:bg-red-900/50 transition-colors disabled:opacity-50"
               >
                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                Delete</button>
+                Delete
+              </button>
             )}
             <button
               type="button"
               onClick={onClose}
               className="flex-1 px-4 py-2.5 rounded-lg border border-slate-600 text-slate-300 text-sm hover:bg-slate-800 transition-colors"
             >
-              Cancel</button>
+              Cancel
+            </button>
             <button
               type="submit"
               disabled={isSubmitting}
@@ -266,4 +214,3 @@ export default function AgentAccountModal({
     </div>
   );
 }
-

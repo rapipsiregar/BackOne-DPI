@@ -84,40 +84,40 @@ export function CategoryDetailPanel({
 
       {/* Dialog */}
       <div
-        className={`relative bg-card border border-border rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 overflow-hidden ${isClosing ? "animate-modal-out" : "animate-modal-in"}`}
+        className={`relative bg-card border border-border/50 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 overflow-hidden font-sans ${isClosing ? "animate-modal-out" : "animate-modal-in"}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top accent line */}
         <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-blue-900/30 to-purple-900/20 rounded-t-2xl flex-shrink-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 sm:px-6 sm:py-4 border-b border-border bg-gradient-to-r from-blue-900/30 to-purple-900/20 rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative flex-shrink-0">
               <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 rounded-full" />
-              <div className="p-2.5 bg-white/[0.06] rounded-xl ring-1 ring-blue-500/30 relative">
-                <LayoutGrid className="w-5 h-5 text-blue-400" />
+              <div className="p-2 sm:p-2.5 bg-white/[0.06] rounded-lg sm:rounded-xl ring-1 ring-blue-500/30 relative">
+                <LayoutGrid className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
               </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-widest mb-0.5 text-blue-400">Traffic Category</p>
-              <h3 className="text-lg font-bold text-card-foreground truncate" title={category}>{category}</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Top applications and devices</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5 text-blue-400">Traffic Category</p>
+              <h3 className="text-base sm:text-lg font-bold text-card-foreground truncate" title={category}>{category}</h3>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Top applications and devices</p>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="ml-4 flex-shrink-0 p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-xl transition-all"
+            className="self-end sm:self-auto ml-0 sm:ml-4 flex-shrink-0 p-1.5 sm:p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-lg sm:rounded-xl transition-all"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 sm:h-5 w-4 sm:w-5" />
           </button>
         </div>
 
         {/* ── Tabs ── */}
-        <div className="flex border-b border-border bg-card/50 flex-shrink-0 px-4 pt-4">
+        <div className="flex border-b border-border bg-card/50 flex-shrink-0 px-4 pt-4 overflow-x-auto no-scrollbar flex-nowrap select-none">
           <button
             onClick={() => setActiveTab("apps")}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex-shrink-0 ${
               activeTab === "apps" 
                 ? "border-blue-500 text-blue-400" 
                 : "border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700"
@@ -128,7 +128,7 @@ export function CategoryDetailPanel({
           </button>
           <button
             onClick={() => setActiveTab("devices")}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex-shrink-0 ${
               activeTab === "devices" 
                 ? "border-blue-500 text-blue-400" 
                 : "border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700"
@@ -141,20 +141,20 @@ export function CategoryDetailPanel({
 
         {/* ── Summary bar ── */}
         {!isLoading && currentData.length > 0 && (
-          <div className="flex items-center gap-6 px-6 py-2.5 bg-white/[0.02] border-b border-white/[0.06] flex-shrink-0 text-xs">
+          <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-1 px-4 py-2.5 sm:px-6 bg-white/[0.02] border-b border-white/[0.06] flex-shrink-0 text-xs">
             <span className="text-muted-foreground">
               <span className="font-semibold text-slate-200">{currentData.length.toLocaleString()}</span>
               {" "}{currentData.length === 1 ? "record" : "records"}
             </span>
-            <div className="h-3 w-px bg-white/10" />
+            <div className="h-3 w-px bg-white/10 hidden sm:block" />
             <span className="text-muted-foreground">
               Download: <span className="font-mono text-cyan-400">{fmtBytes(totalDownload)}</span>
             </span>
             <span className="text-muted-foreground">
               Upload: <span className="font-mono text-emerald-400">{fmtBytes(totalUpload)}</span>
             </span>
-            <div className="h-3 w-px bg-white/10" />
-            <span className="text-slate-500 text-[10px] uppercase tracking-wider">
+            <div className="h-3 w-px bg-white/10 hidden sm:block" />
+            <span className="text-slate-500 text-[10px] uppercase tracking-wider w-full sm:w-auto">
               Sorted by bandwidth
             </span>
           </div>

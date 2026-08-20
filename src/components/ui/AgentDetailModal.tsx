@@ -82,22 +82,22 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={handleClose}>
       <div className={`absolute inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`} />
       <div
-        className={`relative bg-card border border-border rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+        className={`relative bg-card border border-border/50 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 font-sans ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-blue-900/30 to-purple-900/20 rounded-t-2xl flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/20 rounded-lg ring-1 ring-blue-500/30">
-              <Server className="w-5 h-5 text-blue-400" />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 sm:px-6 sm:py-4 border-b border-border bg-gradient-to-r from-blue-900/30 to-purple-900/20 rounded-t-2xl flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-1.5 sm:p-2 bg-blue-500/20 rounded-lg ring-1 ring-blue-500/30 flex-shrink-0">
+              <Server className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-card-foreground">{agentLabel}</h3>
-              <p className="text-xs text-muted-foreground font-mono">{agentUuid}</p>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base sm:text-lg font-bold text-card-foreground truncate">{agentLabel}</h3>
+              <p className="text-[10px] sm:text-xs text-muted-foreground font-mono truncate">{agentUuid}</p>
             </div>
           </div>
-          <button onClick={handleClose} className="p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-lg transition-all">
-            <X className="w-5 h-5" />
+          <button onClick={handleClose} className="p-1.5 sm:p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-lg transition-all self-end sm:self-auto">
+            <X className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
           </button>
         </div>
 
@@ -112,36 +112,36 @@ export function AgentDetailModal({ agentUuid, agentLabel, onClose }: Props) {
           ) : data ? (
             <>
               {/* KPI row */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-4 border-b border-border/50 flex-shrink-0">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-4 py-3 sm:px-6 sm:py-4 border-b border-border/50 flex-shrink-0">
                 {[
                   { label: "Devices",    value: data.summary?.total_devices || data.devices.length, color: "text-card-foreground" },
                   { label: "Flows",      value: data.summary?.active_flows || data.flows.length, color: "text-card-foreground" },
                   { label: "Download",   value: fmtBytes(data.summary?.bandwidth_down || data.devices.reduce((acc, d) => acc + (d.download ?? 0), 0)), color: "text-cyan-400" },
                   { label: "Upload",     value: fmtBytes(data.summary?.bandwidth_up || data.devices.reduce((acc, d) => acc + (d.upload ?? 0), 0)), color: "text-green-400" },
                 ].map((kpi) => (
-                  <div key={kpi.label} className="bg-secondary rounded-xl p-3 border border-border/50">
-                    <p className="text-xs text-muted-foreground mb-1">{kpi.label}</p>
-                    <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
+                  <div key={kpi.label} className="bg-secondary rounded-xl p-2.5 sm:p-3 border border-border/50">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 sm:mb-1">{kpi.label}</p>
+                    <p className={`text-base sm:text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
                   </div>
                 ))}
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-1 px-6 py-3 border-b border-border/50 flex-shrink-0 flex-wrap">
+              <div className="flex gap-1.5 px-4 sm:px-6 py-2 sm:py-3 border-b border-border/50 flex-shrink-0 overflow-x-auto flex-nowrap no-scrollbar select-none">
                 {tabs.map((tab) => (
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex-shrink-0 ${
                       activeTab === tab.key
                         ? "bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/40"
                         : "text-muted-foreground hover:text-card-foreground hover:bg-secondary"
                     }`}
                   >
                     {tab.icon}
-                    {tab.label}
+                    <span>{tab.label}</span>
                     {tab.count !== undefined && tab.count > 0 && (
-                      <span className={`ml-0.5 px-1.5 py-0.5 rounded text-xs ${activeTab === tab.key ? "bg-blue-500/30 text-blue-200" : "bg-white/10 text-slate-300"}`}>
+                      <span className={`ml-0.5 px-1.5 py-0.5 rounded text-[10px] ${activeTab === tab.key ? "bg-blue-500/30 text-blue-200" : "bg-white/10 text-slate-300"}`}>
                         {tab.count}
                       </span>
                     )}

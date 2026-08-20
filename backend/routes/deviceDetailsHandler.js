@@ -119,32 +119,35 @@ module.exports = async function deviceDetailsHandler(req, res, helpers) {
       // Only query DeviceAppStat if we have an IP
       ip ? DeviceAppStat.find(appFilter).sort({ timestamp: -1 }).lean() : [],
       flowQueryConditions.length > 0
-        ? Flow.find({ ...flowFilter, $or: flowQueryConditions }).sort({ timestamp: -1 }).limit(2000).lean()
+        ? Flow.find({ ...flowFilter, $or: flowQueryConditions }).sort({ timestamp: -1 }).limit(5000).lean()
         : [],
       Threat.find(threatQuery).sort({ detected_at: -1 }).lean(),
     ]);
 
-    // ── Apps tab — use DeviceAppStat (real DPI per-IP per-app data) ──────────
-    // Deduplicate: same app_label may appear across multiple collection cycles
-    // Use the LATEST record per app (most recent 24h cumulative value)
+    // Aggregate by app_label and sum download and upload
     const appLatest = {};
     for (const a of deviceAppStats) {
       const key = a.app_label;
-      if (!appLatest[key] || new Date(a.timestamp) > new Date(appLatest[key].timestamp)) {
-        appLatest[key] = a;
+      if (!appLatest[key]) {
+        appLatest[key] = {
+          app_label:  a.app_label,
+          download:   0,
+          upload:     0,
+          flows:      0,
+          first_seen: a.created_at || a.timestamp,
+          last_seen:  a.updated_at || a.timestamp,
+        };
+      }
+      appLatest[key].download += a.download || 0;
+      appLatest[key].upload   += a.upload   || 0;
+      appLatest[key].flows    += a.flows    || 0;
+      if (new Date(a.timestamp) > new Date(appLatest[key].last_seen)) {
+        appLatest[key].last_seen = a.timestamp;
       }
     }
     const apps = Object.values(appLatest)
       .filter(a => (a.download || 0) + (a.upload || 0) > 0)
-      .sort((a, b) => (b.download || 0) - (a.download || 0))
-      .map(a => ({
-        app_label:  a.app_label,
-        download:   a.download  || 0,
-        upload:     a.upload    || 0,
-        flows:      a.flows     || 0,
-        first_seen: a.created_at || a.timestamp,
-        last_seen:  a.updated_at || a.timestamp,
-      }));
+      .sort((a, b) => (b.download || 0) - (a.download || 0));
 
     // ── Protocol / Domain tabs — from Flow collection ────────────────────────
     const protocolsMap = {}, domainsMap = {}, destinationsMap = {};

@@ -1,11 +1,11 @@
 import { revalidatePath } from "next/cache";
 
-export const BASE_URL = process.env.BACKONE_BASE_URL || process.env.NETIFY_BASE_URL;
-export const API_URL = BASE_URL ? `${BASE_URL}/assets/agents` : "https://manager.netify.ai/api/v1/assets/agents";
+export const BASE_URL = process.env.BACKONE_BASE_URL || process.env.BACKONE_INFORMATICS_BASE_URL || "http://127.0.0.1:3011";
+export const API_URL = `${BASE_URL}/assets/agents`;
 
-export const getApiKey = () => process.env.BACKONE_API_KEY || process.env.NETIFY_API_KEY;
-export const getJwtToken = () => process.env.BACKONE_JWT_TOKEN || process.env.NETIFY_JWT_TOKEN;
-export const getSiteUuid = () => process.env.BACKONE_SITE_UUID || process.env.NETIFY_SITE_UUID;
+export const getApiKey = () => process.env.BACKONE_API_KEY || process.env.BACKONE_DPI_API_KEY;
+export const getJwtToken = () => process.env.BACKONE_JWT_TOKEN || process.env.BACKONE_TOKEN;
+export const getSiteUuid = () => process.env.BACKONE_SITE_UUID;
 
 export interface Agent {
   id: number;

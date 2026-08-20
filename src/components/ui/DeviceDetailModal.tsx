@@ -10,6 +10,7 @@ import DeviceDomainsTab from "./DeviceDomainsTab";
 import DeviceFlowsTab from "./DeviceFlowsTab";
 import DeviceThreatsTab from "./DeviceThreatsTab";
 import DeviceIdentityCard from "./DeviceIdentityCard";
+import DeviceKpiSection from "./DeviceKpiSection";
 
 interface Props {
   ip: string;
@@ -96,57 +97,59 @@ export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleClose}>
       <div className={`absolute inset-0 bg-black/60 backdrop-blur-md ${isClosing ? 'animate-overlay-out' : 'animate-overlay-in'}`} />
       <div
-        className={`relative bg-card border border-border rounded-3xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/10 dark:shadow-blue-900/20 overflow-hidden backdrop-blur-xl ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+        className={`relative bg-card border border-border/50 rounded-3xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/10 dark:shadow-blue-900/20 overflow-hidden backdrop-blur-xl font-sans ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-border bg-gradient-to-br from-blue-500/5 via-slate-500/5 to-slate-500/10 dark:from-blue-900/10 dark:via-slate-900/20 dark:to-slate-950/40 relative z-10">
-          <div className="flex items-center gap-4">
-            <div className="relative">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-4 py-4 sm:px-6 sm:py-5 border-b border-border bg-gradient-to-br from-blue-500/5 via-slate-500/5 to-slate-500/10 dark:from-blue-900/10 dark:via-slate-900/20 dark:to-slate-950/40 relative z-10">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="relative flex-shrink-0">
               <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 rounded-full" />
-              <div className="p-3 bg-gradient-to-br from-blue-500/20 to-cyan-500/10 rounded-xl ring-1 ring-blue-500/30 relative">
-                <Monitor className="w-6 h-6 text-blue-500 dark:text-blue-400" />
+              <div className="p-2 sm:p-3 bg-gradient-to-br from-blue-500/20 to-cyan-500/10 rounded-lg sm:rounded-xl ring-1 ring-blue-500/30 relative">
+                <Monitor className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 dark:text-blue-400" />
               </div>
             </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h3 className="text-xl font-bold text-card-foreground tracking-tight">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <h3 className="text-base sm:text-xl font-bold text-card-foreground tracking-tight truncate max-w-full">
                   {ip || data?.ip_address || 'Resolving IP...'}
                 </h3>
-                {isRefreshing && <RefreshCcw className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 animate-spin" />}
+                {isRefreshing && <RefreshCcw className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500 dark:text-blue-400 animate-spin flex-shrink-0" />}
               </div>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {data?.device_label || deviceData?.device_label || 'Unknown Device'} 
-                <span className="text-border mx-2">•</span> 
-                <span className="font-mono text-xs">{mac || data?.mac_address || deviceData?.mac_address || 'No MAC'}</span>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 flex flex-wrap items-center gap-1 sm:gap-2">
+                <span className="truncate max-w-[150px] sm:max-w-none">{data?.device_label || deviceData?.device_label || 'Unknown Device'}</span> 
+                <span className="hidden sm:inline text-border">•</span> 
+                <span className="font-mono text-[10px] sm:text-xs bg-muted/60 dark:bg-slate-800/80 px-1.5 py-0.5 rounded leading-none">{mac || data?.mac_address || deviceData?.mac_address || 'No MAC'}</span>
               </p>
               {data?.agent_label && (
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
-                  <Server className="w-3.5 h-3.5" />
-                  Source Agent: <strong>{data.agent_label}</strong> <span className="text-muted-foreground/60">({data.agent_uuid})</span>
+                <p className="text-[10px] sm:text-xs text-blue-600 dark:text-blue-400 mt-1 flex flex-wrap items-center gap-1">
+                  <Server className="w-3 h-3 flex-shrink-0" />
+                  <span>Source Agent:</span>
+                  <strong className="bg-blue-500/10 px-1 py-0.5 rounded">{data.agent_label}</strong>
+                  <span className="text-muted-foreground/60 truncate max-w-[100px] sm:max-w-none">({data.agent_uuid})</span>
                 </p>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {data && (
+          <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 w-full sm:w-auto border-t border-border/40 pt-3 sm:border-t-0 sm:pt-0">
+            {data ? (
               <button
                 disabled={isExporting}
                 onClick={exportToPdf}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-md shadow-blue-600/15 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-md shadow-blue-600/15 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isExporting ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin" />
                 ) : (
-                  <ArrowDownToLine className="w-3.5 h-3.5" />
+                  <ArrowDownToLine className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 )}
                 Export PDF
               </button>
-            )}
-            <button onClick={handleClose} className="p-2.5 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-xl transition-all">
-              <X className="w-5 h-5" />
+            ) : <div />}
+            <button onClick={handleClose} className="p-1.5 sm:p-2 text-muted-foreground hover:text-card-foreground hover:bg-secondary rounded-lg sm:rounded-xl transition-all">
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
@@ -169,7 +172,7 @@ export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) 
           ) : data ? (
             <>
               {/* Tab Navigation */}
-              <div className="flex items-center gap-2 px-6 py-3 border-b border-border overflow-x-hidden custom-scrollbar flex-shrink-0 bg-secondary/30 flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 sm:py-3 border-b border-border overflow-x-auto flex-nowrap bg-secondary/30 flex-shrink-0 no-scrollbar select-none">
                 {tabs.map((t) => {
                   const Icon = t.icon;
                   const isActive = activeTab === t.id;
@@ -177,14 +180,14 @@ export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) 
                     <button
                       key={t.id}
                       onClick={() => setActiveTab(t.id)}
-                      className={`flex items-center gap-2.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                      className={`flex items-center gap-1.5 sm:gap-2.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 flex-shrink-0 ${
                         isActive
                           ? "bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/30"
                           : "text-muted-foreground hover:text-card-foreground hover:bg-secondary border border-transparent"
                       }`}
                     >
-                      <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600 dark:text-blue-400' : ''}`} />
-                      {t.label}
+                      <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isActive ? 'text-blue-600 dark:text-blue-400' : ''}`} />
+                      <span>{t.label}</span>
                     </button>
                   );
                 })}
@@ -196,26 +199,7 @@ export function DeviceDetailModal({ ip, mac = '', deviceData, onClose }: Props) 
                   <div className="space-y-6 animate-fade-in text-xs">
                     <ActiveDurationDisplay firstSeen={data.first_seen || undefined} lastSeen={data.last_seen || undefined} />
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-6 bg-gradient-to-br from-cyan-500/5 dark:from-cyan-500/10 to-transparent border border-cyan-100 dark:border-cyan-500/20 rounded-2xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                          <ArrowDownToLine className="w-16 h-16 text-cyan-500 dark:text-cyan-400" />
-                        </div>
-                        <p className="text-sm font-medium text-cyan-600 dark:text-cyan-400/80 mb-2 flex items-center gap-2">
-                          <ArrowDownToLine className="w-4 h-4" /> Total Download
-                        </p>
-                        <p className="text-4xl font-black text-card-foreground tracking-tight">{fmtBytes(data.total_download)}</p>
-                      </div>
-                      <div className="p-6 bg-gradient-to-br from-emerald-500/5 dark:from-emerald-500/10 to-transparent border border-emerald-100 dark:border-emerald-500/20 rounded-2xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                          <ArrowUpFromLine className="w-16 h-16 text-emerald-500 dark:text-emerald-400" />
-                        </div>
-                        <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400/80 mb-2 flex items-center gap-2">
-                          <ArrowUpFromLine className="w-4 h-4" /> Total Upload
-                        </p>
-                        <p className="text-4xl font-black text-card-foreground tracking-tight">{fmtBytes(data.total_upload)}</p>
-                      </div>
-                    </div>
+                    <DeviceKpiSection totalDownload={data.total_download} totalUpload={data.total_upload} />
 
                     <DeviceIdentityCard
                       osLabel={data.os_label || deviceData?.os_label || ""}

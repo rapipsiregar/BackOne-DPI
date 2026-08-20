@@ -70,7 +70,7 @@ async function populateAppCache(BASE_URL, token, siteUuid) {
 
 // Core DPI fetch for app-details
 async function fetchFromDpiApi(label, agentUuid, timeRange, token, siteUuid) {
-  const BASE_URL = process.env.NETIFY_INFORMATICS_BASE_URL || 'https://informatics.netify.ai/api/v1';
+  const BASE_URL = process.env.BACKONE_INFORMATICS_BASE_URL || 'https://api0.dev.backone.cloud/api/v1';
   const headers  = { 'x-api-key': token, 'Accept': 'application/json', 'x-net-site': siteUuid };
 
   const TIMEOUT_MS = 12000;

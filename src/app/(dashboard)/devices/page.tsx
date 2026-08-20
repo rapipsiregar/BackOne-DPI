@@ -3,12 +3,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { DeviceDetailModal } from "@/components/ui/DeviceDetailModal";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { TimestampCell } from "@/components/ui/TimestampCell";
 import { DeviceStat } from "@/lib/api";
 import { useDevices } from "@/lib/api-with-context";
 import { fmtBytes } from "@/lib/utils";
-import { Loader2, ChevronRight, ChevronDown } from "lucide-react";
+import { Loader2, ChevronRight } from "lucide-react";
 
 import { UniversalFilters, useUniversalFilterState, FilterConfig } from "@/components/ui/UniversalFilters";
 import { HelpTrigger } from "@/components/help/HelpTrigger";
@@ -161,19 +161,19 @@ export default function DevicesPage() {
   const minDate = minTime !== Infinity ? new Date(minTime).toISOString().slice(0, 10) : "2024-01-01";
 
   return (
-    <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            Devices
-            {devices.isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
+    <div className="space-y-6 sm:space-y-8 animate-fade-in pb-10">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-2 sm:gap-3 flex-wrap">
+            <span>Devices</span>
+            {devices.isLoading && <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-primary flex-shrink-0" />}
           </h2>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-normal sm:leading-relaxed">
             Monitor and manage connected network devices.{" "}
-            <span className="text-slate-500 text-xs">Click an IP to see app usage &amp; flows.</span>
+            <span className="text-slate-500 text-[10px] sm:text-xs block sm:inline mt-0.5 sm:mt-0">Click an IP to see app usage &amp; flows.</span>
           </p>
         </div>
-        <HelpTrigger pageId="devices" />
+        <HelpTrigger pageId="devices" className="flex-shrink-0" />
       </div>
 
       <UniversalFilters

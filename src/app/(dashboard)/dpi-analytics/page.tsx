@@ -47,15 +47,27 @@ export default function DpiAnalyticsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">DPI MetaData</h1>
-          <p className="text-slate-400 mt-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4 w-full">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight truncate">
+              DPI MetaData
+            </h1>
+            {/* Mobile Actions: Inline next to Title */}
+            <div className="flex items-center gap-1.5 flex-shrink-0 sm:hidden">
+              <HelpTrigger pageId="dpi-analytics" />
+            </div>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 leading-normal sm:leading-relaxed">
             Deep Packet Inspection metadata and fingerprinting.{" "}
-            <span className="text-blue-400 text-sm">Click any row to view device-level detail.</span>
+            <span className="text-blue-400 text-[10px] sm:text-xs block sm:inline mt-0.5 sm:mt-0">Click any row to view device-level detail.</span>
           </p>
         </div>
-        <HelpTrigger pageId="dpi-analytics" />
+
+        {/* Laptop/Tablet Actions: Floats on the right */}
+        <div className="hidden sm:flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          <HelpTrigger pageId="dpi-analytics" />
+        </div>
       </div>
 
       <DpiAnalyticsTabs

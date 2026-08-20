@@ -82,7 +82,7 @@ export default function DeviceFlowsTab({ flows, ip }: Props) {
 
   if (flows.length === 0) {
     return (
-      <div className="text-center py-10 bg-slate-50/50 dark:bg-white/[0.02] border border-border rounded-2xl">
+      <div className="text-center py-10 bg-white/[0.02] border border-border/50 rounded-2xl">
         <Activity className="w-12 h-12 text-muted-foreground/60 mx-auto mb-3" />
         <h4 className="text-card-foreground font-bold text-lg mb-1">No Flow Data Yet</h4>
         <p className="text-muted-foreground font-medium max-w-md mx-auto">

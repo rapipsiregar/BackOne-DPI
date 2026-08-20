@@ -158,12 +158,24 @@ function EventsContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-          Network Events
-          {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
-        </h2>
-        <HelpTrigger pageId="events" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4 w-full">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2 sm:gap-3 truncate">
+              <span>Network Events</span>
+              {isLoading && <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-primary flex-shrink-0" />}
+            </h2>
+            {/* Mobile Actions: Inline next to Title */}
+            <div className="flex items-center gap-1.5 flex-shrink-0 sm:hidden">
+              <HelpTrigger pageId="events" />
+            </div>
+          </div>
+        </div>
+
+        {/* Laptop/Tablet Actions: Floats on the right */}
+        <div className="hidden sm:flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          <HelpTrigger pageId="events" />
+        </div>
       </div>
       
       <UniversalFilters
@@ -218,6 +230,7 @@ function EventsContent() {
   );
 }
 
+
 export default function EventsPage() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>
@@ -225,4 +238,3 @@ export default function EventsPage() {
     </Suspense>
   );
 }
-export { EventsContent };

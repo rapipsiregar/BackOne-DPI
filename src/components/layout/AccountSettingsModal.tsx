@@ -34,9 +34,9 @@ export function AccountSettingsModal({
       title="Account Settings"
       className="sm:max-w-3xl sm:w-full h-[520px]"
     >
-      <div className="flex flex-col md:flex-row gap-6 h-[430px]">
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6 h-[430px]">
         {/* Left Sidebar Layout (Fixed Width & Height) */}
-        <div className="w-full md:w-[180px] flex flex-row md:flex-col gap-1 border-b md:border-b-0 md:border-r border-border/50 pb-4 md:pb-0 md:pr-4 shrink-0 overflow-x-auto md:overflow-x-visible custom-scrollbar h-full">
+        <div className="w-full md:w-[180px] flex flex-row md:flex-col gap-1 border-b md:border-b-0 md:border-r border-border/50 pb-2.5 md:pb-0 md:pr-4 shrink-0 overflow-x-auto md:overflow-x-visible custom-scrollbar h-auto md:h-full">
           <button
             onClick={() => setActiveTab('account_name')}
             className={cn(
@@ -101,7 +101,7 @@ export function AccountSettingsModal({
         </div>
 
         {/* Right Content Pane (Fixed Height & Scrollable for strict Rule 9 size consistency) */}
-        <div className="flex-1 min-w-0 h-full overflow-y-auto pr-2 custom-scrollbar">
+        <div className="flex-1 min-w-0 h-[320px] md:h-full overflow-y-auto pr-2 custom-scrollbar">
           {activeTab === 'account_name' && (
             <AccountNameTab user={user} setUser={setUser} onClose={onClose} />
           )}

@@ -1,12 +1,10 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, User, Key, Tag, Loader2, AlertCircle, CheckCircle2, Trash2, Shield } from "lucide-react";
+import { X, Loader2, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 import type { ManagedUser } from "@/lib/admin-api";
 import { useExternalAccountForm } from "./useExternalAccountForm";
-import RoleSelect from "./RoleSelect";
-import AgentChecklist from "./AgentChecklist";
-import ProfilePictureInput from "./ProfilePictureInput";
+import { ExternalAccountFormFields } from "./ExternalAccountFormFields";
 
 interface ExternalAccountModalProps {
   isOpen: boolean;
@@ -24,8 +22,6 @@ export default function ExternalAccountModal({
   onClose,
   onSuccess,
   user,
-  targetSiteUuid,
-  targetCreatedBy,
   targetCompany,
   modalContext = 'user-accounts',
 }: ExternalAccountModalProps) {
@@ -124,95 +120,27 @@ export default function ExternalAccountModal({
                 </div>
               )}
 
-              <ProfilePictureInput previewPic={previewPic} onChange={handlePicChange} />
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                  <Tag className="w-3.5 h-3.5 inline mr-1" />
-                  Account Name
-                </label>
-                <input
-                  type="text"
-                  value={accountName}
-                  onChange={(e) => setAccountName(e.target.value)}
-                  placeholder="Full Name"
-                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500 transition-colors"
-                />
-              </div>
-
-              {!isEdit && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                    <Shield className="w-3.5 h-3.5 inline mr-1" />
-                    Account Role
-                  </label>
-                  <RoleSelect adminRole={adminRole} value={role} onChange={setRole} modalContext={modalContext} />
-                </div>
-              )}
-
-              {/* Company Name: hanya untuk User Accounts context */}
-              {modalContext === 'user-accounts' && adminRole === "SUPER_ADMIN" && (role === "COMPANY_ADMIN" || isEdit) && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                    🏢 Company Name
-                  </label>
-                  <input
-                    type="text"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="Nama Perusahaan (e.g. IFG)"
-                    required
-                    className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500 transition-colors"
-                  />
-                </div>
-              )}
-
-              {/* Agent Checklist: hanya untuk User Accounts context (COMPANY_*) */}
-              {modalContext === 'user-accounts' && (
-                role === "COMPANY_ADMIN" ||
-                role === "COMPANY_OPERATOR" ||
-                role === "COMPANY_VIEWER"
-              ) && (
-                <AgentChecklist
-                  availableAgents={availableAgents}
-                  selectedAgents={selectedAgents}
-                  onAgentCheck={handleAgentCheck}
-                  agentNamesMap={agentNamesMap}
-                />
-              )}
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                  <User className="w-3.5 h-3.5 inline mr-1" />
-                  Login Username
-                </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Username for login"
-                  required
-                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500 transition-colors"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                  <Key className="w-3.5 h-3.5 inline mr-1" />
-                  {isEdit ? "Reset Password" : "Password"}{" "}
-                  {isEdit && (
-                    <span className="text-slate-500">(leave blank to keep unchanged)</span>
-                  )}
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isEdit ? "Type new password to override" : "Create password"}
-                  required={!isEdit}
-                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500 transition-colors"
-                />
-              </div>
+              <ExternalAccountFormFields
+                isEdit={isEdit}
+                adminRole={adminRole}
+                modalContext={modalContext}
+                previewPic={previewPic}
+                handlePicChange={handlePicChange}
+                accountName={accountName}
+                setAccountName={setAccountName}
+                role={role}
+                setRole={setRole}
+                companyName={companyName}
+                setCompanyName={setCompanyName}
+                availableAgents={availableAgents}
+                selectedAgents={selectedAgents}
+                handleAgentCheck={handleAgentCheck}
+                agentNamesMap={agentNamesMap}
+                username={username}
+                setUsername={setUsername}
+                password={password}
+                setPassword={setPassword}
+              />
 
               {error && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-red-900/30 border border-red-800 text-red-300 text-sm">

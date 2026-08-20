@@ -24,13 +24,19 @@ export default function ProfilePictureTab({ user, setUser, onClose }: Props) {
     setErrorMsg("");
     setSuccessMsg("");
 
-    const formData = new FormData();
-    formData.append('profile_picture', profilePicFile);
-
     try {
+      // Konversi file ke base64 data URL — menghindari masalah multipart/form-data
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(profilePicFile);
+      });
+
       const res = await fetch('/api/auth/upload-profile-picture', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_picture_base64: base64 }),
       });
 
       const data = await res.json();

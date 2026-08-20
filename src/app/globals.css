@@ -13,8 +13,18 @@ body {
   width: 100%;
 }
 
+/* ── Auto-Hide Floating Help FAB when any Pop-Up Modal is active ── */
+body[style*="overflow: hidden"] .help-center-fab,
+body[style*="overflow:hidden"] .help-center-fab,
+body:has([role="dialog"]) .help-center-fab,
+body:has(.animate-modal-in) .help-center-fab {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 body {
-  font-family: var(--font-sans);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   color: var(--foreground);
   /* Optical sizing + smoothing */
   font-optical-sizing: auto;
@@ -25,20 +35,15 @@ body {
 
 /* 1-Second Dual-Layer Smooth Background Crossfade */
 
-/* Dark Mode Background Layer (Active by default, fades out on .light) */
-body::before,
-body::after {
+/* Dark Mode Background Layer */
+body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
-  transition: opacity 150ms ease-in-out;
   pointer-events: none;
   background-size: cover;
   background-attachment: fixed;
-}
-
-body::before {
   background-color: #09090b;
   background-image:
     radial-gradient(circle at 0% 0%, rgba(30, 58, 138, 0.35) 0%, transparent 40%),
@@ -47,32 +52,10 @@ body::before {
   opacity: 1;
 }
 
-.light body::before {
-  opacity: 0;
-}
-
-/* Light Mode Background Layer (Hidden by default, fades in on .light) */
-body::after {
-  background-color: #f1f5f9;
-  background-image:
-    radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 40%),
-    radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.05) 0px, transparent 40%);
-  opacity: 0;
-}
-
-.light body::after {
-  opacity: 1;
-}
-
 /* Ambient Colors for Cards & Sidebars */
 :root {
   --ambient-card-bg: rgba(24, 24, 27, 0.7);
   --ambient-sidebar-bg: rgba(9, 9, 11, 0.95);
-}
-
-.light {
-  --ambient-card-bg: rgba(255, 255, 255, 0.9);
-  --ambient-sidebar-bg: rgba(255, 255, 255, 1);
 }
 
 .bg-card {
@@ -100,7 +83,7 @@ canvas {
   transition: none !important;
 }
 
-/* View Transitions API (For perfect whole-screen crossfade including WebGL/Canvas) */
+/* View Transitions API */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 500ms;
@@ -116,14 +99,8 @@ canvas {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: var(--muted);
-  border-radius: 10px;
-}
-.dark .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: rgba(255, 255, 255, 0.1);
-}
-.light .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
 }
 
 /* ── Modal Animations (0.5s) ── */

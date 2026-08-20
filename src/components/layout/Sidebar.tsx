@@ -1,50 +1,67 @@
 // src/components/layout/Sidebar.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { X } from "lucide-react";
 import { AccountSettingsModal } from "./AccountSettingsModal";
-import { useTimeFilter } from "@/contexts/TimeFilterContext";
-import { useTenantConfig } from "@/contexts/TenantConfigContext";
 import { getViewAsHeaders } from "@/lib/admin-api";
-import { NAVIGATION_GROUPS, TIME_OPTIONS } from "./SidebarData";
+import { NAVIGATION_GROUPS } from "./SidebarData";
 import SidebarProfile from "./SidebarProfile";
 import SidebarNotifications from "./SidebarNotifications";
-import { SidebarSiteSwitcher } from "./SidebarSiteSwitcher";
-import { SidebarTimeFilter } from "./SidebarTimeFilter";
+import SidebarSiteSelector from "./SidebarSiteSelector";
+import SidebarTimeSelector from "./SidebarTimeSelector";
+import { getSiteBranding } from "@/lib/branding";
 
-export function Sidebar() {
+interface SidebarProps {
+  isMobile?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { timeRange, setTimeRange } = useTimeFilter();
-  const { tenantConfig } = useTenantConfig();
-
-  const [user, setUser] = useState<{ username?: string; account_name?: string; profile_picture?: string; role?: string; agent_uuid?: string } | null>(null);
+  const [user, setUser] = useState<{ username?: string; account_name?: string; profile_picture?: string; role?: string; agent_uuid?: string; agent_uuids?: string[]; company_name?: string; _isViewAsMode?: boolean } | null>(null);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false);
   const [intervalText, setIntervalText] = useState<string>("");
-
-  const timeDropdownRef = useRef<HTMLDivElement>(null);
-  const selectedTimeOption = TIME_OPTIONS.find(opt => opt.value === timeRange) || TIME_OPTIONS[3];
-
   const [selectedSite, setSelectedSite] = useState<string>("6681452d_9cae_4ff4_8ae8_0d504774265e");
-  const [isSiteDropdownOpen, setIsSiteDropdownOpen] = useState(false);
-  const siteDropdownRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     fetch('/api/auth/me', { headers: getViewAsHeaders() })
-      .then(res => res.json())
+      .then(res => {
+        if (res.status === 401) {
+          window.location.href = "/login";
+          return null;
+        }
+        return res.json();
+      })
       .then(data => {
-        if (data.user) {
+        if (data && data.user) {
           setUser(data.user);
-          if (data.user.site_uuid && data.user.role !== 'SUPER_ADMIN') {
-            const currentStored = localStorage.getItem('backone_site_uuid');
-            if (currentStored !== data.user.site_uuid) {
-              localStorage.setItem('backone_site_uuid', data.user.site_uuid);
-              setSelectedSite(data.user.site_uuid);
-              window.location.reload();
-            }
+          
+          // Role-aware site UUID logic:
+          // - Global roles (SUPER_ADMIN, EXECUTIVE, SOC_ANALYST, ENGINEER):
+          //   Prioritaskan pilihan yang TERSIMPAN di localStorage.
+          //   Hanya set dari DB jika belum ada pilihan tersimpan.
+          //   Ini agar site switcher tidak reset ke SIAB setiap page reload.
+          // - Restricted roles (TENANT_ADMIN, AGENT_VIEWER, COMPANY_*):
+          //   Selalu pakai site_uuid dari DB (mereka tidak bisa ganti site).
+          const globalRoles = ['SUPER_ADMIN', 'EXECUTIVE', 'SOC_ANALYST', 'ENGINEER'];
+          const isGlobalRole = globalRoles.includes(data.user.role || '');
+          const storedSiteUuid = localStorage.getItem('backone_site_uuid');
+          
+          if (isGlobalRole) {
+            // Pakai localStorage jika sudah ada, fallback ke DB, fallback ke SIAB default
+            const siteToUse = storedSiteUuid || data.user.site_uuid || '6681452d_9cae_4ff4_8ae8_0d504774265e';
+            localStorage.setItem('backone_site_uuid', siteToUse);
+            setSelectedSite(siteToUse);
+          } else if (data.user.site_uuid) {
+            // Restricted roles: selalu pakai site_uuid dari DB (tidak bisa switch)
+            localStorage.setItem('backone_site_uuid', data.user.site_uuid);
+            setSelectedSite(data.user.site_uuid);
           }
         }
       })
@@ -70,76 +87,71 @@ export function Sidebar() {
 
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('backone_site_uuid');
-      if (stored) setSelectedSite(stored);
+      if (stored) {
+        setSelectedSite(stored);
+      }
     }
   }, []);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (timeDropdownRef.current && !timeDropdownRef.current.contains(event.target as Node)) setIsTimeDropdownOpen(false);
-      if (siteDropdownRef.current && !siteDropdownRef.current.contains(event.target as Node)) setIsSiteDropdownOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const branding = getSiteBranding(selectedSite);
+  const isNexus = branding.name === "Nexus";
+
+
 
   const handleSiteSelect = (val: string) => {
     setSelectedSite(val);
     localStorage.setItem('backone_site_uuid', val);
-    setIsSiteDropdownOpen(false);
     window.location.reload();
   };
 
-  const getSiteLabel = (uuid: string) => {
-    if (uuid === 'd7902405_0dc2_458b_8584_ed4d24b64f24') return 'Nexus';
-    return 'SIAB';
-  };
-
   return (
-    <div className="flex h-full max-h-screen flex-col border-r border-white/5 bg-black/20 backdrop-blur-3xl transition-all w-64 shrink-0 relative z-40 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)]">
+    <div 
+      className="flex h-full max-h-screen flex-col border-r border-white/5 bg-black/20 backdrop-blur-3xl transition-all w-64 shrink-0 relative z-40 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)]"
+      style={{ fontFamily: "'Times New Roman', Times, serif" }}
+    >
       {/* Brand & Site Info */}
-      <div className="flex flex-col p-2 shrink-0 gap-4 border-b border-white/5">
-        <div className="flex flex-col items-center justify-center text-center w-full pt-4 pb-2 px-2 gap-2">
+      <div className="flex flex-col p-2 shrink-0 gap-4 border-b border-white/5 relative">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Close sidebar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+        <div className="flex flex-col items-center justify-center w-full pt-6 pb-3 px-3 text-center mx-auto" suppressHydrationWarning>
           <img 
-            src={tenantConfig?.brandLogo || "/backone-logo.png"} 
-            alt="Brand Logo" 
-            className="h-10 object-contain drop-shadow-[0_0_12px_rgba(255,0,0,0.2)] shrink-0" 
+            src={mounted ? branding.logo : "/backone-logo.png"} 
+            alt="Logo" 
+            suppressHydrationWarning
+            className={cn(
+              "w-12 h-12 object-contain shrink-0 mb-3",
+              (mounted && isNexus) 
+                ? "drop-shadow-[0_0_12px_rgba(6,182,212,0.45)]" 
+                : "drop-shadow-[0_0_12px_rgba(168,85,247,0.45)]"
+            )} 
           />
-          <div className="flex flex-col items-center justify-center text-center">
-            <span className="text-[9px] uppercase tracking-[0.1em] text-slate-400 font-semibold mt-1">
-              Deep Package Inspection
-            </span>
-            <div className="flex items-center gap-1.5 mt-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold px-2 py-0.5 rounded-full w-fit">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              DPI ENGINE: ACTIVE
-            </div>
+          <span className="text-[9.5px] uppercase tracking-[0.18em] text-slate-300 font-mono font-bold block">
+            Deep Package Inspection
+          </span>
+          <div className="flex items-center gap-1.5 mt-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold px-3 py-1 rounded-full w-fit">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            DPI ENGINE: ACTIVE
           </div>
         </div>
 
-        {/* Global Site Switcher Widget */}
-        <SidebarSiteSwitcher
+        <SidebarSiteSelector
           user={user}
           selectedSite={selectedSite}
-          isSiteDropdownOpen={isSiteDropdownOpen}
-          setIsSiteDropdownOpen={setIsSiteDropdownOpen}
-          siteDropdownRef={siteDropdownRef}
           handleSiteSelect={handleSiteSelect}
-          getSiteLabel={getSiteLabel}
         />
 
-        {/* Global Time Filter Widget */}
-        <SidebarTimeFilter
-          timeRange={timeRange}
-          setTimeRange={setTimeRange}
-          isTimeDropdownOpen={isTimeDropdownOpen}
-          setIsTimeDropdownOpen={setIsTimeDropdownOpen}
-          timeDropdownRef={timeDropdownRef}
-          selectedTimeOption={selectedTimeOption}
-          timeOptions={TIME_OPTIONS}
-        />
+        <SidebarTimeSelector />
       </div>
 
-      {/* Navigation */}
+      {/* Navigation (Flexible Scrollable Container for Rule 9) */}
       <div className="flex-1 overflow-y-auto px-4 py-3 custom-scrollbar h-full">
         {intervalText && (
           <div className="mb-4 rounded-lg bg-blue-500/5 border border-blue-500/10 p-2 text-center">
@@ -152,7 +164,13 @@ export function Sidebar() {
           {NAVIGATION_GROUPS.map((group) => {
             const allowedItems = group.items.filter((item) => {
               if (item.href === "/agents") {
-                return user?.role === "SUPER_ADMIN" || user?.role === "TENANT_ADMIN";
+                return user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE" || user?.role === "TENANT_ADMIN" || user?.role === "COMPANY_ADMIN" || user?.role === "COMPANY_OPERATOR";
+              }
+              if (item.href === "/device-labeling") {
+                return user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE" || user?.role === "TENANT_ADMIN" || user?.role === "COMPANY_ADMIN" || user?.role === "COMPANY_OPERATOR";
+              }
+              if (item.href === "/user-accounts") {
+                return user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE" || user?.role === "COMPANY_ADMIN";
               }
               return true;
             });
@@ -171,8 +189,9 @@ export function Sidebar() {
                     <Link
                       key={item.href}
                       href={item.href}
+                      onClick={() => onClose?.()}
                       className={cn(
-                        "group flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold tracking-wide transition-all duration-300",
+                        "group flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium tracking-wide transition-all duration-300",
                         isActive
                           ? "bg-primary/10 text-primary border-l-2 border-primary font-bold shadow-md shadow-primary/5"
                           : "text-slate-400 hover:bg-white/[0.02] hover:text-slate-200"
@@ -198,7 +217,7 @@ export function Sidebar() {
       {/* Footer (Account & Notifications) */}
       <div className="mt-auto p-4 border-t border-white/5 bg-white/5 backdrop-blur-sm">
         <div className="flex items-center gap-3">
-          <SidebarProfile user={user} onOpenSettings={() => setIsAccountOpen(true)} />
+          <SidebarProfile user={user} onOpenSettings={() => { setIsAccountOpen(true); onClose?.(); }} />
           <SidebarNotifications />
         </div>
       </div>

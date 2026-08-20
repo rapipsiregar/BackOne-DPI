@@ -12,7 +12,7 @@ cd "$DEPLOY_DIR"
 echo "=== [1/6] Checking environment ==="
 node --version
 npm --version
-pm2 --version || npm install -g pm2
+npx -y pm2 --version
 
 echo ""
 echo "=== [2/6] Installing backend dependencies ==="
@@ -27,21 +27,27 @@ npm install --omit=dev --legacy-peer-deps
 cd "$DEPLOY_DIR"
 
 echo ""
-echo "=== [4/6] Creating required directories ==="
+echo "=== [4/6] Creating required directories and symlinks ==="
 mkdir -p logs
 mkdir -p scratch
+if [ -d _next ] && [ ! -L _next ]; then
+  echo "Removing old physical _next directory..."
+  rm -rf _next
+fi
+echo "Ensuring _next is a symlink to .next..."
+ln -sf .next _next
 
 echo ""
 echo "=== [5/6] Stopping old PM2 processes (if any) ==="
-pm2 delete source2-proxy   2>/dev/null || echo "source2-proxy: not running"
-pm2 delete source2-backend 2>/dev/null || echo "source2-backend: not running"
-pm2 delete source2-frontend 2>/dev/null || echo "source2-frontend: not running"
+npx -y pm2 delete source2-proxy   2>/dev/null || echo "source2-proxy: not running"
+npx -y pm2 delete source2-backend 2>/dev/null || echo "source2-backend: not running"
+npx -y pm2 delete source2-frontend 2>/dev/null || echo "source2-frontend: not running"
 
 echo ""
 echo "=== [6/6] Starting PM2 processes ==="
-pm2 start ecosystem.config.js --env production
-pm2 save
-pm2 list
+npx -y pm2 start ecosystem.config.js --env production
+npx -y pm2 save
+npx -y pm2 list
 
 echo ""
 echo "=== DEPLOY COMPLETE ==="

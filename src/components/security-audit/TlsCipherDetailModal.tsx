@@ -78,7 +78,7 @@ export function TlsCipherDetailModal({ cipher, onClose }: Props) {
         <div className={"fixed top-0 left-0 w-screen h-[100dvh] bg-black/40 dark:bg-black/75 backdrop-blur-sm " + (isClosing ? 'animate-overlay-out' : 'animate-overlay-in')} />
         
         <div
-          className={"relative bg-card border border-border rounded-2xl w-full max-w-2xl flex flex-col shadow-2xl shadow-black/60 my-auto " + (isClosing ? 'animate-modal-out' : 'animate-modal-in')}
+          className={"relative bg-card border border-border/50 rounded-2xl w-full max-w-2xl flex flex-col shadow-2xl shadow-black/60 my-auto font-sans " + (isClosing ? 'animate-modal-out' : 'animate-modal-in')}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}

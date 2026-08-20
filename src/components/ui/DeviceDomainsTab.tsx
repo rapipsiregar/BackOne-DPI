@@ -56,7 +56,7 @@ export default function DeviceDomainsTab({ domains, totalDownload, totalUpload }
 
   if (domains.length === 0) {
     return (
-      <div className="text-center py-10 bg-slate-50/50 dark:bg-white/[0.02] border border-border rounded-2xl">
+      <div className="text-center py-10 bg-white/[0.02] border border-border/50 rounded-2xl">
         <Globe className="w-12 h-12 text-muted-foreground/60 mx-auto mb-3" />
         <h4 className="text-card-foreground font-bold text-lg mb-1">No Web/Domain Traffic</h4>
         <p className="text-muted-foreground font-medium max-w-md mx-auto">
@@ -91,7 +91,7 @@ export default function DeviceDomainsTab({ domains, totalDownload, totalUpload }
           const appBytes = dom.download + dom.upload;
           const pct = totalBytes > 0 ? ((appBytes / totalBytes) * 100).toFixed(1) : "0";
           return (
-            <div key={i} className="bg-slate-50/50 dark:bg-white/[0.03] border border-border p-4 rounded-2xl hover:bg-slate-100/50 dark:hover:bg-white/[0.05] transition-colors group relative overflow-hidden text-xs">
+            <div key={i} className="bg-white/[0.03] border border-border/50 p-4 rounded-2xl hover:bg-white/[0.05] transition-colors group relative overflow-hidden text-xs">
               <div className="absolute top-0 left-0 h-1 bg-purple-500/30 transition-all duration-500" style={{ width: `${pct}%` }} />
               <h5 className="font-semibold text-card-foreground mb-3 text-sm flex justify-between items-center truncate gap-2" title={dom.app_label}>
                 <span className="truncate">{dom.app_label}</span>

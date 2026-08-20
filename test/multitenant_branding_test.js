@@ -33,6 +33,32 @@ async function runTests() {
     await mongoose.connect(MONGODB_URI);
     console.log('✓ Connected to MongoDB');
 
+    // Ensure at least one summary document exists for both SIAB and Nexus
+    const dbConnection = mongoose.connection.db;
+    const hasSiabSummary = await dbConnection.collection('summaries').findOne({ site_uuid: '6681452d_9cae_4ff4_8ae8_0d504774265e' });
+    if (!hasSiabSummary) {
+      await dbConnection.collection('summaries').insertOne({
+        timestamp: new Date(),
+        agent_uuid: 'mock_siab_agent_uuid',
+        site_uuid: '6681452d_9cae_4ff4_8ae8_0d504774265e',
+        bandwidth_down: 100,
+        bandwidth_up: 50,
+        active_flows: 10
+      });
+    }
+
+    const hasNexusSummary = await dbConnection.collection('summaries').findOne({ site_uuid: 'd7902405_0dc2_458b_8584_ed4d24b64f24' });
+    if (!hasNexusSummary) {
+      await dbConnection.collection('summaries').insertOne({
+        timestamp: new Date(),
+        agent_uuid: 'mock_nexus_agent_uuid',
+        site_uuid: 'd7902405_0dc2_458b_8584_ed4d24b64f24',
+        bandwidth_down: 100,
+        bandwidth_up: 50,
+        active_flows: 10
+      });
+    }
+
     // 2. Validate User Accounts Seeding
     const adminUser = await User.findOne({ username: 'admin' });
     assert('User "admin" should exist', !!adminUser);

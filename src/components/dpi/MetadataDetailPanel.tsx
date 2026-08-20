@@ -1,19 +1,13 @@
 "use client";
 
-// src/components/dpi/MetadataDetailPanel.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Row-level detail modal for BackOne Metadata page.
-// Matches animation style of DeviceDetailModal and AgentDetailModal.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Database, AlertCircle, Globe, Monitor, Cpu, Fingerprint, Hash, Terminal, Radio } from "lucide-react";
-import { useMetadataDetail, MetadataDetailType, MetadataDetailRow } from "@/lib/api-metadata-detail";
+import { useMetadataDetail, MetadataDetailType } from "@/lib/api-metadata-detail";
 import { Pagination } from "@/components/ui/Pagination";
 import { fmtBytes, getKnownDomainService } from "@/lib/utils";
+import { COLS, getColGroup, TableHead, TableRow } from "./MetadataDetailTable";
 
-// ─── Type config ───────────────────────────────────────────────────────────────
 interface TypeConfig {
   title: string;
   subtitle: string;
@@ -46,152 +40,6 @@ const COLOR_MAP: Record<string, { icon: string; ring: string; glow: string }> = 
   teal:   { icon: "text-teal-400",    ring: "ring-teal-500/30",    glow: "bg-teal-500" },
 };
 
-// ─── Cell with overflow ellipsis + title tooltip ────────────────────────────────
-// ─── Cell with overflow ellipsis + title tooltip ────────────────────────────────
-function Cell({ value, className = "", center = true }: { value: string | number; className?: string; center?: boolean }) {
-  const str = String(value ?? "—");
-  return (
-    <div
-      className={`truncate whitespace-nowrap overflow-hidden text-ellipsis ${center ? "text-center" : ""} ${className}`}
-      title={str}
-    >
-      {str || "—"}
-    </div>
-  );
-}
-
-// ─── Column definitions with even percentage widths ────────────────────────────
-type ColDef = { header: string; width: string; align?: "center" };
-
-const COLS: Record<string, ColDef[]> = {
-  domain: [
-    { header: "Source IP",    width: "w-[12.5%]" },
-    { header: "MAC Address",  width: "w-[12.5%]" },
-    { header: "Device Name",  width: "w-[12.5%]" },
-    { header: "Manufacturer", width: "w-[12.5%]" },
-    { header: "OS",           width: "w-[12.5%]" },
-    { header: "Download",     width: "w-[12.5%]", align: "center" },
-    { header: "Upload",       width: "w-[12.5%]", align: "center" },
-    { header: "Flows",        width: "w-[12.5%]", align: "center" },
-  ],
-  device: [
-    { header: "IP Address",   width: "w-[16.6%]" },
-    { header: "MAC Address",  width: "w-[16.6%]" },
-    { header: "Device Name",  width: "w-[16.6%]" },
-    { header: "Manufacturer", width: "w-[16.6%]" },
-    { header: "Download",     width: "w-[16.6%]", align: "center" },
-    { header: "Upload",       width: "w-[16.6%]", align: "center" },
-  ],
-  torrent: [
-    { header: "Agent",          width: "w-[20%]" },
-    { header: "Torrent Label",  width: "w-[20%]" },
-    { header: "Download",       width: "w-[20%]", align: "center" },
-    { header: "Upload",         width: "w-[20%]", align: "center" },
-    { header: "Flows",          width: "w-[20%]", align: "center" },
-  ],
-  ssh: [
-    { header: "Role",     width: "w-[20%]", align: "center" },
-    { header: "Agent",    width: "w-[20%]" },
-    { header: "Download", width: "w-[20%]", align: "center" },
-    { header: "Upload",   width: "w-[20%]", align: "center" },
-    { header: "Flows",    width: "w-[20%]", align: "center" },
-  ],
-  default: [
-    { header: "Agent",    width: "w-[25%]" },
-    { header: "Download", width: "w-[25%]", align: "center" },
-    { header: "Upload",   width: "w-[25%]", align: "center" },
-    { header: "Flows",    width: "w-[25%]", align: "center" },
-  ],
-};
-
-function getColGroup(type: MetadataDetailType): string {
-  if (["sni_hostname", "ssl_server_cn", "quic_hostname"].includes(type)) return "domain";
-  if (["netbios_hostname", "os_label"].includes(type)) return "device";
-  if (type === "bittorrent_hash") return "torrent";
-  if (type === "ssh_version") return "ssh";
-  return "default";
-}
-
-// ─── Table Head ────────────────────────────────────────────────────────────────
-function TableHead({ cols }: { cols: ColDef[] }) {
-  const base = "px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-white/10 text-center";
-  return (
-    <tr>
-      {cols.map((c) => (
-        <th key={c.header} className={`${base} ${c.width}`}>
-          {c.header}
-        </th>
-      ))}
-    </tr>
-  );
-}
-
-// ─── Table Row ─────────────────────────────────────────────────────────────────
-function TableRow({ row, group }: { row: MetadataDetailRow; group: string }) {
-  const tr = "border-b border-white/[0.04] hover:bg-white/[0.04] transition-colors duration-150";
-  const tc = "px-3 py-2.5 text-sm text-center align-middle";
-
-  if (group === "domain") return (
-    <tr className={tr}>
-      <td className={tc}><Cell value={row.src_ip || "—"} className="text-blue-400 font-mono text-xs" /></td>
-      <td className={tc}><Cell value={row.mac_address || "—"} className="font-mono text-xs text-slate-400" /></td>
-      <td className={tc}><Cell value={row.device_label || row.src_ip || "—"} className="text-slate-200" /></td>
-      <td className={tc}><Cell value={row.manufacturer || "—"} className="text-slate-400 text-xs" /></td>
-      <td className={tc}><Cell value={row.os_label || "—"} className="text-slate-400 text-xs" /></td>
-      <td className={tc}><Cell value={fmtBytes(row.download)} className="text-cyan-400 font-mono text-xs" /></td>
-      <td className={tc}><Cell value={fmtBytes(row.upload)} className="text-emerald-400 font-mono text-xs" /></td>
-      <td className={tc}><Cell value={(row.flows ?? 0).toLocaleString()} className="text-slate-300 font-mono text-xs" /></td>
-    </tr>
-  );
-
-  if (group === "device") return (
-    <tr className={tr}>
-      <td className={tc}><Cell value={row.ip_address || "—"} className="text-blue-400 font-mono text-xs" /></td>
-      <td className={tc}><Cell value={row.mac_address || "—"} className="font-mono text-xs text-slate-400" /></td>
-      <td className={tc}><Cell value={row.device_label || "—"} className="text-slate-200" /></td>
-      <td className={tc}><Cell value={row.manufacturer || "—"} className="text-slate-400 text-xs" /></td>
-      <td className={tc}><Cell value={fmtBytes(row.download)} className="text-cyan-400 font-mono text-xs" /></td>
-      <td className={tc}><Cell value={fmtBytes(row.upload)} className="text-emerald-400 font-mono text-xs" /></td>
-    </tr>
-  );
-
-  if (group === "torrent") return (
-    <tr className={tr}>
-      <td className={tc}><Cell value={row.agent_uuid || "—"} className="font-mono text-xs text-slate-400" /></td>
-      <td className={tc}><Cell value={row.label || "Unknown"} className="text-slate-200" /></td>
-      <td className={tc}><Cell value={fmtBytes(row.download)} className="text-cyan-400 font-mono text-xs" /></td>
-      <td className={tc}><Cell value={fmtBytes(row.upload)} className="text-emerald-400 font-mono text-xs" /></td>
-      <td className={tc}><Cell value={(row.flows ?? 0).toLocaleString()} className="text-slate-300 font-mono text-xs" /></td>
-    </tr>
-  );
-
-  if (group === "ssh") return (
-    <tr className={tr}>
-      <td className={tc}>
-        <div className="flex justify-center">
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            row.role === "Client" ? "bg-blue-500/20 text-blue-300" : "bg-purple-500/20 text-purple-300"
-          }`}>{row.role || "—"}</span>
-        </div>
-      </td>
-      <td className={tc}><Cell value={row.agent_uuid || "—"} className="font-mono text-xs text-slate-400" /></td>
-      <td className={tc}><Cell value={fmtBytes(row.download)} className="text-cyan-400 font-mono text-xs" /></td>
-      <td className={tc}><Cell value={fmtBytes(row.upload)} className="text-emerald-400 font-mono text-xs" /></td>
-      <td className={tc}><Cell value={(row.flows ?? 0).toLocaleString()} className="text-slate-300 font-mono text-xs" /></td>
-    </tr>
-  );
-
-  return (
-    <tr className={tr}>
-      <td className={tc}><Cell value={row.agent_uuid || "—"} className="font-mono text-xs text-slate-400" /></td>
-      <td className={tc}><Cell value={fmtBytes(row.download)} className="text-cyan-400 font-mono text-xs" /></td>
-      <td className={tc}><Cell value={fmtBytes(row.upload)} className="text-emerald-400 font-mono text-xs" /></td>
-      <td className={tc}><Cell value={(row.flows ?? 0).toLocaleString()} className="text-slate-300 font-mono text-xs" /></td>
-    </tr>
-  );
-}
-
-// ─── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   type:      MetadataDetailType | null;
   value:     string | null;
@@ -201,7 +49,6 @@ interface Props {
 
 const PAGE_SIZE = 50;
 
-// ─── Main Modal ────────────────────────────────────────────────────────────────
 export function MetadataDetailPanel({ type, value, timeRange, onClose }: Props) {
   const isOpen = !!(type && value);
   const { data, isLoading, error } = useMetadataDetail(type, value, timeRange);
@@ -258,18 +105,14 @@ export function MetadataDetailPanel({ type, value, timeRange, onClose }: Props) 
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleClose}>
-      {/* Backdrop */}
       <div className={`absolute inset-0 bg-black/60 backdrop-blur-md ${isClosing ? "animate-overlay-out" : "animate-overlay-in"}`} />
 
-      {/* Dialog */}
       <div
-        className={`relative bg-card border border-border rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 overflow-hidden ${isClosing ? "animate-modal-out" : "animate-modal-in"}`}
+        className={`relative bg-card border border-border/50 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl shadow-black/60 overflow-hidden font-sans ${isClosing ? "animate-modal-out" : "animate-modal-in"}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top accent line */}
         <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
 
-        {/* ── Header ── */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-blue-900/30 to-purple-900/20 rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative flex-shrink-0">
@@ -297,7 +140,6 @@ export function MetadataDetailPanel({ type, value, timeRange, onClose }: Props) 
           </button>
         </div>
 
-        {/* ── Summary bar ── */}
         {!isLoading && data.length > 0 && (
           <div className="flex items-center gap-6 px-6 py-2.5 bg-white/[0.02] border-b border-white/[0.06] flex-shrink-0 text-xs">
             <span className="text-muted-foreground">
@@ -315,7 +157,6 @@ export function MetadataDetailPanel({ type, value, timeRange, onClose }: Props) 
           </div>
         )}
 
-        {/* ── Body ── */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 custom-scrollbar">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3">
@@ -347,7 +188,6 @@ export function MetadataDetailPanel({ type, value, timeRange, onClose }: Props) 
           )}
         </div>
 
-        {/* ── Pagination ── */}
         {!isLoading && !error && data.length > 0 && (
           <div className="flex-shrink-0">
             <Pagination

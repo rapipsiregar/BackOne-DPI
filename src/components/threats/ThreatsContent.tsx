@@ -132,20 +132,33 @@ export default function ThreatsContent() {
   if (!mounted) return null;
 
   return (
-    <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            Detected Threats
-            {threats.isLoading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
-          </h2>
-          <p className="text-muted-foreground mt-1">Monitor and respond to network security threats.</p>
+    <div className="space-y-6 sm:space-y-8 animate-fade-in pb-10">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4 w-full">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-2 sm:gap-3 truncate">
+              <span>Detected Threats</span>
+              {threats.isLoading && <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-primary flex-shrink-0" />}
+            </h2>
+            {/* Mobile Actions: Inline next to Title */}
+            <div className="flex items-center gap-1.5 flex-shrink-0 sm:hidden">
+              <HelpTrigger pageId="threats" />
+              <div className="flex items-center justify-center text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-1.5 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.1)]" title="Active Monitoring">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+            </div>
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-normal sm:leading-relaxed">
+            Monitor and respond to network security threats.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        {/* Laptop/Tablet Actions: Floats on the right */}
+        <div className="hidden sm:flex items-center gap-2 sm:gap-3 flex-shrink-0">
           <HelpTrigger pageId="threats" />
-          <div className="flex items-center gap-2 text-sm font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-            <ShieldCheck className="h-4 w-4" />
-            <span>Active Monitoring</span>
+          <div className="flex items-center justify-center text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-400 mr-1.5" />
+            <span className="text-xs font-semibold">Active Monitoring</span>
           </div>
         </div>
       </div>

@@ -77,11 +77,11 @@ try {
   });
   assert('Nexus site UUID should return Nexus branding', brand4.name === 'Nexus' && brand4.logo === '/nexus-logo.png');
 
-  // Test Case 5: Nexus fallback on demoplace.my.id when no site is selected
+  // Test Case 5: Default fallback on demoplace.my.id when no site is selected
   const brand5 = runGetSiteBranding({
     hostname: 'demoplace.my.id'
   });
-  assert('Fallback on demoplace.my.id should be Nexus branding', brand5.name === 'Nexus' && brand5.logo === '/nexus-logo.png');
+  assert('Fallback on demoplace.my.id should be BackOne branding', brand5.name === 'BackOne' && brand5.logo === '/backone-logo.png');
 
   console.log(`\n=========================================`);
   console.log(`  RESULT: ${passedCount} / ${testCount} tests passed.`);

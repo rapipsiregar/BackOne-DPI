@@ -13,7 +13,8 @@ const dash = fs.readFileSync('backend/routes/dashboard.js','utf8') +
              fs.readFileSync('backend/routes/dashboard/tls.js','utf8') +
              fs.readFileSync('backend/routes/dashboard/telemetry.js','utf8') +
              fs.readFileSync('backend/routes/dashboard/events.js','utf8');
-const api  = fs.readFileSync('src/lib/api.ts','utf8');
+const api  = fs.readFileSync('src/lib/api.ts','utf8') +
+             fs.readFileSync('src/lib/api-types.ts','utf8');
 
 console.log('=== Field Name Alignment: Backend ↔ Frontend ===\n');
 

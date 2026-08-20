@@ -15,6 +15,7 @@ export const REFRESH_INTERVAL_MS = 60 * 1000;
  *   - timeRange from context
  *   - stale-while-revalidate caching (no spinner if cached data is present)
  *   - auto-refresh every 5 minutes
+ *   - endpoint change detection: resets data when filter changes, no stale data shown
  */
 export function useCtxFetch<T>(endpoint: string, timeRange: string, defaultValue: T): {
   data: T;
@@ -22,7 +23,6 @@ export function useCtxFetch<T>(endpoint: string, timeRange: string, defaultValue
   isLoading: boolean;
 } {
   const cacheKey = `${endpoint}:${timeRange}`;
-
   // Initial state reads from global memory cache if present
   const [data, setData] = useState<T>(() => {
     return (globalCache[cacheKey] as T) ?? defaultValue;
@@ -52,8 +52,15 @@ export function useCtxFetch<T>(endpoint: string, timeRange: string, defaultValue
   }, [cacheKey]);
 
   // Fetch on mount + timeRange change + auto-refresh tick
+  // When endpoint changes (filter change): show cache hit immediately, or reset+loading on cache miss
   useEffect(() => {
-    if (!globalCache[cacheKey]) {
+    if (globalCache[cacheKey]) {
+      // Cache hit: show instantly, no loading spinner
+      setData(globalCache[cacheKey] as T);
+      setIsLoading(false);
+    } else {
+      // Cache miss: reset to default and show loading so stale data is not shown
+      setData(defaultValue);
       setIsLoading(true);
     }
     setError(null);

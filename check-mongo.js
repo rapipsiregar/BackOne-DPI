@@ -49,7 +49,7 @@ async function checkMongo() {
   } catch (err) {
     console.error(`[ERROR] Gagal terhubung ke MongoDB: ${err.message}`);
     console.error('\nPossible causes:');
-    console.error('  1. Host "mongodb-netify" tidak bisa dijangkau (butuh VPN/SSH tunnel)');
+    console.error('  1. Host MongoDB tidak bisa dijangkau (butuh VPN/SSH tunnel)');
     console.error('  2. Kredensial backone_inspect:backone_inspect salah');
     console.error('  3. MongoDB belum berjalan di server tujuan');
     console.error('\n[RESULT] ❌ STEP 8 FAIL — Hubungi atasan untuk verifikasi koneksi.\n');

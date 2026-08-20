@@ -6,8 +6,8 @@
 
 const { DeviceStat, Threat, Event } = require('./models/Schemas');
 
-async function collectThreats(agentUuid, timestamp, SITE_UUID, netify, label) {
-  const threats = await netify.fetchCyberThreats(agentUuid, SITE_UUID);
+async function collectThreats(agentUuid, timestamp, SITE_UUID, backone, label) {
+  const threats = await backone.fetchCyberThreats(agentUuid, SITE_UUID);
   if (threats && threats.length > 0) {
     const threatDocs = threats.map(t => ({
       timestamp, agent_uuid: agentUuid, site_uuid: SITE_UUID,
@@ -20,8 +20,8 @@ async function collectThreats(agentUuid, timestamp, SITE_UUID, netify, label) {
   }
 }
 
-async function collectEvents(agentUuid, timestamp, SITE_UUID, netify, label) {
-  const events = await netify.fetchEvents(100, agentUuid, SITE_UUID);
+async function collectEvents(agentUuid, timestamp, SITE_UUID, backone, label) {
+  const events = await backone.fetchEvents(100, agentUuid, SITE_UUID);
   if (events && events.length > 0) {
     const eventIds = events.map(e => e.event_id).filter(id => id !== null);
     const existing = await Event.find({ site_uuid: SITE_UUID, event_id: { $in: eventIds } }).distinct('event_id');

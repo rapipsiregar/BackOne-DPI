@@ -54,7 +54,7 @@ router.post('/agent-locations', async (req, res) => {
         siteUuid = summaryDoc.site_uuid;
       } else {
         // Fallback or use standard env site_uuid
-        siteUuid = process.env.NETIFY_SITE_UUID || '6681452d_9cae_4ff4_8ae8_0d504774265e';
+        siteUuid = process.env.BACKONE_SITE_UUID || '6681452d_9cae_4ff4_8ae8_0d504774265e';
       }
     }
 

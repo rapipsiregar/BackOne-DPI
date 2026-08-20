@@ -7,6 +7,7 @@ const {
   Flow
 } = require('../../models/Schemas');
 const { getTimeFilter, getBaseFilter } = require('./helpers');
+const { getSniFallbackData } = require('./telemetryHelper');
 
 // GET /api/dashboard/netbios
 router.get('/netbios', async (req, res) => {
@@ -21,10 +22,7 @@ router.get('/netbios', async (req, res) => {
     ]);
     const data = raw.map((r, index) => {
       const hostname = r._id && r._id !== '-' ? r._id : `LAN-Host-${index + 1}`;
-      return {
-        hostname,
-        total: r.download + r.upload
-      };
+      return { hostname, total: r.download + r.upload };
     }).sort((a, b) => b.total - a.total).slice(0, limit);
 
     res.json({ ok: true, data });
@@ -41,13 +39,7 @@ router.get('/discovery-os', async (req, res) => {
 
     const raw = await DeviceStat.aggregate([
       { $match: matchBase },
-      {
-        $group: {
-          _id:      '$os_label',
-          download: { $sum: '$download' },
-          upload:   { $sum: '$upload' },
-        }
-      },
+      { $group: { _id: '$os_label', download: { $sum: '$download' }, upload: { $sum: '$upload' } } },
       { $match: { _id: { $ne: null, $ne: '' } } },
     ]);
 
@@ -73,12 +65,7 @@ router.get('/dhcp-fingerprints', async (req, res) => {
 
     const raw = await DhcpFingerprintStat.aggregate([
       { $match: matchBase },
-      { $group: {
-          _id:         '$fingerprint',
-          download:    { $sum: '$download' },
-          upload:      { $sum: '$upload' },
-          flows:       { $sum: '$flows' }
-      }},
+      { $group: { _id: '$fingerprint', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
       { $project: { fingerprint: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
       { $sort: { total: -1 } },
       { $limit: limit }
@@ -98,12 +85,7 @@ router.get('/http-user-agents', async (req, res) => {
 
     const raw = await HttpUserAgentStat.aggregate([
       { $match: matchBase },
-      { $group: {
-          _id:         '$user_agent',
-          download:    { $sum: '$download' },
-          upload:      { $sum: '$upload' },
-          flows:       { $sum: '$flows' }
-      }},
+      { $group: { _id: '$user_agent', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
       { $project: { user_agent: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
       { $sort: { total: -1 } },
       { $limit: limit }
@@ -117,7 +99,6 @@ router.get('/http-user-agents', async (req, res) => {
 // GET /api/dashboard/sni-hostnames
 router.get('/sni-hostnames', async (req, res) => {
   try {
-    const limit       = parseInt(req.query.limit ?? 50);
     const timeFilter  = getTimeFilter(req);
     const matchBase   = getBaseFilter(req, timeFilter);
 
@@ -125,21 +106,11 @@ router.get('/sni-hostnames', async (req, res) => {
       { $match: matchBase },
       { $group: { _id: '$sni_hostname', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
       { $project: { sni_hostname: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
-      { $sort: { total: -1 } },
-      
+      { $sort: { total: -1 } }
     ]);
 
     if (raw.length === 0) {
-      const SYSTEM_DOMAINS = ['agents.backone.ai', 'agents.backonedpi.ai'];
-      const flowBase = { ...matchBase, domain: { $exists: true, $ne: null, $ne: '', $nin: SYSTEM_DOMAINS } };
-      raw = await Flow.aggregate([
-        { $match: flowBase },
-        { $group: { _id: '$domain', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: 1 } } },
-        { $project: { sni_hostname: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
-        { $sort: { total: -1 } },
-        
-      ]);
-      raw = raw.filter(r => r.sni_hostname && !String(r.sni_hostname).startsWith('Port '));
+      raw = await getSniFallbackData(Flow, matchBase, 'sni_hostname');
     }
 
     res.json({ ok: true, data: raw });
@@ -151,7 +122,6 @@ router.get('/sni-hostnames', async (req, res) => {
 // GET /api/dashboard/ssl-server-cn
 router.get('/ssl-server-cn', async (req, res) => {
   try {
-    const limit       = parseInt(req.query.limit ?? 50);
     const timeFilter  = getTimeFilter(req);
     const matchBase   = getBaseFilter(req, timeFilter);
 
@@ -159,21 +129,11 @@ router.get('/ssl-server-cn', async (req, res) => {
       { $match: matchBase },
       { $group: { _id: '$ssl_server_cn', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
       { $project: { ssl_server_cn: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
-      { $sort: { total: -1 } },
-      
+      { $sort: { total: -1 } }
     ]);
 
     if (raw.length === 0) {
-      const SYSTEM_DOMAINS = ['agents.backone.ai', 'agents.backonedpi.ai'];
-      const flowBase = { ...matchBase, domain: { $exists: true, $ne: null, $ne: '', $nin: SYSTEM_DOMAINS } };
-      const flowRaw = await Flow.aggregate([
-        { $match: flowBase },
-        { $group: { _id: '$domain', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: 1 } } },
-        { $project: { ssl_server_cn: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
-        { $sort: { total: -1 } },
-        
-      ]);
-      raw = flowRaw.filter(r => r.ssl_server_cn && !String(r.ssl_server_cn).startsWith('Port '));
+      raw = await getSniFallbackData(Flow, matchBase, 'ssl_server_cn');
     }
 
     res.json({ ok: true, data: raw });
@@ -185,7 +145,6 @@ router.get('/ssl-server-cn', async (req, res) => {
 // GET /api/dashboard/quic-hostnames
 router.get('/quic-hostnames', async (req, res) => {
   try {
-    const limit       = parseInt(req.query.limit ?? 50);
     const timeFilter  = getTimeFilter(req);
     const matchBase   = getBaseFilter(req, timeFilter);
 
@@ -193,21 +152,11 @@ router.get('/quic-hostnames', async (req, res) => {
       { $match: matchBase },
       { $group: { _id: '$quic_hostname', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
       { $project: { quic_hostname: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
-      { $sort: { total: -1 } },
-      
+      { $sort: { total: -1 } }
     ]);
 
     if (raw.length === 0) {
-      const SYSTEM_DOMAINS = ['agents.backone.ai', 'agents.backonedpi.ai'];
-      const flowBase = { ...matchBase, domain: { $exists: true, $ne: null, $ne: '', $nin: SYSTEM_DOMAINS } };
-      const flowRaw = await Flow.aggregate([
-        { $match: flowBase },
-        { $group: { _id: '$domain', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: 1 } } },
-        { $project: { quic_hostname: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
-        { $sort: { total: -1 } },
-        
-      ]);
-      raw = flowRaw.filter(r => r.quic_hostname && !String(r.quic_hostname).startsWith('Port '));
+      raw = await getSniFallbackData(Flow, matchBase, 'quic_hostname');
     }
 
     res.json({ ok: true, data: raw });
@@ -254,15 +203,13 @@ router.get('/ssh-versions', async (req, res) => {
         { $match: matchBase },
         { $group: { _id: '$ssh_client', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
         { $project: { ssh_version: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
-        { $sort: { total: -1 } },
-        
+        { $sort: { total: -1 } }
       ]),
       SshServerStat.aggregate([
         { $match: matchBase },
         { $group: { _id: '$ssh_server', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
         { $project: { ssh_version: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
-        { $sort: { total: -1 } },
-        
+        { $sort: { total: -1 } }
       ]),
     ]);
 
@@ -286,15 +233,13 @@ router.get('/ssh-versions', async (req, res) => {
 // GET /api/dashboard/mdns-hostnames
 router.get('/mdns-hostnames', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit ?? 30);
     const timeFilter = getTimeFilter(req);
     const matchBase = getBaseFilter(req, timeFilter);
     const raw = await MdnsHostnameStat.aggregate([
       { $match: matchBase },
       { $group: { _id: '$mdns_hostname', download: { $sum: '$download' }, upload: { $sum: '$upload' }, flows: { $sum: '$flows' } } },
       { $project: { mdns_hostname: '$_id', total: { $add: ['$download', '$upload'] }, download: 1, upload: 1, flows: 1, _id: 0 } },
-      { $sort: { total: -1 } },
-      
+      { $sort: { total: -1 } }
     ]);
     res.json({ ok: true, data: raw });
   } catch (err) {

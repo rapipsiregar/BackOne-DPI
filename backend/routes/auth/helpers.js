@@ -6,7 +6,7 @@ const fs = require('fs');
 
 const { requireAuth, requireAdmin, JWT_SECRET } = require('../../middleware/auth');
 
-function makeToken(user) {
+function makeToken(user, sessionId) {
   return jwt.sign(
     {
       id: user._id.toString(),
@@ -16,6 +16,9 @@ function makeToken(user) {
       role: user.role,
       site_uuid: user.site_uuid,
       agent_uuid: user.agent_uuid,
+      company_name: user.company_name,
+      agent_uuids: user.agent_uuids,
+      session_id: sessionId ? sessionId.toString() : undefined,
     },
     JWT_SECRET,
     { expiresIn: '1d' }
@@ -27,7 +30,6 @@ function setCookieToken(res, token) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 24 * 60 * 60 * 1000,
   });
 }
 
@@ -50,7 +52,24 @@ const storage = multer.diskStorage({
     cb(null, `profile-${uniqueSuffix}${path.extname(file.originalname)}`);
   }
 });
-const upload = multer({ storage });
+
+// File filter — only allow image formats for profile picture uploads
+function imageFileFilter(req, file, cb) {
+  const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only JPEG, PNG, and WebP images are allowed.'), false);
+  }
+}
+
+const upload = multer({
+  storage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 MB maximum per profile picture
+  },
+});
 
 module.exports = {
   JWT_SECRET,

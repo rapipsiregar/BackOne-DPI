@@ -1,7 +1,7 @@
 // proxy/models/SchemasTelemetry.js
 // ─────────────────────────────────────────────────────────────────────────────
 // DPI Telemetry Property Schemas — Split from Schemas.js to stay under 256 lines.
-// These are Netify-specific data fields collected via /data/stats/top/<field> API.
+// These are BackOne-specific data fields collected via /data/stats/top/<field> API.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const mongoose = require('mongoose');
@@ -13,7 +13,7 @@ const baseOptions = {
 // ─── Helper: build a consistent DPI property schema ───────────────────────────
 function dpiPropertySchema(fieldName) {
   const fields = {
-    timestamp:  { type: Date,   required: true, index: true, expires: '7d' },
+    timestamp:  { type: Date,   required: true, index: true, expires: '30d' },
     agent_uuid: { type: String, index: true },
     site_uuid:  { type: String, index: true },
     download:   Number,
@@ -34,7 +34,7 @@ const HttpUserAgentStatSchema = dpiPropertySchema('user_agent');
 
 // ─── BitTorrent Info Hashes (bittorrent_info_hash) ────────────────────────────
 const BittorrentHashStatSchema = new mongoose.Schema({
-  timestamp:  { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:  { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid: { type: String, index: true },
   site_uuid:  { type: String, index: true },
   info_hash:  { type: String, required: true },

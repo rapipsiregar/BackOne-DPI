@@ -1,7 +1,7 @@
 // Admin User Management API helpers
 
 export interface ManagedUser {
-  id: number;
+  id: string | number;
   username: string;
   role: 'SUPER_ADMIN' | 'EXECUTIVE' | 'AGENT_VIEWER' | 'SOC_ANALYST' | 'ENGINEER' | 'TENANT_ADMIN' | string;
   site_uuid: string | null;
@@ -10,6 +10,8 @@ export interface ManagedUser {
   agent_uuids?: string[];
   account_name: string | null;
   profile_picture: string | null;
+  login_attempts?: number;
+  lockout_until?: string | null;
   created_at: string;
 }
 
@@ -22,9 +24,6 @@ export interface ViewAsStatus {
   user_name?: string;   // Nama user yang di-view (hanya untuk view_as_type='user')
   user_role?: string;   // Role user yang di-view (hanya untuk view_as_type='user')
 }
-
-
-// ─── localStorage key untuk view-as state ─────────────────────────────────────
 const VIEW_AS_KEY = 'backone_view_as';
 
 // Ambil view-as token dari localStorage (berjalan hanya di browser)
@@ -74,24 +73,26 @@ export async function createAdminAgentUser(data: {
   return json;
 }
 
-// POST /api/auth/admin/create-external-user (FormData)
-export async function createAdminExternalUser(formData: FormData): Promise<{ ok: boolean; message: string; userId: string }> {
+// POST /api/auth/admin/create-external-user (JSON — foto profil via /upload-profile-picture setelah create)
+export async function createAdminExternalUser(data: Record<string, any>): Promise<{ ok: boolean; message: string; userId: string }> {
   const res = await fetch('/api/auth/admin/create-external-user', {
     method: 'POST',
     credentials: 'include',
-    body: formData,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
   });
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'Failed to create external account');
   return json;
 }
 
-// POST /api/auth/admin/update-agent-user (FormData)
-export async function updateAdminAgentUser(formData: FormData): Promise<{ ok: boolean; message: string }> {
+// POST /api/auth/admin/update-agent-user (JSON — foto profil via /upload-profile-picture)
+export async function updateAdminAgentUser(data: Record<string, any>): Promise<{ ok: boolean; message: string }> {
   const res = await fetch('/api/auth/admin/update-agent-user', {
     method: 'POST',
     credentials: 'include',
-    body: formData,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
   });
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'Failed to update account');
@@ -99,7 +100,7 @@ export async function updateAdminAgentUser(formData: FormData): Promise<{ ok: bo
 }
 
 // DELETE /api/auth/admin/delete-agent-user/:id
-export async function deleteAdminAgentUser(userId: number): Promise<void> {
+export async function deleteAdminAgentUser(userId: string | number): Promise<void> {
   const res = await fetch('/api/auth/admin/delete-agent-user/' + userId, {
     method: 'DELETE',
     credentials: 'include',
@@ -118,7 +119,7 @@ export async function startViewAs(agent_uuid: string, agent_label: string): Prom
   });
   const contentType = res.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
-    throw new Error(`Server error (${res.status}): Backend mungkin perlu di-restart`);
+    throw new Error(`Server error (${res.status}): Please check if the server is running.`);
   }
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'Failed to enter view-as mode');
@@ -142,17 +143,24 @@ export async function startViewAsUser(
   agentLabel: string,
   userName: string,
   userRole: string,
+  targetUserId?: number | string
 ): Promise<void> {
   const labelForToken = `${userName} (${userRole.replace(/_/g, ' ')})`;
   const res = await fetch('/api/auth/admin/view-as', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ agent_uuid: agentUuid, agent_label: labelForToken }),
+    body: JSON.stringify({
+      agent_uuid: agentUuid,
+      agent_label: labelForToken,
+      target_user_id: targetUserId || undefined,
+      target_username: userName,
+      target_role: userRole
+    }),
   });
   const contentType = res.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
-    throw new Error(`Server error (${res.status}): Backend mungkin perlu di-restart`);
+    throw new Error(`Server error (${res.status}): Please check if the server is running.`);
   }
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'Failed to enter view-as mode');
@@ -167,10 +175,31 @@ export async function startViewAsUser(
       view_as_type: 'user',            // User view-as mode
       user_name: userName,             // Nama user yang di-view
       user_role: userRole,             // Role user yang di-view
+      targetUserId: targetUserId || json.target_user_id
     }));
   }
 }
 
+
+// Hapus penuh state view-as di browser
+export function clearViewAsState(): void {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(VIEW_AS_KEY);
+  }
+}
+
+// Validasi apakah role user saat ini diizinkan menggunakan mode view-as
+export function validateViewAsSession(currentUserRole?: string): ViewAsStatus {
+  const status = getViewAsStatusSync();
+  if (!status.active) return { active: false };
+
+  const allowedRoles = ['SUPER_ADMIN', 'TENANT_ADMIN', 'COMPANY_ADMIN', 'COMPANY_OPERATOR'];
+  if (currentUserRole && !allowedRoles.includes(currentUserRole)) {
+    clearViewAsState();
+    return { active: false };
+  }
+  return status;
+}
 
 // Keluar dari mode view-as — hapus dari localStorage dan server session
 export async function stopViewAs(): Promise<void> {
@@ -183,9 +212,7 @@ export async function stopViewAs(): Promise<void> {
     console.error('Failed to terminate server view-as session:', err);
   }
 
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(VIEW_AS_KEY);
-  }
+  clearViewAsState();
 }
 
 // GET view-as status (dari localStorage, bukan server)
@@ -211,5 +238,17 @@ export function getViewAsHeaders(): Record<string, string> {
 export function resolveAgentLabel(agentUuid: string, users: ManagedUser[]): string {
   const user = users.find(u => u.agent_uuid === agentUuid && u.role === 'AGENT_VIEWER');
   return user?.account_name || agentUuid;
+}
+
+export async function unlockUser(userId: string | number): Promise<{ ok: boolean; message?: string; error?: string }> {
+  const res = await fetch('/api/auth/admin/unlock-user', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getViewAsHeaders(),
+    },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  return res.json();
 }
 

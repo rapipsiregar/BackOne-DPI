@@ -20,7 +20,7 @@ const SSH = {
   readyTimeout: 60000
 };
 
-const REMOTE_ROOT = '/home/adminbackend/web/demoplace.my.id/public_html';
+const REMOTE_ROOT = '/home/adminbackend/web/dev.demoplace.my.id/public_html';
 const LOCAL_ROOT = path.join(__dirname, '..');
 
 let testCount = 0;
@@ -66,7 +66,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const root = '/home/adminbackend/web/demoplace.my.id/public_html';
+const root = '/home/adminbackend/web/dev.demoplace.my.id/public_html';
 
 function getMD5(filePath) {
   try {

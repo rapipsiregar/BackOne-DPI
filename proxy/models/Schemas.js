@@ -15,7 +15,7 @@ const baseOptions = {
 
 // ─── Bandwidth Summary (per agent, per collection cycle) ───────────────────────
 const SummarySchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:      { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:     { type: String, index: true },  // null = global/all agents
   site_uuid:      { type: String, index: true },
   bandwidth_down: Number,
@@ -34,7 +34,7 @@ const SummarySchema = new mongoose.Schema({
 
 // ─── Top Applications (per agent) ─────────────────────────────────────────────
 const AppStatSchema = new mongoose.Schema({
-  timestamp:  { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:  { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid: { type: String, index: true },
   site_uuid:  { type: String, index: true },
   app_label:  { type: String, required: true },
@@ -45,7 +45,7 @@ const AppStatSchema = new mongoose.Schema({
 
 // ─── Protocol Statistics (per agent) ──────────────────────────────────────────
 const ProtocolStatSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:      { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:     { type: String, index: true },
   site_uuid:      { type: String, index: true },
   protocol_label: { type: String, required: true },
@@ -56,7 +56,7 @@ const ProtocolStatSchema = new mongoose.Schema({
 
 // ─── Discovered Devices (per agent, includes IP + MAC + device info) ───────────
 const DeviceStatSchema = new mongoose.Schema({
-  timestamp:    { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:    { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:   { type: String, index: true },
   site_uuid:    { type: String, index: true },
   ip_address:   { type: String, required: true, index: true },
@@ -73,7 +73,7 @@ const DeviceStatSchema = new mongoose.Schema({
 
 // ─── Network Flows (per agent) ─────────────────────────────────────────────────
 const FlowSchema = new mongoose.Schema({
-  timestamp:  { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:  { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid: { type: String, index: true },
   site_uuid:  { type: String, index: true },
   flow_id:    String,
@@ -92,7 +92,7 @@ const FlowSchema = new mongoose.Schema({
 
 // ─── Cyber Threats (per agent) ─────────────────────────────────────────────────
 const ThreatSchema = new mongoose.Schema({
-  timestamp:   { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:   { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:  { type: String, index: true },
   site_uuid:   { type: String, index: true },
   threat_type: String,
@@ -108,7 +108,7 @@ const ThreatSchema = new mongoose.Schema({
 
 // ─── App Categories (per agent) ───────────────────────────────────────────────
 const AppCategoryStatSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:      { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:     { type: String, index: true },
   site_uuid:      { type: String, index: true },
   category_label: { type: String, required: true },
@@ -119,7 +119,7 @@ const AppCategoryStatSchema = new mongoose.Schema({
 
 // ─── System Events (per agent) ─────────────────────────────────────────────────
 const EventSchema = new mongoose.Schema({
-  timestamp:      { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:      { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid:     { type: String, index: true },
   site_uuid:      { type: String, index: true },
   event_id:       Number,
@@ -150,7 +150,7 @@ FlowSchema.index({ site_uuid: 1, src_mac: 1, timestamp: -1 }); // for MAC-to-IP 
 // Collected from DPI API: /data/stats/top/application/download with filter_local_ips
 // Allows showing "YouTube 134GB" in Device Detail modal per specific IP
 const DeviceAppStatSchema = new mongoose.Schema({
-  timestamp:  { type: Date,   required: true, index: true, expires: '7d' },
+  timestamp:  { type: Date,   required: true, index: true, expires: '30d' },
   agent_uuid: { type: String, index: true },
   site_uuid:  { type: String, index: true },
   ip_address: { type: String, required: true, index: true },
@@ -168,7 +168,7 @@ DeviceAppStatSchema.index({ site_uuid: 1, app_label: 1, timestamp: -1 });
 const telemetrySchemas = require('./SchemasTelemetry');
 const auxSchemas = require('./SchemasAux');
 
-// ─── Agent Registry (all agents registered in Netify, regardless of activity) ──
+// ─── Agent Registry (all agents registered in BackOne, regardless of activity) ──
 // Upserted every collector cycle. Source of truth for the agents list page.
 const AgentRegistrySchema = new mongoose.Schema({
   uuid:         { type: String, required: true, unique: true, index: true },
@@ -178,7 +178,6 @@ const AgentRegistrySchema = new mongoose.Schema({
   provisioned:  { type: Boolean, default: false },
   activated:    { type: Boolean, default: false },
   last_seen_at: { type: mongoose.Schema.Types.Mixed },
-  netify_id:    { type: Number },
 }, { ...baseOptions, collection: 'agent_registry' });
 
 module.exports = {
