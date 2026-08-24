@@ -94,15 +94,36 @@ export default function AgentsPage() {
   const uptimeValues = agents.map(a => uptimeMap[a.uuid || a.serial] ?? 100);
   const avgUptime = uptimeValues.length > 0 ? uptimeValues.reduce((s, v) => s + v, 0) / uptimeValues.length : 100;
 
-  // External Accounts di halaman Agents = akun eksternal teknikal/operasional saja
-  // AGENT_VIEWER = akun network agent (sudah ada di tabel agents) → BUKAN akun eksternal
-  // COMPANY_* = akun customer/client → sudah ada di halaman User Accounts
+  // External Accounts di halaman Agents = akun teknikal/operasional saja
+  // AGENT_VIEWER = akun network agent (ditampilkan di tabel agents atas) → exclude
+  // COMPANY_* = akun customer/client → ada di halaman User Accounts → exclude
   const EXCLUDED_ROLES = ['COMPANY_ADMIN', 'COMPANY_OPERATOR', 'COMPANY_VIEWER', 'AGENT_VIEWER'];
+  const SIAB_UUID = '6681452d_9cae_4ff4_8ae8_0d504774265e';
+  const NEXUS_UUID = 'd7902405_0dc2_458b_8584_ed4d24b64f24';
   const externalUsers = managedUsers.filter(u => !EXCLUDED_ROLES.includes(u.role || ''));
-  // Grouping by site — semua sudah dipastikan hanya SUPER_ADMIN, EXECUTIVE, TENANT_ADMIN, SOC_ANALYST, ENGINEER
-  const superadminUsers = externalUsers.filter(u => u.role === 'SUPER_ADMIN' || u.role === 'EXECUTIVE' || !u.site_uuid || u.site_uuid === 'default');
-  const siabUsers = externalUsers.filter(u => u.site_uuid === '6681452d_9cae_4ff4_8ae8_0d504774265e' && u.role !== 'SUPER_ADMIN' && u.role !== 'EXECUTIVE');
-  const nexusUsers = externalUsers.filter(u => u.site_uuid === 'd7902405_0dc2_458b_8584_ed4d24b64f24' && u.role !== 'SUPER_ADMIN' && u.role !== 'EXECUTIVE');
+
+  // Grouping eksplisit:
+  // - siabUsers: memiliki site_uuid = SIAB (bukan SUPER_ADMIN/EXECUTIVE)
+  // - nexusUsers: memiliki site_uuid = NEXUS (bukan SUPER_ADMIN/EXECUTIVE)
+  // - superadminUsers: SUPER_ADMIN, EXECUTIVE, atau site_uuid selain SIAB/NEXUS (termasuk null)
+  const siabUsers = externalUsers.filter(u =>
+    u.site_uuid === SIAB_UUID &&
+    u.role !== 'SUPER_ADMIN' &&
+    u.role !== 'EXECUTIVE'
+  );
+  const nexusUsers = externalUsers.filter(u =>
+    u.site_uuid === NEXUS_UUID &&
+    u.role !== 'SUPER_ADMIN' &&
+    u.role !== 'EXECUTIVE'
+  );
+  const superadminUsers = externalUsers.filter(u =>
+    u.role === 'SUPER_ADMIN' ||
+    u.role === 'EXECUTIVE' ||
+    u.site_uuid === null ||
+    u.site_uuid === undefined ||
+    u.site_uuid === 'default' ||
+    (u.site_uuid !== SIAB_UUID && u.site_uuid !== NEXUS_UUID)
+  );
 
   return (
     <div className="space-y-6">

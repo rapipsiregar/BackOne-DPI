@@ -8,7 +8,12 @@ const path = require('path');
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.local';
 require('dotenv').config({ path: path.join(__dirname, '../../', envFile) });
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
+if (!process.env.MONGODB_URI) {
+  console.error('[MongoDB] ❌ CRITICAL ERROR: MONGODB_URI environment variable is missing.');
+  console.error('[MongoDB] Local database is disabled. Connection to central database backone_dpi is required.');
+  process.exit(1);
+}
+const MONGODB_URI = process.env.MONGODB_URI;
 
 async function connectDB() {
   if (mongoose.connection.readyState >= 1) return; // already connected

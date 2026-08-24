@@ -35,7 +35,10 @@ export async function getAgents(clientSiteUuid?: string): Promise<Agent[]> {
     // All agent data comes from MongoDB agent_registry (single source of truth)
     if (API_KEY && API_KEY.startsWith("sk_db_")) {
       const mongoose = require('mongoose');
-      const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
+      const MONGODB_URI = process.env.MONGODB_URI;
+      if (!MONGODB_URI) {
+        throw new Error('MONGODB_URI environment variable is missing. Connection to central database backone_dpi is required.');
+      }
 
       try {
         if (mongoose.connection.readyState === 0) {

@@ -27,6 +27,8 @@ export default function DeviceLabelingPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailedDevice, setDetailedDevice] = useState<DeviceLabelItem | null>(null);
 
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
   const fetchDevices = async () => {
     setIsLoading(true);
     setError(null);
@@ -103,8 +105,6 @@ export default function DeviceLabelingPage() {
     onEditClick: handleEditClick,
     onMacClick: handleMacClick,
   });
-
-  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const handleExportPdf = async () => {
     if (devices.length === 0) return;

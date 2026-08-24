@@ -111,7 +111,7 @@ const POST_DEPLOY_COMMANDS = [
   // Copy Next.js static assets to standalone directory (required for standalone mode)
   // Fix standalone directory structure for Next.js
   'mkdir -p /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next/',
-  'cp -r /home/adminbackend/web/demoplace.my.id/public_html/.next/static /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next/static && echo "Static assets copied to standalone"',
+  'rm -rf /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next/static && cp -r /home/adminbackend/web/demoplace.my.id/public_html/.next/static /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next/static && echo "Static assets copied to standalone"',
   'cp -r /home/adminbackend/web/demoplace.my.id/public_html/public /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/public 2>/dev/null || true',
   'ln -sfn /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next /home/adminbackend/web/demoplace.my.id/public_html/_next',
   'ln -sfn /home/adminbackend/web/demoplace.my.id/public_html/.next/standalone/.next/static /home/adminbackend/web/demoplace.my.id/public_html/.next/static',
@@ -239,7 +239,7 @@ function runSshCommands(commands) {
       port: CONFIG.port,
       username: CONFIG.username,
       password: CONFIG.password,
-      readyTimeout: 30000,
+      readyTimeout: 90000,
     });
   });
 }
@@ -280,7 +280,7 @@ async function deploy() {
       port: CONFIG.port,
       username: CONFIG.username,
       password: CONFIG.password,
-      readyTimeout: 30000,
+      readyTimeout: 90000,
     });
     console.log('[SFTP] Connected!\n');
 

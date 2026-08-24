@@ -10,6 +10,19 @@ const CONFIG = {
 
 const cleanProxyPhpCode = `<?php
 // proxy.php — Reverse proxy to BackOne Dashboard Engine on port 3000
+
+if (!function_exists('getallheaders')) {
+    function getallheaders() {
+        $headers = array();
+        foreach ($_SERVER as $name => $value) {
+            if (substr($name, 0, 5) == 'HTTP_') {
+                $headers[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))))] = $value;
+            }
+        }
+        return $headers;
+    }
+}
+
 $target = 'http://127.0.0.1:3000' . $_SERVER['REQUEST_URI'];
 
 $ch = curl_init($target);
@@ -50,7 +63,11 @@ curl_close($ch);
 
 http_response_code($status);
 foreach (explode("\r\n", $resp_headers) as $h) {
-    if ($h && !str_starts_with($h, 'HTTP/') && !str_starts_with(strtolower($h), 'transfer-encoding:')) {
+    if ($h && stripos($h, 'HTTP/') !== 0 && stripos($h, 'transfer-encoding:') !== 0) {
+        if (stripos($h, 'location:') === 0) {
+            $h = str_replace('http://127.0.0.1:3000', '', $h);
+            $h = str_replace('http://localhost:3000', '', $h);
+        }
         header($h, false);
     }
 }

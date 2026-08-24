@@ -20,26 +20,6 @@ version: '3.8'
 services:
 
   # ─── Container Group 1: INFRA ───────────────────────────────
-  mongodb:
-    image: mongo:6.0
-    container_name: backone_mongodb
-    restart: always
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    environment:
-      - MONGO_INITDB_DATABASE=backone_dpi
-    networks:
-      - backone-infra
-      - backone-app # backend juga bisa connect ke MongoDB
-    healthcheck:
-      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 20s
-
   proxy:
     build:
       context: ./proxy
@@ -50,7 +30,7 @@ services:
     env_file:
       - .env.local
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/backone_dpi
+      - MONGODB_URI=${MONGODB_URI}
       - PROXY_PORT=4000
       # Mode 1: kumpulkan SEMUA agent (default)
       # Ubah ke PROXY_COLLECT_MODE=agent dan isi PROXY_AGENT_UUID untuk mode spesifik
@@ -59,9 +39,6 @@ services:
       - PROXY_CRON_SCHEDULE=${PROXY_CRON_SCHEDULE:-*/5 * * * *}
     networks:
       - backone-infra
-    depends_on:
-      mongodb:
-        condition: service_healthy
 
   # ─── Container Group 2: APP ─────────────────────────────────
   backend:
@@ -74,14 +51,11 @@ services:
     env_file:
       - .env.local
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/backone_dpi
+      - MONGODB_URI=${MONGODB_URI}
       - BACKEND_PORT=3001
       - PROXY_URL=http://proxy:4000 # untuk trigger manual refresh dari dashboard
     networks:
       - backone-app
-    depends_on:
-      mongodb:
-        condition: service_healthy
 
   frontend:
     build:
@@ -106,7 +80,3 @@ networks:
   backone-app:
     driver: bridge
     name: backone-app
-
-volumes:
-  mongodb_data:
-    name: backone_mongodb_data

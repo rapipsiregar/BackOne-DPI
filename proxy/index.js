@@ -19,7 +19,12 @@ const scheduler = require('./scheduler');
 const routes    = require('./routes');
 
 const PORT        = parseInt(process.env.PROXY_PORT || '4000');
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
+if (!process.env.MONGODB_URI) {
+  console.error('[MongoDB] ❌ CRITICAL ERROR: MONGODB_URI environment variable is missing.');
+  console.error('[MongoDB] Local database is disabled. Connection to central database backone_dpi is required.');
+  process.exit(1);
+}
+const MONGODB_URI = process.env.MONGODB_URI;
 
 // Connect to MongoDB with automated retries
 async function connectDB() {

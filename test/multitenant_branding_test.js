@@ -5,7 +5,12 @@ const path = require('path');
 // Load environment variables
 require('dotenv').config({ path: path.join(__dirname, '../.env.local') });
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/backone_dpi';
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  console.error('✗ ERROR: MONGODB_URI environment variable is missing.');
+  console.error('Local database is disabled. Connection to central database backone_dpi is required.');
+  process.exit(1);
+}
 
 const User = require('../backend/models/User');
 const { TenantConfig } = require('../backend/models/Schemas');
@@ -76,10 +81,10 @@ async function runTests() {
       assert('Nexus brand_logo should be /nexus-logo.png', nexusConfig.brand_logo === '/nexus-logo.png');
     }
 
-    // 4. Validate Agent listing isolation per site_uuid (summaries collection)
+    // 4. Validate Agent listing isolation per site_uuid (agent_registry collection)
     const db = mongoose.connection.db;
-    const siabAgents = await db.collection('summaries').distinct('agent_uuid', { site_uuid: '6681452d_9cae_4ff4_8ae8_0d504774265e' });
-    const nexusAgents = await db.collection('summaries').distinct('agent_uuid', { site_uuid: 'd7902405_0dc2_458b_8584_ed4d24b64f24' });
+    const siabAgents = await db.collection('agent_registry').distinct('uuid', { site_uuid: '6681452d_9cae_4ff4_8ae8_0d504774265e' });
+    const nexusAgents = await db.collection('agent_registry').distinct('uuid', { site_uuid: 'd7902405_0dc2_458b_8584_ed4d24b64f24' });
     
     assert('SIAB agents count should be greater than 0', siabAgents.length > 0);
     assert('Nexus agents count should be greater than 0', nexusAgents.length > 0);

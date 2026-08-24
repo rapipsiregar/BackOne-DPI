@@ -28,7 +28,7 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ rou
     const url = new URL(req.url);
     
     // Force ALL traffic to go through our own Express Backend
-    const backendPort = process.env.BACKEND_PORT || '3002';
+    const backendPort = process.env.BACKEND_PORT || '3001';
     const localBase = process.env.NEXT_PUBLIC_API_URL || `http://127.0.0.1:${backendPort}`;
     const destinationUrl = `${localBase}/api/${route}${url.search}`;
     

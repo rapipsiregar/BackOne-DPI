@@ -85,7 +85,7 @@ console.log('');
 console.log('[GROUP 4] Docker Compose — 2 Container Groups + 2 Networks');
 const composeCode = readFile('docker-compose.yml');
 
-test('docker-compose.yml punya service: mongodb',        composeCode.includes('mongodb:'));
+test('docker-compose.yml tidak punya service: mongodb',   !composeCode.includes('mongodb:'));
 test('docker-compose.yml punya service: proxy',          composeCode.includes('proxy:'));
 test('docker-compose.yml punya service: backend',        composeCode.includes('backend:'));
 test('docker-compose.yml punya service: frontend',       composeCode.includes('frontend:'));
@@ -93,7 +93,7 @@ test('docker-compose.yml punya network: backone-infra',  composeCode.includes('b
 test('docker-compose.yml punya network: backone-app',    composeCode.includes('backone-app'));
 test('proxy connect ke backone-infra (Container 1)',     composeCode.includes('backone-infra'));
 test('backend connect ke backone-app (Container 2)',     composeCode.includes('backone-app'));
-test('proxy depends on mongodb',                         composeCode.includes('service_healthy'));
+test('proxy tidak depends on mongodb',                    !composeCode.includes('service_healthy'));
 test('env PROXY_COLLECT_MODE di docker-compose',        composeCode.includes('PROXY_COLLECT_MODE'));
 test('env PROXY_AGENT_UUID di docker-compose',          composeCode.includes('PROXY_AGENT_UUID'));
 test('PROXY_URL dikirim ke backend',                     composeCode.includes('PROXY_URL=http://proxy:4000'));
